@@ -14,6 +14,8 @@ import openfl.utils.Assets;
 import hxvlc.flixel.FlxVideoSprite;
 #end
 
+import funkin.save.Save;
+
 class OriginFunkinIntroState extends FlxState
 {
 	var finished:Bool = false;
@@ -48,9 +50,11 @@ class OriginFunkinIntroState extends FlxState
 
 	function startIntro():Void
 	{
+		var save = Save.instance;
+
 		#if VIDEOS_ALLOWED
-		var videoPath:String = OriginFunkinMode.novaFlareIntroVideoPath;
-		if (videoPath == null || videoPath.length == 0 || !OriginFunkinConfig.canStartVideo())
+		var videoPath:String = OriginFunkinMode.dceIntroVideoPath;
+		if (videoPath == null || videoPath.length == 0 || save.novaSettings.skipVideo ?? false)
 		{
 			finishIntro();
 			return;

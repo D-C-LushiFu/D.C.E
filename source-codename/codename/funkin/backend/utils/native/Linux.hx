@@ -1,6 +1,6 @@
 package codename.funkin.backend.utils.native;
 
-#if linux
+#if (linux && !mobile)
 @:cppFileCode("#include <stdio.h>")
 @:dox(hide)
 final class Linux {

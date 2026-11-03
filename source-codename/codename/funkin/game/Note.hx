@@ -116,10 +116,11 @@ class Note extends FlxSprite
 	// Deprecated?
 	@:dox(hide) public var tripTimer:Float = 0; // ranges from 0 to 1
 
-	private static function customTypePathExists(path:String) {
-		if (__customNoteTypeExists.exists(path))
-			return __customNoteTypeExists[path];
-		return __customNoteTypeExists[path] = Assets.exists(path);
+	private static function customTypeExists(noteType:String) {
+		if (__customNoteTypeExists.exists(noteType))
+			return __customNoteTypeExists[noteType];
+		var path = Paths.image('game/notes/$noteType');
+		return __customNoteTypeExists[noteType] = path != null && Assets.exists(path);
 	}
 
 	static var DEFAULT_FIELDS:Array<String> = ["time", "id", "type", "sLen"];
@@ -153,9 +154,10 @@ class Note extends FlxSprite
 		this.strumTime = noteData.time.getDefault(0) + sustainOffset;
 		this.noteData = noteData.id.getDefault(0);
 
-		var customType = Paths.image('game/notes/${this.noteType}');
-		var event = EventManager.get(NoteCreationEvent).recycle(this, strumID, this.noteType, noteTypeID, PlayState.instance.strumLines.members.indexOf(strumLine), mustPress,
-			(this.noteType != null && customTypePathExists(customType)) ? 'game/notes/${this.noteType}' : 'game/notes/default', @:privateAccess strumLine.strumScale * Flags.DEFAULT_NOTE_SCALE, animSuffix);
+		var currentNoteType = this.noteType;
+		var noteSprite = currentNoteType != null && customTypeExists(currentNoteType) ? 'game/notes/$currentNoteType' : 'game/notes/default';
+		var event = EventManager.get(NoteCreationEvent).recycle(this, strumID, currentNoteType, noteTypeID, PlayState.instance.strumLines.members.indexOf(strumLine), mustPress,
+			noteSprite, @:privateAccess strumLine.strumScale * Flags.DEFAULT_NOTE_SCALE, animSuffix);
 
 		if (PlayState.instance != null)
 			event = PlayState.instance.gameAndCharsEvent("onNoteCreation", event);
@@ -170,23 +172,23 @@ class Note extends FlxSprite
 
 					switch(event.strumID % 4) {
 						case 0:
-							animation.addByPrefix('scroll', 'purple0');
-							animation.addByPrefix('hold', 'purple hold piece');
-							animation.addByPrefix("holdend", "pruple end hold");
+							strumLine.addCachedSkinAnimation(this, 'scroll', 'purple0');
+							strumLine.addCachedSkinAnimation(this, 'hold', 'purple hold piece');
+							strumLine.addCachedSkinAnimation(this, "holdend", "pruple end hold");
 							if (animation.exists("holdend") != true) // null or false
-								animation.addByPrefix('holdend', 'purple hold end');
+								strumLine.addCachedSkinAnimation(this, 'holdend', 'purple hold end');
 						case 1:
-							animation.addByPrefix('scroll', 'blue0');
-							animation.addByPrefix('hold', 'blue hold piece');
-							animation.addByPrefix('holdend', 'blue hold end');
+							strumLine.addCachedSkinAnimation(this, 'scroll', 'blue0');
+							strumLine.addCachedSkinAnimation(this, 'hold', 'blue hold piece');
+							strumLine.addCachedSkinAnimation(this, 'holdend', 'blue hold end');
 						case 2:
-							animation.addByPrefix('scroll', 'green0');
-							animation.addByPrefix('hold', 'green hold piece');
-							animation.addByPrefix('holdend', 'green hold end');
+							strumLine.addCachedSkinAnimation(this, 'scroll', 'green0');
+							strumLine.addCachedSkinAnimation(this, 'hold', 'green hold piece');
+							strumLine.addCachedSkinAnimation(this, 'holdend', 'green hold end');
 						case 3:
-							animation.addByPrefix('scroll', 'red0');
-							animation.addByPrefix('hold', 'red hold piece');
-							animation.addByPrefix('holdend', 'red hold end');
+							strumLine.addCachedSkinAnimation(this, 'scroll', 'red0');
+							strumLine.addCachedSkinAnimation(this, 'hold', 'red hold piece');
+							strumLine.addCachedSkinAnimation(this, 'holdend', 'red hold end');
 					}
 
 					scale.set(event.noteScale, event.noteScale);
@@ -199,17 +201,17 @@ class Note extends FlxSprite
 		if (isSustainNote && prevNote != null)
 		{
 			alpha = 0.6;
-			animation.play('holdend');
+			if (animation.exists('holdend')) animation.play('holdend');
 
 			updateHitbox();
 
 			if (prevNote.isSustainNote)
 			{
 				prevNote.nextSustain = this;
-				prevNote.animation.play('hold');
+				if (prevNote.animation.exists('hold')) prevNote.animation.play('hold');
 			}
 		} else {
-			animation.play("scroll");
+			if (animation.exists('scroll')) animation.play('scroll');
 		}
 
 		if (PlayState.instance != null) {
@@ -229,7 +231,7 @@ class Note extends FlxSprite
 		return v;
 	}
 	inline function get_useAntialiasingFix() {
-		return gapFix>0;
+		return gapFix > 0;
 	}
 
 	/**
@@ -288,14 +290,15 @@ class Note extends FlxSprite
 
 	@:noCompletion @:dox(hide) override function isOnScreen(?camera:FlxCamera):Bool {
 		var downscrollCam = (Std.isOfType(camera, HudCamera) ? cast(camera, HudCamera).downscroll : false);
-
+		if (updateFlipY) {
+			flipY = (isSustainNote && flipSustain) && (downscrollCam != (lastScrollSpeed < 0));
+		}
 		if (downscrollCam == __lastDownscrollCam)
-			return super.isOnScreen(camera);
+		return super.isOnScreen(camera);
 		else
 			__lastX = x;
 
-		if (updateFlipY) flipY = (isSustainNote && flipSustain) && (downscrollCam != (__strum != null && __strum.getScrollSpeed(this) < 0));
-		if (downscrollCam && __strum != null) {
+		if (downscrollCam && __strum != null && __strum.updateNotesPosX && updateNotesPosX) {
 			x = -x + 2 * (__strum.x - origin.x + offset.x) + __strum.width;
 		}
 		final isOnScreen = super.isOnScreen(camera);
@@ -312,7 +315,7 @@ class Note extends FlxSprite
 	}
 
 	public function isOnScreenOriginal(?camera:FlxCamera):Bool {
-    return super.isOnScreen(camera);
+		return super.isOnScreen(camera);
 	}
 
 	public var earlyPressWindow:Float = Flags.EARLY_HIT_WINDOW_RANGE;
@@ -324,7 +327,7 @@ class Note extends FlxSprite
 		if (lastScrollSpeed != scrollSpeed) {
 			lastScrollSpeed = scrollSpeed;
 			if (nextSustain != null) {
-				scale.y = (sustainLength * 0.45 * scrollSpeed) / frameHeight;
+				scale.y = (sustainLength * 0.45 * Math.abs(scrollSpeed)) / frameHeight;
 				updateHitbox();
 				scale.y += gapFix / frameHeight;
 			}
@@ -334,7 +337,7 @@ class Note extends FlxSprite
 	}
 
 	public function updateSustainClip() if (wasGoodHit && !noSustainClip) {
-		var t = CoolUtil.bound((Conductor.songPosition - strumTime) / height * 0.45 * lastScrollSpeed, 0, 1);
+		var t = CoolUtil.bound((Conductor.songPosition - strumTime) / height * 0.45 * Math.abs(lastScrollSpeed), 0, 1);
 		@:bypassAccessor {
 			if (clipRect == null) clipRect = FlxRect.get();
 			clipRect.set(0, frameHeight * t, frameWidth, frameHeight * (1 - t));

@@ -8,6 +8,9 @@ import openfl.display.Sprite;
 import openfl.events.KeyboardEvent;
 import openfl.text.TextFormat;
 import openfl.ui.Keyboard;
+#if ios
+import flixel.util.FlxTimer;
+#end
 
 class Framerate extends Sprite {
 	public static var instance:Framerate;
@@ -41,6 +44,14 @@ class Framerate extends Sprite {
 			__bitmap = new BitmapData(1, 1, 0xFF000000);
 		return __bitmap;
 	}
+
+	#if android
+	var backTapCount:Int = 0;
+	var backTapExpiresAt:Float = 0;
+	#end
+	#if ios
+	public var sillyTimer:FlxTimer = new FlxTimer();
+	#end
 
 	public function new() {
 		super();
@@ -103,13 +114,36 @@ class Framerate extends Sprite {
 	public override function __enterFrame(t:Float) {
 		alpha = CoolUtil.fpsLerp(alpha, debugMode > 0 ? 1 : 0, 0.5);
 		debugAlpha = CoolUtil.fpsLerp(debugAlpha, debugMode > 1 ? 1 : 0, 0.5);
+		#if android
+		if (FlxG.android.justReleased.BACK) {
+			var now = haxe.Timer.stamp();
+			if (now > backTapExpiresAt) backTapCount = 0;
+			backTapExpiresAt = now + 0.45;
+			if (++backTapCount == 3) {
+				backTapCount = 0;
+				backTapExpiresAt = 0;
+				cycleDebugMode();
+				return;
+			}
+		}
+		#elseif ios
+		for (camera in FlxG.cameras.list) {
+			var pos = FlxG.mouse.getScreenPosition(camera);
+			if (pos.x >= FlxG.game.x + 10 + offset.x && pos.x <= FlxG.game.x + offset.x + 80
+				&& pos.y >= FlxG.game.y + 2 + offset.y && pos.y <= FlxG.game.y + 2 + offset.y + 60) {
+				if (FlxG.mouse.justPressed)
+					sillyTimer.start(0.4, (timer:FlxTimer) -> debugMode = (debugMode + 1) % 3);
+				if (FlxG.mouse.justReleased) sillyTimer.cancel();
+			} else if (sillyTimer.active && !sillyTimer.finished) sillyTimer.cancel();
+		}
+		#end
 
 		if (alpha < 0.05) return;
 		super.__enterFrame(t);
 		bgSprite.alpha = debugAlpha * 0.5;
 
-		x = 10 + offset.x;
-		y = 2 + offset.y;
+		x = #if mobile FlxG.game.x + #end 10 + offset.x;
+		y = #if mobile FlxG.game.y + #end 2 + offset.y;
 
 		var width = MathUtil.maxSmart(fpsCounter.width, memoryCounter.width #if SHOW_BUILD_ON_FPS , codenameBuildField.width #end) + (x*2);
 		var height = #if SHOW_BUILD_ON_FPS codenameBuildField.y + codenameBuildField.height #else memoryCounter.y + memoryCounter.height #end;
@@ -134,4 +168,23 @@ class Framerate extends Sprite {
 			y = c.y + c.height + 4;
 		}
 	}
+
+	inline function cycleDebugMode():Void
+		debugMode = (debugMode + 1) % 3;
+
+	#if mobile
+	public inline function setScale(?scale:Float):Void {
+		// Framerate is a sibling of FlxGame, so it needs FlxGame's scale in the
+		// current OpenFL Stage coordinate space. Using the physical Lime window
+		// size here applies D.C.E.'s logical Stage scale a second time.
+		if (scale == null) {
+			var stageWidth = FlxG.stage.stageWidth;
+			var stageHeight = FlxG.stage.stageHeight;
+			scale = stageWidth > 0 && stageHeight > 0
+				? Math.min(stageWidth / FlxG.width, stageHeight / FlxG.height)
+				: (FlxG.game != null ? Math.min(FlxG.game.scaleX, FlxG.game.scaleY) : 1);
+		}
+		scaleX = scaleY = scale;
+	}
+	#end
 }

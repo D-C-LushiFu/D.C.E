@@ -97,7 +97,19 @@ class UISubstateWindow extends MusicBeatSubstate {
 	}
 
 	public override function update(elapsed:Float) {
+		#if mobile
+		if (controls.BACK) {
+			onMobileBack();
+			return;
+		}
+		#end
+
 		super.update(elapsed);
 		subCam.scroll.set(Std.int(-(FlxG.width - windowSpr.bWidth) / 2), Std.int(-(FlxG.height - windowSpr.bHeight) / 2));
+	}
+
+	/** Hardware/system back mirrors the window's cancel or close action on mobile. */
+	public function onMobileBack():Void {
+		close();
 	}
 }

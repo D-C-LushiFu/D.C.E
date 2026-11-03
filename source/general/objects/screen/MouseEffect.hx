@@ -55,12 +55,14 @@ class MouseEffect extends Sprite {
     0xA5D4FF  // 低饱和天蓝 (柔和蓝)
     ];
     public static var trailDuration:Float = 0.3; // 路径贴图动画持续时间(秒)
-    // Freeplay already has a full-screen shader, a large interactive list and
-    // its own mouse feedback.  Compositing transient OpenFL display-list
-    // children above it turns high-polling-rate mouse input into repeated
-    // allocations and shader invalidations.  States can suppress only the
-    // movement trail while retaining click feedback.
+    // Freeplay can suppress only the movement trail while retaining click
+    // feedback. Gameplay uses a separate suppression layer that hides both
+    // kinds of pointer feedback without changing the saved user preference.
     public static var trailEnabled:Bool = true;
+    public static var userEffectsEnabled(default, null):Bool = true;
+    public static var userTrailEnabled(get, never):Bool;
+    private static var gameplayHideDepth:Int = 0;
+    private static var instances:Array<MouseEffect> = [];
     
     // 对象池
     private var clickEffects:Array<ClickEffect> = [];
@@ -97,6 +99,8 @@ class MouseEffect extends Sprite {
         // 添加事件监听
         Lib.current.stage.addEventListener(MouseEvent.MOUSE_DOWN, onMouseDown);
         Lib.current.stage.addEventListener(MouseEvent.MOUSE_MOVE, onMouseMove);
+		addEventListener(Event.REMOVED_FROM_STAGE, onRemovedFromStage);
+		instances.push(this);
     }
 
     private inline function startUpdating():Void {
@@ -108,6 +112,8 @@ class MouseEffect extends Sprite {
     }
 
     private function onMouseDown(e:MouseEvent):Void {
+        if (!effectsEnabled()) return;
+
         // 从对象池获取点击特效
         var effect:ClickEffect = null;
         if (clickEffects.length > 0) {
@@ -125,7 +131,7 @@ class MouseEffect extends Sprite {
     }
     
     private function onMouseMove(e:MouseEvent):Void {
-        if (!trailEnabled) {
+        if (!trailEnabled || !effectsEnabled()) {
             // Keep the anchor current so re-enabling the effect in another
             // state never emits a stale, long-distance trail point.
             lastTrailPosition.setTo(e.stageX, e.stageY);
@@ -165,6 +171,78 @@ class MouseEffect extends Sprite {
         addChild(effect);
         startUpdating();
     }
+
+	private static inline function get_userTrailEnabled():Bool {
+		return userEffectsEnabled;
+	}
+
+	private static inline function effectsEnabled():Bool {
+		return userEffectsEnabled && gameplayHideDepth == 0;
+	}
+
+	public static function setUserEffectsEnabled(value:Bool):Void {
+		if (userEffectsEnabled == value) return;
+
+		userEffectsEnabled = value;
+		if (!value) clearAllEffects();
+	}
+
+	// Compatibility for source/mod code that still calls the old trail-only API.
+	public static inline function setUserTrailEnabled(value:Bool):Void {
+		setUserEffectsEnabled(value);
+	}
+
+	public static function enterGameplay():Void {
+		gameplayHideDepth++;
+		clearAllEffects();
+	}
+
+	public static function leaveGameplay():Void {
+		if (gameplayHideDepth > 0) gameplayHideDepth--;
+	}
+
+	private static function clearAllEffects():Void {
+		for (instance in instances)
+			instance.clearEffects();
+	}
+
+	private function clearEffects():Void {
+		var i = activeClickEffects.length;
+		while (i-- > 0) {
+			var effect = activeClickEffects[i];
+			activeClickEffects.splice(i, 1);
+			removeEffect(effect);
+			clickEffects.push(effect);
+		}
+
+		clearTrailEffects();
+	}
+
+	private function clearTrailEffects():Void {
+		var i = activeTrailEffects.length;
+		while (i-- > 0) {
+			var effect = activeTrailEffects[i];
+			activeTrailEffects.splice(i, 1);
+			removeEffect(effect);
+			trailEffects.push(effect);
+		}
+
+		if (activeClickEffects.length == 0 && activeTrailEffects.length == 0 && updating) {
+			Lib.current.stage.removeEventListener(Event.ENTER_FRAME, update);
+			updating = false;
+		}
+	}
+
+	private function onRemovedFromStage(_:Event):Void {
+		removeEventListener(Event.REMOVED_FROM_STAGE, onRemovedFromStage);
+		Lib.current.stage.removeEventListener(MouseEvent.MOUSE_DOWN, onMouseDown);
+		Lib.current.stage.removeEventListener(MouseEvent.MOUSE_MOVE, onMouseMove);
+		if (updating) {
+			Lib.current.stage.removeEventListener(Event.ENTER_FRAME, update);
+			updating = false;
+		}
+		instances.remove(this);
+	}
     
     private function update(e:Event):Void {
 		var now:Float = Timer.stamp();

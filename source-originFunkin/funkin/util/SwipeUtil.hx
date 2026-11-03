@@ -299,7 +299,7 @@ class SwipeUtil
    */
   public static inline function resetSwipeVelocity():Void
   {
-    // NF's selected Flixel exposes completed FlxSwipe values instead of the
+    // D.C.E.'s selected Flixel exposes completed FlxSwipe values instead of the
     // upstream FNF fork's persistent flickManager. The global swipe list is
     // cleared by FlxGame at the end of the current frame.
   }

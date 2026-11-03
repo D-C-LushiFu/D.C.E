@@ -14,7 +14,7 @@ package games.backend;
 	谱面数据规则（分段编码）：
 	含 KeyChange 事件的谱面，音符的 lane 以「段」为单位书写——从歌曲开始到第一个
 	KeyChange 事件前为第一段（使用谱面 json 的 mania 字段），每个事件之后进入新段，
-	每段内玩家侧 lane 0..keys-1、对手侧 lane keys..keys*2-1（与 NovaFlare 现有多键位
+	每段内玩家侧 lane 0..keys-1、对手侧 lane keys..keys*2-1（与 D.C.E. 现有多键位
 	解析一致，只是键数在事件处切换）。该规则同时被 PlayState.generateSong（游戏内
 	解析）、ChartingState（编辑器渲染/编辑）使用。
 **/

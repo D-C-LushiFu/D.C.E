@@ -18,7 +18,7 @@ class CLIUtil
     var cwd:String = Path.addTrailingSlash(Sys.getCwd());
     var gameDir:String = '';
     #if (android && ORIGIN_FUNKIN_COMPAT)
-    // Main has already selected NovaFlare's player-visible storage root.
+    // Main has already selected D.C.E.'s player-visible storage root.
     gameDir = cwd;
     #elseif android
     gameDir = Path.addTrailingSlash(android.content.Context.getExternalFilesDir());

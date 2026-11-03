@@ -163,7 +163,7 @@ class WindowUtil
   public static function showError(name:String, desc:String):Void
   {
     #if android
-    showNovaFlareAlert(name, desc);
+    showDCEAlert(name, desc);
     #else
     lime.app.Application.current.window.alert(desc, name);
     #end
@@ -177,7 +177,7 @@ class WindowUtil
   public static function showWarning(name:String, desc:String):Void
   {
     #if android
-    showNovaFlareAlert(name, desc);
+    showDCEAlert(name, desc);
     #else
     lime.app.Application.current.window.alert(desc, name);
     #end
@@ -191,7 +191,7 @@ class WindowUtil
   public static function showInformation(name:String, desc:String):Void
   {
     #if android
-    showNovaFlareAlert(name, desc);
+    showDCEAlert(name, desc);
     #else
     lime.app.Application.current.window.alert(desc, name);
     #end
@@ -199,11 +199,11 @@ class WindowUtil
 
   #if android
   /**
-   * Route Origin-side messages through NovaFlare's native AndroidTools dialog.
+   * Route Origin-side messages through D.C.E.'s native AndroidTools dialog.
    * Passing null callback objects is intentional: a script error can occur
    * during startup, and no Haxe callback should survive that modal boundary.
    */
-  static function showNovaFlareAlert(name:String, desc:String):Void
+  static function showDCEAlert(name:String, desc:String):Void
   {
     JNICache.createStaticMethod('org/haxe/extension/Tools', 'showAlertDialog',
       '(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lorg/haxe/lime/HaxeObject;Ljava/lang/String;Lorg/haxe/lime/HaxeObject;)V')(
@@ -213,8 +213,8 @@ class WindowUtil
 
   public static function setVSyncMode(value:OriginVSyncMode):Void
   {
-    // NovaFlare's current Lime fork has no runtime Window.setVSyncMode API.
-    // Preserve the original saved value and let NovaFlare's render thread own
+    // D.C.E.'s current Lime fork has no runtime Window.setVSyncMode API.
+    // Preserve the original saved value and let D.C.E.'s render thread own
     // presentation timing.
   }
 }

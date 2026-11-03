@@ -214,7 +214,7 @@ $inThreads = $false
         if (
             $captureLeaves -and
             $line -match (
-                '^([0-9]+)\s+.*novaflare engine\.exe\+0x([0-9a-f]+)$')
+                '^([0-9]+)\s+.*dce engine\.exe\+0x([0-9a-f]+)$')
         ) {
             $address = [Convert]::ToUInt64($Matches[2], 16)
             $resolved = Resolve-Symbol $address
@@ -228,8 +228,8 @@ $inThreads = $false
         if (
             $captureEdges -and
             $line -match (
-                '^([0-9]+)\s+.*novaflare engine\.exe\+0x([0-9a-f]+)' +
-                ' <- .*novaflare engine\.exe\+0x([0-9a-f]+)$')
+                '^([0-9]+)\s+.*dce engine\.exe\+0x([0-9a-f]+)' +
+                ' <- .*dce engine\.exe\+0x([0-9a-f]+)$')
         ) {
             $leafAddress = [Convert]::ToUInt64($Matches[2], 16)
             $callerAddress = [Convert]::ToUInt64($Matches[3], 16)

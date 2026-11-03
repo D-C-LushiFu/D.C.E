@@ -154,7 +154,7 @@ class FlxHitbox extends FlxMobileInputManager
 	 */
 	private function getColor(index:Int, mania:Int):Int
 	{
-		// Origin mode does not initialize NovaFlare's ExtraKeysHandler. The
+		// Origin mode does not initialize D.C.E.'s ExtraKeysHandler. The
 		// mobile controls selector still creates a FlxHitbox for its preview,
 		// so treat the extra-keys palette as optional and use the built-in
 		// four-colour fallback when it is unavailable.

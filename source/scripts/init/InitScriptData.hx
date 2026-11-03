@@ -115,7 +115,6 @@ class InitScriptData {
         Iris.proxyImports.set("states.CreditsState", states.creditsState.CreditsState);
         Iris.proxyImports.set("states.FlashingState", states.backend.flashingState.FlashingState);
 
-        //Iris.proxyImports.set("states.FreeplayState", states.freeplayState.FreeplayState); 为啥要加注释啊 ——dmmchh
 
         Iris.proxyImports.set("states.LoadingState", states.loadingState.LoadingState);
         Iris.proxyImports.set("states.MainMenuState", states.mainMenuState.MainMenuState);
@@ -185,7 +184,6 @@ class InitScriptData {
         Iris.proxyImports.set("Song", games.backend.Song);
         Iris.proxyImports.set("StageData", games.backend.StageData);
         Iris.proxyImports.set("WeekData", games.backend.WeekData);
-        //new (会出错吗，应该不会吧。 --dmmchh
         Iris.proxyImports.set("Mods", general.backend.Mods);
 
         //cutscenes

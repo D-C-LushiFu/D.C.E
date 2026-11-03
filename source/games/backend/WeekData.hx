@@ -19,6 +19,7 @@ typedef WeekFile =
 	var hideStoryMode:Bool;
 	var hideFreeplay:Bool;
 	var difficulties:String;
+	@:optional var difficultyColors:Dynamic;
 }
 
 class WeekData
@@ -41,6 +42,8 @@ class WeekData
 	public var hideStoryMode:Bool;
 	public var hideFreeplay:Bool;
 	public var difficulties:String;
+	/** Optional mod mapping, e.g. { "Insane": "#FF40C8" }. */
+	public var difficultyColors:Dynamic = null;
 
 	public var fileName:String;
 

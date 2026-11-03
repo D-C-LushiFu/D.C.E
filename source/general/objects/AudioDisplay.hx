@@ -5,6 +5,7 @@ import funkin.vis.dsp.SpectralAnalyzer;
 import funkin.vis.dsp.SpectralAnalyzer.Bar;
 import lime.media.AudioBuffer;
 import lime.media.AudioSource;
+import flixel.FlxStrip;
 
 /**
  * Main-menu spectrum rendered as one cached sprite texture.
@@ -31,6 +32,16 @@ class AudioDisplay extends FlxSprite
 	public var symmetry:Bool = false;
 	public var stopUpdate:Bool = false;
 	public var amplitude:Float = 0;
+    /** Per-view gain; the default preserves other menus' spectrum levels. */
+    public var visualGain:Float = 1;
+	public var attackSpeed:Float = 16;
+	public var releaseSpeed:Float = 16;
+    /** Freeplay's finite voice stems must not retain a stopped channel's last FFT. */
+    public var resetWhenStopped:Bool = false;
+	/** Negative keeps the global preference; views can request a faster local FFT cadence. */
+	public var sampleIntervalMs:Float = -1;
+	/** Optional per-view FFT resolution; zero follows the user's global preference. */
+	public var fftQualityOverride:Int = 0;
 
 	var line:Int;
 	var displayWidth:Int;
@@ -45,6 +56,9 @@ class AudioDisplay extends FlxSprite
 	var saveTime:Float = 0;
 	var motionTime:Float = 0;
 	var getValues:Array<Bar>;
+	var barMesh:FlxStrip;
+	var reflectedMesh:FlxStrip;
+	var geometryRate:Float = 60;
 
 	static inline final MAX_VISUAL_RATE:Float = 120;
 	static inline final MAX_BITMAP_WIDTH:Int = 640;
@@ -127,8 +141,13 @@ class AudioDisplay extends FlxSprite
 		saveTime += elapsed * 1000;
 		motionTime += elapsed;
 		final sampleInterval = Math.max(1000 / MAX_VISUAL_RATE,
-			ClientPrefs.data.audioDisplayUpdate);
-		if (analyzer != null && boundAudioSource != null && saveTime >= sampleInterval)
+			sampleIntervalMs < 0 ? ClientPrefs.data.audioDisplayUpdate : sampleIntervalMs);
+        var stopped = resetWhenStopped && snd != null && !snd.playing;
+        if (stopped && getValues != null) {
+            for (value in getValues) { value.value = 0; value.peak = 0; }
+            amplitude = 0;
+        }
+		if (!stopped && analyzer != null && boundAudioSource != null && saveTime >= sampleInterval)
 		{
 			saveTime %= sampleInterval;
 			// Reuse both the level array and its Bar records. Passing null here
@@ -150,7 +169,7 @@ class AudioDisplay extends FlxSprite
 
 		// Visual data only needs display-rate interpolation.  The engine frame
 		// loop remains uncapped, while intermediate frames reuse the texture.
-		if (getValues != null && motionTime >= 1 / MAX_VISUAL_RATE)
+		if (getValues != null && motionTime >= 1 / (barMesh == null ? MAX_VISUAL_RATE : geometryRate))
 		{
 			updateLine(motionTime);
 			motionTime = 0;
@@ -211,14 +230,33 @@ class AudioDisplay extends FlxSprite
 
 		if (analyzer == null)
 		{
+			var quality = fftQualityOverride > 0 ? fftQualityOverride : ClientPrefs.data.audioDisplayQuality;
 			analyzer = new SpectralAnalyzer(source,
 				Std.int(line + Math.abs(0.05 *
-					(4 - ClientPrefs.data.audioDisplayQuality))), 1, 5);
-			analyzer.fftN = 256 * ClientPrefs.data.audioDisplayQuality;
+					(4 - quality))), 1, 5);
+			analyzer.fftN = 256 * quality;
+			// Freeplay opts into a short sample interval for responsive motion;
+			// pass that through to the analyzer too, otherwise its 33 ms default
+			// silently repeats stale FFT frames while the display updates faster.
+			if (sampleIntervalMs > 0)
+				analyzer.updateIntervalMs = Std.int(Math.max(8, sampleIntervalMs));
+			// Analyze the full usable spectrum for this source without extending
+			// past its Nyquist limit (which creates empty-looking high bands).
+			if (source.buffer != null && source.buffer.sampleRate > 0)
+				analyzer.maxFreq = Math.min(22000, source.buffer.sampleRate * 0.49);
 		}
 		else
 			analyzer.changeSnd(source);
 		boundAudioSource = source;
+	}
+
+	public function refreshFFTQuality():Void
+	{
+		if (analyzer != null) analyzer.changeSnd(null);
+		analyzer = null;
+		boundAudioSource = null;
+		getValues = null;
+		refreshAnalyzerBinding();
 	}
 
 	function invalidateAnalyzerBinding():Void
@@ -251,15 +289,24 @@ class AudioDisplay extends FlxSprite
 			return;
 
 		final minimum = bitmapHeight / 40;
-		final blend = Math.exp(-elapsed * 16);
-		final volume = FlxG.sound.volume;
 		for (i in 0...line)
 		{
 			var valueIndex = symmetry && i >= line / 2 ? line - 1 - i : i;
 			if (valueIndex >= getValues.length)
 				valueIndex = getValues.length - 1;
-			final target = Math.round(
-				getValues[valueIndex].value * bitmapHeight * volume);
+			// Analyzer levels already represent normalized spectral energy. Do not
+			// multiply by master volume: changing listening volume must not warp
+			// the spectrum. A small noise gate and power curve retain peak shape;
+			// the previous soft-knee compressed every band toward the same ceiling.
+			var level = getValues[valueIndex].value * visualGain;
+			if (!Math.isFinite(level)) level = 0;
+			final normalized = FlxMath.bound(level, 0, 1);
+			final aboveFloor = Math.max(0, (normalized - 0.055) / 0.945);
+			final shapedLevel = Math.pow(aboveFloor, 1.75);
+			// Cap transient peaks and ease attacks: malformed/very hot mod stems
+			// must never turn a full-width white spectrum into a flash frame.
+			final target = Math.round(shapedLevel * bitmapHeight * 0.52);
+			final blend = Math.exp(-elapsed * (target > barHeights[i] ? attackSpeed : releaseSpeed));
 			final height = Math.max(minimum,
 				FlxMath.lerp(target, barHeights[i], blend));
 			barHeights[i] = height;
@@ -269,6 +316,11 @@ class AudioDisplay extends FlxSprite
 
 	function rasterizeBars():Void
 	{
+		if (barMesh != null)
+		{
+			updateBarMesh();
+			return;
+		}
 		final bitmap = pixels;
 		if (bitmap == null)
 			return;
@@ -292,6 +344,64 @@ class AudioDisplay extends FlxSprite
 		dirty = true;
 	}
 
+	/** Freeplay uses a stable white texture and persistent triangle buffers.
+	 * No live BitmapData uploads are shared with the reflected spectrum. */
+	public function enableBarGeometry():FlxStrip
+	{
+		if (barMesh != null) return reflectedMesh;
+		barMesh = createBarMesh();
+		reflectedMesh = createBarMesh();
+		reflectedMesh.setPosition(x, y + displayHeight);
+		reflectedMesh.active = false;
+		updateBarMesh();
+		return reflectedMesh;
+	}
+
+	function createBarMesh():FlxStrip
+	{
+		var mesh = new FlxStrip();
+		mesh.makeGraphic(1, 1, FlxColor.WHITE, true);
+		mesh.color = barColor;
+		mesh.antialiasing = false;
+		mesh.width = displayWidth;
+		mesh.height = displayHeight;
+		for (i in 0...line)
+		{
+			var left = barXPositions[i] * displayWidth / bitmapWidth;
+			var right = (barXPositions[i] + barWidths[i]) * displayWidth / bitmapWidth;
+			for (value in [left, 0.0, right, 0.0, right, 0.0, left, 0.0]) mesh.vertices.push(value);
+			var first = i * 4;
+			for (index in [first, first + 1, first + 2, first, first + 2, first + 3]) mesh.indices.push(index);
+			for (value in [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0]) mesh.uvtData.push(value);
+		}
+		return mesh;
+	}
+
+	function updateBarMesh():Void
+	{
+		barMesh.color = reflectedMesh.color = barColor;
+		for (i in 0...line)
+		{
+			var height = barHeights[i] * displayHeight / bitmapHeight;
+			if (!Math.isFinite(height)) height = 0;
+			height = FlxMath.bound(height, 0, displayHeight);
+			var vertex = i * 8;
+			barMesh.vertices[vertex + 1] = barMesh.vertices[vertex + 3] = displayHeight - height;
+			barMesh.vertices[vertex + 5] = barMesh.vertices[vertex + 7] = displayHeight;
+			reflectedMesh.vertices[vertex + 1] = reflectedMesh.vertices[vertex + 3] = 0;
+			reflectedMesh.vertices[vertex + 5] = reflectedMesh.vertices[vertex + 7] = height;
+		}
+	}
+
+	override public function draw():Void
+	{
+		if (barMesh == null) { super.draw(); return; }
+		barMesh.cameras = cameras;
+		barMesh.setPosition(x, y);
+		barMesh.alpha = alpha;
+		barMesh.draw();
+	}
+
 	public function changeAnalyzer(snd:FlxSound):Void
 	{
 		invalidateAnalyzerBinding();
@@ -299,7 +409,16 @@ class AudioDisplay extends FlxSprite
 		useExternalAudioSource = false;
 		this.snd = snd;
 		refreshAnalyzerBinding();
+
 		stopUpdate = false;
+	}
+
+	/** Change the cached spectrum tint without replacing its analyzer or audio source. */
+	public function setBarColor(color:FlxColor):Void
+	{
+		if (barColor == color) return;
+		barColor = color;
+		rasterizeBars();
 	}
 
 	/**
@@ -323,6 +442,13 @@ class AudioDisplay extends FlxSprite
 		}
 
 		refreshAnalyzerBinding();
+		if (analyzer != null && externalAudioBuffer != null)
+		{
+			// A VLC preview has no OpenAL clock. Sample decoded PCM at the real
+			// FlxSound playback position instead of the analysis-only source's 0ms.
+			@:privateAccess analyzer.audioClip = new PreviewAnalysisClip(externalAudioBuffer, snd);
+			analyzer.updateIntervalMs = 8;
+		}
 		stopUpdate = false;
 	}
 
@@ -336,6 +462,10 @@ class AudioDisplay extends FlxSprite
 
 	override public function destroy():Void
 	{
+		if (barMesh != null) barMesh.destroy();
+		barMesh = null;
+		// The reflection is owned and destroyed by the view's sprite group.
+		reflectedMesh = null;
 		if (analyzer != null)
 			analyzer.changeSnd(null);
 		releaseExternalAudioBuffer();
@@ -344,5 +474,25 @@ class AudioDisplay extends FlxSprite
 		getValues = null;
 		snd = null;
 		super.destroy();
+	}
+}
+
+private class PreviewAnalysisClip implements funkin.vis.AudioClip
+{
+	public var audioBuffer(default, null):funkin.vis.AudioBuffer;
+	public var source:Dynamic;
+	public var currentFrame(get, never):Int;
+	var player:FlxSound;
+	var duration:Float;
+	public function new(buffer:AudioBuffer, player:FlxSound)
+	{
+		this.player = player;
+		audioBuffer = new funkin.vis.AudioBuffer(cast buffer.data, buffer.sampleRate);
+		source = buffer.src;
+		duration = buffer.data.length / (buffer.channels * buffer.bitsPerSample / 8) / buffer.sampleRate * 1000;
+	}
+	function get_currentFrame():Int
+	{
+		return player == null || duration <= 0 ? 0 : Std.int(audioBuffer.data.length * FlxMath.bound(player.time / duration, 0, 1));
 	}
 }

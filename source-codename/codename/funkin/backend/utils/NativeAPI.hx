@@ -174,8 +174,14 @@ class NativeAPI {
 	public static function showMessageBox(caption:String, message:String, icon:MessageBoxIcon = MSG_WARNING) {
 		#if windows
 		Windows.showMessageBox(caption, message, icon);
+		#elseif mobile
+		mobile.backend.SUtil.showPopUp(message, caption);
 		#else
-		lime.app.Application.current.window.alert(message, caption);
+		var application = lime.app.Application.current;
+		if (application != null && application.window != null)
+			application.window.alert(message, caption);
+		else
+			Sys.println('$caption\n$message');
 		#end
 	}
 
@@ -207,7 +213,7 @@ class NativeAPI {
 	 * Set cursor icon.
 	**/
 	public static function setCursorIcon(icon:CodeCursor) {
-		#if (mac && cpp)
+		#if (mac && cpp && !mobile)
 		Mac.setMouseCursorIcon(cast icon);
 		#else
 		Mouse.cursor = icon.toOpenFL();

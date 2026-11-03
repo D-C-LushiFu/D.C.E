@@ -94,7 +94,7 @@ class UIButtonList<T:UIButton> extends UIWindow {
 				buttons.sort(function(o, a:T, b:T) return FlxSort.byValues(o, a.y + (a.bHeight / 2), b.y + (a.bHeight / 2)), -1);
 				mousePos.put();
 			}
-			if (FlxG.mouse.justReleased) {
+			if (FlxG.mouse.released) {
 				curMoving = null;
 				curMovingInterval = 0;
 			}

@@ -63,13 +63,13 @@ NovaGC 不是 HotSpot 的源码移植，也不会伪装成 JVM。JFR、Java Refe
 - Haxe 生成 probe matrix：9/9（array、closure、enum、event loop、exception、dynamic interface、Lime CFFI、Prime、thread）。
 - Android NDK r29、arm64、API 24：`runtime.cpp` 在 `-Wall -Wextra -Wpedantic -Werror` 下编译通过。
 - precise ABI、no-legacy audit 和 generated Haxe smoke：全部通过。
-- NovaFlare Windows release：见下方真实游戏验证记录。
+- D.C.E. Windows release：见下方真实游戏验证记录。
 
-## 真实 NovaFlare 验证
+## 真实 D.C.E. 验证
 
-验证对象为本轮完整源图生成和 2763 对象链接后生成的 `export/release/windows/bin/NovaFlare Engine.exe`，不是历史 EXE。最终二进制时间戳为 2026-07-18 17:59:37、大小为 1857644455 字节，SHA-256 为 `6AD276BB5C442882DEA75D086D6D591D52A616061DEB3F1258A82BB41E3E10F6`；构建同时通过 generated precise ABI 检查。
+验证对象为本轮完整源图生成和 2763 对象链接后生成的 `export/release/windows/bin/D.C.E.exe`，不是历史 EXE。最终二进制时间戳为 2026-07-18 17:59:37、大小为 1857644455 字节，SHA-256 为 `6AD276BB5C442882DEA75D086D6D591D52A616061DEB3F1258A82BB41E3E10F6`；构建同时通过 generated precise ABI 检查。
 
-- 2026-07-18 18:00:56 启动可见 NF 窗口，进程 PID 17828；已进入并持续渲染完整标题界面，窗口标题为 `NovaFlare Engine`，最终检查时 `Responding=True` 且两秒采样间 CPU 时间继续增长。测试完成后未终止该实例。
+- 2026-07-18 18:00:56 启动可见 NF 窗口，进程 PID 17828；已进入并持续渲染完整标题界面，窗口标题为 `D.C.E.`，最终检查时 `Responding=True` 且两秒采样间 CPU 时间继续增长。测试完成后未终止该实例。
 - 测试启用了 `HXCPP_NOVAGC_VERIFY_REFERENCES=1`、`HXCPP_NOVAGC_VERIFY_REMEMBERED=1`，并把 initial/Young 阈值压到 16 MiB、Full 频率提高到每 2 次 Young 一次。
 - 已连续完成 32 次 Young 和 16 次 Full，跨过旧实现约第 29--31 周期耗尽逻辑 region 的故障区间后又完成一轮。累计分配 590.6 MiB，峰值 created/active region 为 23595/23583，而 8 GiB arena 峰值仅 commit 434.9 MiB；证明默认 4096 只参与容量换算，不再限制逻辑 region 数量。
 - 全程没有 safepoint timeout、cycle 重入、递归 GC、引用/remembered-set verifier 报错或 finalizer failure；`emergency_collections=0`、`allocation_stalls=0`、`allocation_stall_timeouts=0`。

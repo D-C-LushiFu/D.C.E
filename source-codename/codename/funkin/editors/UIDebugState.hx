@@ -12,10 +12,18 @@ class UIDebugState extends UIState {
 	public var testingUIItems:Array<FlxSprite> = [];
 	public var testingUIHidden:Bool = false;
 
+	#if mobile
+	public override function onMobileBack():Bool {
+		FlxG.switchState(new codename.funkin.menus.MainMenuState());
+		return true;
+	}
+	#end
+
 	public override function create() {
 		super.create();
 
-		FlxG.mouse.useSystemCursor = FlxG.mouse.visible = true;
+		FlxG.mouse.useSystemCursor = !controls.touchC;
+		FlxG.mouse.visible = true;
 
 		var bg = new FlxSprite().makeSolid(FlxG.width, FlxG.height, 0xFF444444);
 		bg.updateHitbox();

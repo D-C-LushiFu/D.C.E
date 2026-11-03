@@ -1,19 +1,6 @@
 package substates;
 
-/*
-	ResultsScreen made by NF|beihu (北狐丶逐梦)
-	bilibili: https://b23.tv/SnqG443
-	youtube: https://youtube.com/@beihu235?si=NHnWxcUWPS46EqUt
-	discord: @beihu235
-
-	you can use it but must give me credit(dont forget my icon)
-	logic is very easy so I think everyone can understand it
-
-	Who cares about rudy's hscript so I continue to choose to use my lua logic
-	Her hscript weren't worth stole and I didn't stole it
-
-	by the way dont move this to hscript,I dont allow it
- */
+/* ResultsScreen by D.C.LushiFu */
 
 import openfl.display.BitmapData;
 import openfl.display.Shape;
@@ -1053,7 +1040,7 @@ class ResultsScreen extends MusicBeatSubstate
 			loadLeft.setGraphicSize(FlxG.width, FlxG.height);
 			loadLeft.updateHitbox();
 
-			WaterMark = new FlxText(isTransIn ? 50 : -1230, 720 - 50 - 50 * 2, 0, 'NF ENGINE V' + MainMenuState.novaFlareEngineVersion, 50);
+			WaterMark = new FlxText(isTransIn ? 50 : -1230, 720 - 50 - 50 * 2, 0, 'D.C.E. V' + MainMenuState.dceEngineVersion, 50);
 			WaterMark.scrollFactor.set();
 			WaterMark.setFormat(Assets.getFont("assets/fonts/loadText.ttf").fontName, 50, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			WaterMark.antialiasing = ClientPrefs.data.antialiasing;
@@ -1133,7 +1120,7 @@ class ResultsScreen extends MusicBeatSubstate
 			loadAlpha.setGraphicSize(FlxG.width, FlxG.height);
 			loadAlpha.updateHitbox();
 
-			WaterMark = new FlxText(50, 720 - 50 - 50 * 2, 0, 'NF ENGINE V' + MainMenuState.novaFlareEngineVersion, 50);
+			WaterMark = new FlxText(50, 720 - 50 - 50 * 2, 0, 'D.C.E. V' + MainMenuState.dceEngineVersion, 50);
 			WaterMark.scrollFactor.set();
 			WaterMark.setFormat(Assets.getFont("assets/fonts/loadText.ttf").fontName, 50, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			WaterMark.antialiasing = ClientPrefs.data.antialiasing;
@@ -1214,6 +1201,14 @@ class ResultsScreen extends MusicBeatSubstate
 			loadTextTween.cancel();
 			EventTextTween.cancel();
 		}
+		// ★ camOther 是 static：不清掉的话每次结算都会把这一台相机（含其后缓冲/画布）
+		//   永久留在内存里，同时它还挂在 FlxG.cameras.list 上。
+		if (camOther != null)
+		{
+			if (FlxG.cameras != null && FlxG.cameras.list != null && FlxG.cameras.list.indexOf(camOther) >= 0)
+				FlxG.cameras.remove(camOther);
+			camOther = null;
+		}
 		super.destroy();
 	}
 
@@ -1221,8 +1216,6 @@ class ResultsScreen extends MusicBeatSubstate
 	{
 		var frag:String = "
 		#pragma header
-
-		// by HeiHua
 
 		const vec2 blur_size = [100,100];
 

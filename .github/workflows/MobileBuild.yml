@@ -27,7 +27,7 @@ on:
 jobs: 
   Android:
     runs-on: macos-14
-    environment: ${{ github.repository == 'NovaFlare-Engine-Concentration/FNF-NovaFlare-Engine' && github.event_name != 'pull_request_target' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'private-build' || 'public-build' }}
+    environment: ${{ github.repository == 'D-C-LushiFu/Different-Creatingness-Engine' && github.event_name != 'pull_request_target' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'private-build' || 'public-build' }}
     concurrency:
       group: ${{ github.workflow }}-Android-${{ github.ref }}
 
@@ -53,7 +53,7 @@ jobs:
           haxe-version: 4.3.7
 
       - name: Restore private GameAnalytics
-        if: github.repository == 'NovaFlare-Engine-Concentration/FNF-NovaFlare-Engine' && github.event_name != 'pull_request_target' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        if: github.repository == 'D-C-LushiFu/Different-Creatingness-Engine' && github.event_name != 'pull_request_target' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         shell: pwsh
         env:
           NOVA_GA_IMPL_B64: ${{ secrets.NOVA_GA_IMPL_B64 }}
@@ -99,7 +99,7 @@ jobs:
           haxelib --global run hmm install
           # A cached haxelib git checkout can drift to the upstream default
           # branch even when hmm.json pins a commit. Restore every immutable
-          # dependency plus NovaFlare's compatibility fork before compilation.
+          # dependency plus D.C.E.'s compatibility fork before compilation.
           for library in polymod thx.core thx.semver FlxPartialSound; do
             haxelib --global run hmm reinstall --force "$library"
           done
@@ -195,7 +195,7 @@ jobs:
           
   iOS:
     runs-on: macos-15
-    environment: ${{ github.repository == 'NovaFlare-Engine-Concentration/FNF-NovaFlare-Engine' && github.event_name != 'pull_request_target' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'private-build' || 'public-build' }}
+    environment: ${{ github.repository == 'D-C-LushiFu/Different-Creatingness-Engine' && github.event_name != 'pull_request_target' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'private-build' || 'public-build' }}
     concurrency:
       group: ${{ github.workflow }}-iOS-${{ github.ref }}
 
@@ -214,7 +214,7 @@ jobs:
           haxe-version: 4.3.7
 
       - name: Restore private GameAnalytics
-        if: github.repository == 'NovaFlare-Engine-Concentration/FNF-NovaFlare-Engine' && github.event_name != 'pull_request_target' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        if: github.repository == 'D-C-LushiFu/Different-Creatingness-Engine' && github.event_name != 'pull_request_target' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         shell: pwsh
         env:
           NOVA_GA_IMPL_B64: ${{ secrets.NOVA_GA_IMPL_B64 }}
@@ -287,7 +287,7 @@ jobs:
           rm -rf Payload
           mkdir Payload
           mv *.app Payload
-          zip -r NovaFlareEngine.ipa Payload
+          zip -r DCEEngine.ipa Payload
 
       - name: Create iOS zip package
         run: |

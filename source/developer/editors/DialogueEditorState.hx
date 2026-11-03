@@ -19,7 +19,7 @@ import games.cutscenes.DialogueBoxPsych;
 import games.cutscenes.DialogueCharacter;
 
 /**
- * 对话编辑器（NovaFlare 新版 UI）：
+ * 对话编辑器（D.C.E. 新版 UI）：
  *  - Adobe 风格顶栏菜单（DialogueEditorMenuBar）+ 底部状态栏 + EditorChromeUI 窗口栏
  *  - 对白预览区保留在主相机（角色/气泡/打字文字），可 A/D/W/S 切换行/表情
  *  - 所有字段编辑收进顶栏菜单；原生 FlxUI 控件只作数据源（隐藏），由菜单自绘接管
@@ -66,8 +66,23 @@ class DialogueEditorState extends MusicBeatState
 	var curAnim:Int = 0;
 	var transitioning:Bool = false;
 
+	public var documentHistory:EditorDocumentHistory;
+	 override public function editorMobileModalOpen():Bool
+		return super.editorMobileModalOpen() || (menuBar != null && menuBar.activeMenu >= 0);
+
+	function historyRead():String return EditorDocumentHistory.jsonSnapshot(dialogueFile);
+	function historyRestore(snapshot:String):Void
+	{
+		dialogueFile = cast haxe.Json.parse(snapshot);
+		curSelected = Std.int(FlxMath.bound(curSelected, 0, dialogueFile.dialogue.length - 1));
+		changeText();
+	}
+
 	override function create()
 	{
+		// ★ 十三轮：编辑器统一走高分辨率设计（文字 1:1 光栅化 = 清晰）；
+		//   离开时由 EditorInputStyle 的 stateSwitched 钩子自动还原 1280×720。
+		EditorInputStyle.enterHiRes();
 		persistentUpdate = persistentDraw = true;
 		mark('DE.create:persist');
 
@@ -158,6 +173,11 @@ class DialogueEditorState extends MusicBeatState
 		changeText();
 		mark('DE.create:changeText');
 		super.create();
+		documentHistory = new EditorDocumentHistory(historyRead, historyRestore, () -> EditorDocumentHistory.inputFocused([w_char, w_text, w_sound], menuBar), camHUD);
+		documentHistory.onDirtyChanged = (dirty) -> unsavedProgress = dirty;
+		documentHistory.onSave = saveDialogue;
+		add(documentHistory);
+
 		mark('DE.create:superCreate');
 	}
 
@@ -251,6 +271,16 @@ class DialogueEditorState extends MusicBeatState
 	{
 		switch (actionKey)
 		{
+			case 'duplicate_line':
+				documentHistory.capture();
+				var duplicate:DialogueLine = cast haxe.Json.parse(haxe.Json.stringify(dialogueFile.dialogue[curSelected]));
+				dialogueFile.dialogue.insert(curSelected + 1, duplicate);
+				changeText(1);
+				documentHistory.capture();
+			case 'move_line_up':
+				moveCurrentLine(-1);
+			case 'move_line_down':
+				moveCurrentLine(1);
 			case 'prev_line':
 				changeText(-1);
 			case 'next_line':
@@ -275,12 +305,24 @@ class DialogueEditorState extends MusicBeatState
 			case 'next_anim':
 				scrollAnim(1);
 			case 'load':
-				loadDialogue();
+				documentHistory.confirmDiscard(loadDialogue);
 			case 'save':
 				saveDialogue();
 			case 'exit':
 				doExit();
 		}
+	}
+
+	function moveCurrentLine(direction:Int):Void
+	{
+		var target = curSelected + direction;
+		if (target < 0 || target >= dialogueFile.dialogue.length) return;
+		documentHistory.capture();
+		var line = dialogueFile.dialogue.splice(curSelected, 1)[0];
+		dialogueFile.dialogue.insert(target, line);
+		curSelected = target;
+		changeText();
+		documentHistory.capture();
 	}
 
 	/** 菜单打开后刷新 widget 显示值（从当前对白行数据同步） */
@@ -433,6 +475,7 @@ class DialogueEditorState extends MusicBeatState
 	}
 
 	override function update(elapsed:Float) {
+		if (documentHistory != null && documentHistory.blocksInput()) { super.update(elapsed); return; }
 		mark('DE.update:frame');
 		if(transitioning) {
 			super.update(elapsed);
@@ -461,6 +504,7 @@ class DialogueEditorState extends MusicBeatState
 		}
 		catch (e:Dynamic) {}
 
+		typing = typing || (menuBar != null && menuBar.isInputOverlayActive());
 		if(!typing)
 		{
 			ClientPrefs.toggleVolumeKeys(true);
@@ -469,13 +513,13 @@ class DialogueEditorState extends MusicBeatState
 				reloadText(false);
 			}
 			if(FlxG.keys.justPressed.ESCAPE) {
-				if(!unsavedProgress)
+				if(!documentHistory.hasChanges())
 				{
 					MusicBeatState.switchState(new MasterEditorMenu());
 					FlxG.sound.playMusic(Paths.music('freakyMenu'));
 					transitioning = true;
 				}
-				else openSubState(new ConfirmationPopupSubstate(function() transitioning = true));
+				else openSubState(new ConfirmationPopupSubstate(function() transitioning = true, {langGroup: 'dialogue', danger: true}));
 				return;
 			}
 
@@ -553,13 +597,13 @@ class DialogueEditorState extends MusicBeatState
 
 	function doExit():Void
 	{
-		if(!unsavedProgress)
+		if(!documentHistory.hasChanges())
 		{
 			MusicBeatState.switchState(new MasterEditorMenu());
 			FlxG.sound.playMusic(Paths.music('freakyMenu'));
 			transitioning = true;
 		}
-		else openSubState(new ConfirmationPopupSubstate(function() transitioning = true));
+		else openSubState(new ConfirmationPopupSubstate(function() transitioning = true, {langGroup: 'dialogue', danger: true}));
 	}
 
 	// ============ 切换对白行 ============
@@ -628,12 +672,13 @@ class DialogueEditorState extends MusicBeatState
 		if(fullPath != null) {
 			var rawJson:String = File.getContent(fullPath);
 			if(rawJson != null) {
-				var loadedDialog:DialogueFile = cast Json.parse(rawJson);
-				if(loadedDialog.dialogue != null && loadedDialog.dialogue.length > 0)
+				var loadedDialog:DialogueFile = cast EditorInputValidation.parseJsonObject(rawJson);
+				if(loadedDialog != null && EditorInputValidation.objectArray(loadedDialog.dialogue) && loadedDialog.dialogue.length > 0)
 				{
 					var cutName:String = _file.name.substr(0, _file.name.length - 5);
 					trace("Successfully loaded file: " + cutName);
 					dialogueFile = loadedDialog;
+					documentHistory.resetTimeline();
 					unsavedProgress = false;
 					changeText();
 		mark('DE.create:changeText');
@@ -667,6 +712,8 @@ class DialogueEditorState extends MusicBeatState
 	}
 
 	function saveDialogue() {
+		var history = documentHistory;
+		if (history != null) history.prepareSave();
 		var data:String = haxe.Json.stringify(dialogueFile, "\t");
 		if (data.length > 0)
 		{
@@ -680,6 +727,8 @@ class DialogueEditorState extends MusicBeatState
 
 	function onSaveComplete(_):Void
 	{
+		var history = documentHistory;
+		if (history != null) history.markSaved();
 		_file.removeEventListener(#if desktop Event.SELECT #else Event.COMPLETE #end, onSaveComplete);
 		_file.removeEventListener(Event.CANCEL, onSaveCancel);
 		_file.removeEventListener(IOErrorEvent.IO_ERROR, onSaveError);

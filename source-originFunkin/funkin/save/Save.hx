@@ -43,6 +43,13 @@ class Save implements ConsoleClass
     return _instance;
   }
 
+  public var novaSettings(get, never):DCESettings;
+
+  function get_novaSettings():DCESettings
+  {
+      return data.options.novaSettings;
+  }
+
   var data:RawSaveData;
 
   public static function load():Save
@@ -138,6 +145,14 @@ class Save implements ConsoleClass
             },
           },
         },
+
+        novaSettings: {
+          fpsViewMode: "FPS",
+          fpsViewScale: 1.0,
+          skipVideo: false,
+          autoShaderConversion: true,
+          mouseEffects: true
+        }
       },
       #if mobile
       mobileOptions: {
@@ -1262,6 +1277,20 @@ typedef SaveDataOptions =
       var p1:PlayerControlData;
       var p2:PlayerControlData;
     };
+
+    var novaSettings:DCESettings;
+}
+
+/**
+ * D.C.E. Settings
+ */
+typedef DCESettings =
+{
+  var fpsViewMode:String;
+  var fpsViewScale:Float;
+  var skipVideo:Bool;
+  var autoShaderConversion:Bool;
+  var mouseEffects:Bool;
 }
 
 typedef PlayerControlData =

@@ -12,16 +12,19 @@ import flixel.math.FlxPoint;
 
 import openfl.display.Shape;
 import openfl.display.BitmapData;
+import openfl.media.Sound;
 
 import general.backend.ClientPrefs;
 import general.backend.Paths;
 import general.backend.language.Language;
 import mobile.objects.EditorMobileKeyData; // EMKButton 等次类型与本模块同文件
+import developer.editors.EditorInputStyle;
+import developer.editors.EditorText;
 
 /**
  * Editor 内的自定义移动端按键覆盖层。
  *
- * - 从 FuckYouNFEMobile/<EditorId>NewFuckingButtonMobile.json 读取（缺失 = 空，仅隐藏默认键）；
+ * - 从 FuckYouDCEMobile/<EditorId>NewFuckingButtonMobile.json 读取（缺失 = 空，仅隐藏默认键）；
  * - 每个按键 = 自绘圆角块 + 标签，坐标与外部窗口画布一致（左上角 [0,0]，1280x720 逻辑空间）；
  * - 覆盖层挂在自己的固定 HUD 相机上，不受谱面相机滚动/缩放影响；
  * - 触摸/鼠标按下 = 向 FlxG.keys 注入该键的 click 组合键（与默认虚拟按键同机制）；
@@ -36,7 +39,7 @@ class EditorMobileKeyOverlay extends FlxSpriteGroup
 
 	static final TAP_TIME:Float = 0.28;
 
-	// ---- 注入调试日志（环境变量 NOVAF_EMK_DEBUG=1 时开启，写到 FuckYouNFEMobile/emk_inject.log）----
+	// ---- 注入调试日志（环境变量 DCE_EMK_DEBUG=1 时开启，写到 FuckYouDCEMobile/emk_inject.log）----
 	static var dbgChecked:Bool = false;
 	static var dbgOn:Bool = false;
 
@@ -48,7 +51,7 @@ class EditorMobileKeyOverlay extends FlxSpriteGroup
 			#if sys
 			try
 			{
-				dbgOn = Sys.getEnv('NOVAF_EMK_DEBUG') == '1';
+				dbgOn = Sys.getEnv('DCE_EMK_DEBUG') == '1';
 			}
 			catch (e:Dynamic) {}
 			#end
@@ -94,13 +97,10 @@ class EditorMobileKeyOverlay extends FlxSpriteGroup
 		reloadFromFile();
 	}
 
-	/** 是否应该显示（桌面端跟随 needMobileControl，移动端恒显示） */
+	/** The editor-specific switch is independent of gameplay's mobile-control switch. */
 	public function refreshVisibility():Void
 	{
-		var show:Bool = true;
-		#if desktop
-		show = ClientPrefs.data.needMobileControl;
-		#end
+		var show:Bool = EditorMobileKeys.overlayVisible();
 		visible = show;
 		active = show;
 		alpha = ClientPrefs.data.controlsAlpha + 0.000001;
@@ -115,9 +115,33 @@ class EditorMobileKeyOverlay extends FlxSpriteGroup
 		active = false;
 	}
 
+	// ---- 按钮点击音效（开发工具按下/松开） ----
+	// 资源：assets/shared/sounds/chartingSounds/ClickDown.ogg / ClickUp.ogg
+	static var clickDownSound:Sound = null;
+	static var clickUpSound:Sound = null;
+	static var clickSoundTried:Bool = false;
+
+	static function playClick(down:Bool):Void
+	{
+		try
+		{
+			if (!clickSoundTried)
+			{
+				clickSoundTried = true;
+				clickDownSound = Paths.sound('chartingSounds/ClickDown');
+				clickUpSound = Paths.sound('chartingSounds/ClickUp');
+			}
+			var snd:Sound = down ? clickDownSound : clickUpSound;
+			if (snd != null)
+				FlxG.sound.play(snd);
+		}
+		catch (e:Dynamic) {}
+	}
+
 	/** ★ 命中检测：坐标 (x,y)（逻辑屏幕坐标）是否落在某个按键上（供编辑器判断“本次点击被虚拟键吃掉”） */
 	public function hitTest(x:Float, y:Float):Bool
 	{
+		if (!visible || !active) return false;
 		for (view in views)
 		{
 			if (view == null || view.def == null) continue;
@@ -125,6 +149,20 @@ class EditorMobileKeyOverlay extends FlxSpriteGroup
 				return true;
 		}
 		return false;
+	}
+
+	/** ★ 按名称（忽略大小写）查找按键矩形；找不到返回 null。
+	 *  供编辑器把附加 UI（如 note 密度缩略图）锚定到某个虚拟键旁边。 */
+	public function buttonRectByName(name:String):Null<{x:Float, y:Float, w:Float, h:Float}>
+	{
+		var lower:String = name.toLowerCase();
+		for (view in views)
+		{
+			if (view == null || view.def == null || view.def.name == null) continue;
+			if (view.def.name.toLowerCase() == lower)
+				return {x: view.def.x, y: view.def.y, w: view.def.w, h: view.def.h};
+		}
+		return null;
 	}
 
 	// ==================== 加载 ====================
@@ -147,9 +185,22 @@ class EditorMobileKeyOverlay extends FlxSpriteGroup
 				if (rawBtns != null && Std.isOfType(rawBtns, Array))
 				{
 					var seen:Array<String> = [];
+					var sourceW:Float = 1280;
+					var sourceH:Float = 720;
+					if (Std.isOfType(doc.screenW, Float) && Math.isFinite(doc.screenW) && doc.screenW > 0) sourceW = doc.screenW;
+					if (Std.isOfType(doc.screenH, Float) && Math.isFinite(doc.screenH) && doc.screenH > 0) sourceH = doc.screenH;
+					var top = EditorInputStyle.si(68);
+					var scaleX = FlxG.width / sourceW;
+					var scaleY = (FlxG.height - top) / sourceH;
 					for (raw in cast(rawBtns, Array<Dynamic>))
 					{
 						var def:EMKButton = EditorMobileKeyData.parseButton(raw);
+						// ★ 十二轮：编辑器跑在设备分辨率设计空间 → 按键坐标/尺寸同倍放大
+						//   （谱面编辑器 1.5 倍；720 设计的编辑器 uiScale=1 → 完全无副作用）
+						def.x *= scaleX;
+						def.y = top + def.y * scaleY;
+						def.w = Math.round(def.w * scaleX);
+						def.h = Math.round(def.h * scaleY);
 						if (def.name == null || def.name == '') continue;
 						if (seen.contains(def.name)) continue;
 						seen.push(def.name);
@@ -211,7 +262,7 @@ class EditorMobileKeyOverlay extends FlxSpriteGroup
 			view.sprite.antialiasing = ClientPrefs.data.antialiasing;
 			add(view.sprite);
 
-			view.label = new FlxText(def.x + 2, def.y + 2, def.w - 4, def.name, 14);
+			view.label = new EditorText(def.x + 2, def.y + 2, def.w - 4, def.name, 14);
 			// 文字颜色：textColor（老文件缺省 = 白 0xFFFFFFFF）
 			view.label.setFormat(font(), 14, def.textColor, CENTER, FlxTextBorderStyle.OUTLINE, 0xFF000000);
 			view.label.borderStyle = FlxTextBorderStyle.OUTLINE;
@@ -278,7 +329,7 @@ class EditorMobileKeyOverlay extends FlxSpriteGroup
 		dbgLine('OVERLAY-CAM-REBUILT');
 	}
 
-	override function update(elapsed:Float)
+	public function updateInput(elapsed:Float):Void
 	{
 		if (visible && active)
 		{
@@ -295,7 +346,12 @@ class EditorMobileKeyOverlay extends FlxSpriteGroup
 			updateViews(elapsed);
 			updateLabels();
 			refreshInjectedKeys();
+			for (view in views) view.justPressed = false;
 		}
+	}
+
+	override function update(elapsed:Float)
+	{
 		super.update(elapsed);
 	}
 
@@ -325,6 +381,7 @@ class EditorMobileKeyOverlay extends FlxSpriteGroup
 				view.pressed = false;
 				view.pointerId = -2;
 				view.justReleased = true;
+				playClick(false); // ★ 触点丢失被强制释放 = 松开音
 				dbgLine('UP-FORCED name=' + view.def.name);
 			}
 		}
@@ -360,6 +417,8 @@ class EditorMobileKeyOverlay extends FlxSpriteGroup
 	{
 		if (justDown)
 		{
+			if (Std.isOfType(FlxG.state, general.backend.MusicBeatState)
+				&& (cast FlxG.state:general.backend.MusicBeatState).editorMobilePointerBlocked(x, y)) return;
 			// 命中检测：最上层（后 add）优先
 			var hit:EMKView = null;
 			for (i in 0...views.length)
@@ -369,14 +428,15 @@ class EditorMobileKeyOverlay extends FlxSpriteGroup
 				if (x >= view.def.x && x <= view.def.x + view.def.w && y >= view.def.y && y <= view.def.y + view.def.h)
 					hit = view; // 越靠后（越上层）越优先
 			}
-			if (hit != null)
-			{
-				hit.pressed = true;
-				hit.pointerId = pointerId;
-				hit.holdTime = 0;
-				hit.justPressed = true;
-				dbgLine('DOWN ptr=' + pointerId + ' name=' + hit.def.name + ' at=' + Math.round(x) + ',' + Math.round(y));
-			}
+		if (hit != null)
+		{
+			hit.pressed = true;
+			hit.pointerId = pointerId;
+			hit.holdTime = 0;
+			hit.justPressed = true;
+			playClick(true); // ★ 开发工具按下 = ClickDown
+			dbgLine('DOWN ptr=' + pointerId + ' name=' + hit.def.name + ' at=' + Math.round(x) + ',' + Math.round(y));
+		}
 			else
 			{
 				dbgLine('DOWN-NOHIT ptr=' + pointerId + ' at=' + Math.round(x) + ',' + Math.round(y));
@@ -394,6 +454,7 @@ class EditorMobileKeyOverlay extends FlxSpriteGroup
 				view.pressed = false;
 				view.pointerId = -2;
 				view.justReleased = true;
+				playClick(false); // ★ 开发工具松开 = ClickUp
 				dbgLine('UP ptr=' + pointerId + ' name=' + view.def.name);
 				continue;
 			}
@@ -408,6 +469,7 @@ class EditorMobileKeyOverlay extends FlxSpriteGroup
 					view.pressed = false;
 					view.pointerId = -2;
 					view.justReleased = true;
+					playClick(false); // ★ 滑出松开 = ClickUp
 					dbgLine('UP-SLIDEOUT name=' + view.def.name);
 				}
 			}
@@ -467,8 +529,6 @@ class EditorMobileKeyOverlay extends FlxSpriteGroup
 				view.justReleased = false;
 			}
 
-			if (view.justPressed)
-				view.justPressed = false;
 		}
 	}
 

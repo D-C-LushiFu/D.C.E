@@ -71,6 +71,7 @@ class OptionsState extends MusicBeatState
 
     var options:OptionsMenu = optionsCodex.addPage(Options, new OptionsMenu());
     var preferences:PreferencesMenu = optionsCodex.addPage(Preferences, new PreferencesMenu());
+    var extraOptions:ExtraOptionsMenu = optionsCodex.addPage(ExtraOptions, new ExtraOptionsMenu());
     var controls:ControlsMenu = optionsCodex.addPage(Controls, new ControlsMenu());
     #if FEATURE_LAG_ADJUSTMENT
     var offsets:OffsetMenu = optionsCodex.addPage(Offsets, new OffsetMenu());
@@ -78,7 +79,7 @@ class OptionsState extends MusicBeatState
     var saveData:SaveDataMenu = optionsCodex.addPage(SaveData, new SaveDataMenu());
 
     options.addSaveDataOptionsItem(saveData);
-    options.addReturnToNovaFlareItem();
+    options.addReturnToDCEItem();
     options.addExitItem();
 
     if (options.hasMultipleOptions())
@@ -86,6 +87,7 @@ class OptionsState extends MusicBeatState
       options.onExit.add(exitToMainMenu);
       controls.onExit.add(exitControls);
       preferences.onExit.add(optionsCodex.switchPage.bind(Options));
+      extraOptions.onExit.add(optionsCodex.switchPage.bind(Options));
       #if FEATURE_LAG_ADJUSTMENT
       offsets.onExit.add(exitOffsets);
       #end
@@ -176,6 +178,7 @@ class OptionsMenu extends Page<OptionsMenuPageName>
     if (ControlsHandler.hasExternalInputDevice)
     #end
     createItem("CONTROLS", function() codex.switchPage(Controls));
+    createItem("EXTRA OPTIONS", function() codex.switchPage(ExtraOptions));
     #if FEATURE_LAG_ADJUSTMENT
     createItem("LAG ADJUSTMENT", function()
     {
@@ -200,12 +203,14 @@ class OptionsMenu extends Page<OptionsMenuPageName>
       InAppPurchasesUtil.restorePurchases();
     });
     #end
+    /*
     #if android
     createItem("OPEN DATA FOLDER", function()
     {
       funkin.external.android.DataFolderUtil.openDataFolder();
     });
     #end
+    */
     #if FEATURE_NEWGROUNDS
     if (NewgroundsClient.instance.isLoggedIn())
     {
@@ -293,16 +298,16 @@ class OptionsMenu extends Page<OptionsMenuPageName>
     #end
   }
 
-  public function addReturnToNovaFlareItem():Void
+  public function addReturnToDCEItem():Void
   {
     #if sys
-    createItem("RETURN TO NOVAFLARE ENGINE", function():Void
+    createItem("RETURN TO D.C.E.", function():Void
     {
       items.enabled = false;
-      if (!originfunkin.OriginFunkinConfig.requestNovaFlare())
+      if (!originfunkin.OriginFunkinConfig.requestDCE())
       {
         items.enabled = true;
-        trace('[originFunkin] Could not save the NovaFlare startup request.');
+        trace('[originFunkin] Could not save the D.C.E. startup request.');
         return;
       }
       try
@@ -311,7 +316,7 @@ class OptionsMenu extends Page<OptionsMenuPageName>
       }
       catch (error:Dynamic)
       {
-        trace('[originFunkin] Could not flush Funkin preferences before returning to NovaFlare: $error');
+        trace('[originFunkin] Could not flush Funkin preferences before returning to D.C.E.: $error');
       }
       LimeSystem.exit(0);
     }, true);
@@ -369,4 +374,5 @@ enum abstract OptionsMenuPageName(String) to PageName
   var Preferences = "preferences";
   var Offsets = "offsets";
   var SaveData = "saveData";
+  var ExtraOptions = "extraOptions";
 }

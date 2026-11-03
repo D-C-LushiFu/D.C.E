@@ -12,6 +12,7 @@ import openfl.display.BitmapData;
 import openfl.events.KeyboardEvent;
 
 import flixel.input.gamepad.FlxGamepad;
+import flixel.util.FlxTimer;
 
 import states.storyMenuState.StoryMenuState;
 import states.backend.flashingState.FlashingState;
@@ -52,8 +53,338 @@ class InitState extends MusicBeatState
 	var mustUpdate:Bool = false;
 
 	public static var updateVersion:String = '';
+	/** 全局监听（stage 键盘 / FlxG.signals）只允许注册一次 —— 软重启会重新执行 create()，见下方注释 */
+	static var globalHooksInstalled:Bool = false;
 
 	public static var ignoreCopy = false; //用于copystate，别删
+
+	#if sys
+	/**
+	 * 【临时诊断实验】在 stage 顶层叠加"光栅化分辨率对比"图案。
+	 *
+	 * 三块图案的**视觉尺寸完全相同**（都是 240x120 逻辑像素，再按 1280→1920
+	 * 的 1.5 倍放大显示），唯一差别是内部位图的光栅化倍率：
+	 *   A = 1 倍（= 当前引擎：按 1280 逻辑空间 1:1 生成，然后放大 1.5 倍）
+	 *   B = 2 倍（= 若把内容按 2K 光栅化，再缩回原视觉尺寸）
+	 *   C = 4 倍
+	 * 截图后测量细条纹的峰谷对比度与笔画的过渡宽度，即可量化回答
+	 * "提高光栅化分辨率能不能真的让 1920 全屏变清晰"。
+	 */
+	public static function renderProbePattern():Void
+	{
+		try
+		{
+			var stage = FlxG.stage;
+			if (stage == null) return;
+
+			var logW:Int = 240;
+			var logH:Int = 120;
+			var zoom:Float = 1.5;   // 1280 逻辑 → 1920 屏幕
+			var gap:Int = 40;
+			var factors:Array<Int> = [1, 2, 4];
+
+			var holder = new openfl.display.Sprite();
+			holder.x = 60;
+			holder.y = 60;
+			stage.addChild(holder);
+
+			var shownW:Float = logW * zoom;
+			var label = new openfl.text.TextField();
+			label.defaultTextFormat = new openfl.text.TextFormat(null, 15, 0x00FF00);
+
+			var line1:String = '';
+			for (i in 0...factors.length)
+			{
+				var bmp = detailBitmap(logW * factors[i], logH * factors[i], factors[i]);
+				var spr = new Bitmap(bmp);
+				spr.scaleX = spr.scaleY = zoom / factors[i];   // 视觉尺寸恒等
+				spr.x = i * (shownW + gap);
+				spr.y = 0;
+				holder.addChild(spr);
+			}
+
+			line1 = 'A = raster x1 (current engine)      B = raster x2      C = raster x4      -- all shown at identical size on 1920'
+				+ '\n[A .. x=' + Std.int(60 + shownW) + ']  [B .. x=' + Std.int(60 + 2 * shownW + gap) + ']  [C .. x=' + Std.int(60 + 3 * shownW + 2 * gap) + ']';
+			label.text = line1;
+			label.x = 0;
+			label.y = logH * zoom + 12;
+			holder.addChild(label);
+
+			// ── FlxText 高清字形对照 ──────────────────────────────
+			// 同一段文字、同一个逻辑字号，唯一差别是字形光栅化倍率：
+			//   T1 = renderScale 1.0（原版：字形按逻辑字号光栅化）
+			//   T2 = renderScale 1.5（位图 ×1.5，再缩回相同逻辑尺寸显示）
+			// 两者视觉尺寸完全一致，只有"每个字有多少真实像素"不同。
+			final sample:String = 'FlxText AaBbGg 0123 中文测试';
+			final prevRS:Float = FlxText.renderScale;
+
+			FlxText.renderScale = 1.0;
+			var t1 = new FlxText(0, 0, 0, sample);
+			t1.setFormat(null, 16, 0xFFFFFF);
+			@:privateAccess t1.regenGraphic();
+			final bmp1 = t1.graphic.bitmap;
+
+			FlxText.renderScale = 1.5;
+			var t2 = new FlxText(0, 0, 0, sample);
+			t2.setFormat(null, 16, 0xFFFFFF);
+			@:privateAccess t2.regenGraphic();
+			final bmp2 = t2.graphic.bitmap;
+
+			FlxText.renderScale = prevRS;
+
+			var pair = new openfl.display.Sprite();
+			pair.x = 60;
+			pair.y = 60 + logH * zoom + 44;
+			stage.addChild(pair);
+
+			// T1：位图即逻辑尺寸，按 zoom 放到屏幕
+			var s1 = new Bitmap(bmp1);
+			s1.scaleX = s1.scaleY = zoom;
+			pair.addChild(s1);
+
+			// T2：位图是 1.5 倍，按 zoom/1.5 缩回**相同的逻辑/屏幕尺寸**
+			var s2 = new Bitmap(bmp2);
+			s2.scaleX = s2.scaleY = zoom / 1.5;
+			s2.x = 40;
+			pair.addChild(s2);
+
+			L_probeNote = 'textPair t1bitmap=' + bmp1.width + 'x' + bmp1.height
+				+ ' t2bitmap=' + bmp2.width + 'x' + bmp2.height
+				+ ' at pair(60,' + Std.int(60 + logH * zoom + 44) + ')';
+		}
+		catch (e:Dynamic)
+		{
+			trace('renderProbePattern failed: $e');
+		}
+	}
+
+	/** 图案布局备注（写入探针，便于定位截图区域）。 */
+	public static var L_probeNote:String = '';
+
+	/** 构造一份"细节测试图"：细条纹 + 1px 竖线 + 小字号文字 + 1px 描边。 */
+	static function detailBitmap(w:Int, h:Int, f:Int):BitmapData
+	{
+		var bd = new BitmapData(w, h, true, 0xFF14141C);
+
+		// 源空间 1px 线 + 1px 间隔的细条纹：最能暴露放大插值
+		var stripeH:Int = f;
+		var i:Int = 0;
+		while (i * 2 * stripeH < Std.int(h * 0.28))
+		{
+			bd.fillRect(new openfl.geom.Rectangle(0, i * 2 * stripeH, w, stripeH), 0xFFFFFFFF);
+			i++;
+		}
+
+		// 源空间 1px 宽的竖线组
+		for (k in 0...6)
+			bd.fillRect(new openfl.geom.Rectangle(Std.int((6 + k * 5) * f), Std.int(h * 0.32), f, Std.int(h * 0.14)), 0xFF00FF88);
+
+		// 小字号文字（UI 文字是"糊"的重灾区）
+		var sizes:Array<Float> = [11.0, 9.0];
+		var ty:Float = h * 0.50;
+		for (s in sizes)
+		{
+			var tf = new openfl.text.TextField();
+			tf.defaultTextFormat = new openfl.text.TextFormat(null, Std.int(s * f), 0xFFFFFF);
+			tf.text = 'AaBbGg 0123 ' + Std.int(s) + 'px';
+			tf.autoSize = openfl.text.TextFieldAutoSize.LEFT;
+			tf.x = 6 * f;
+			tf.y = ty;
+			bd.draw(tf);
+			ty += s * 2.2 * f;
+		}
+
+		// 源空间 1px 描边的方框
+		var bx:Int = Std.int(w * 0.58);
+		var by:Int = Std.int(h * 0.72);
+		var bw:Int = Std.int(w * 0.36);
+		var bh:Int = Std.int(h * 0.22);
+		bd.fillRect(new openfl.geom.Rectangle(bx, by, bw, f), 0xFF66CCFF);
+		bd.fillRect(new openfl.geom.Rectangle(bx, by + bh - f, bw, f), 0xFF66CCFF);
+		bd.fillRect(new openfl.geom.Rectangle(bx, by, f, bh), 0xFF66CCFF);
+		bd.fillRect(new openfl.geom.Rectangle(bx + bw - f, by, f, bh), 0xFF66CCFF);
+
+		return bd;
+	}
+	#end
+
+	#if sys
+	/**
+	 * 【临时诊断】把渲染管线的真实运行参数写到 nova_render_probe.txt。
+	 *
+	 * 目的：确认桌面端实际走的是哪条路——
+	 *   DRAW_TILES（GPU 直接变换采样，不存在中间缓冲）
+	 *   BLITTING （相机持有一张 FlxG.width x FlxG.height 的 BitmapData，
+	 *              再被 FlxCamera.canvas._flashBitmap 按 scaleMode.scale 放大）
+	 * 后者才是"以 1280 渲染再放大"的字面情形，也才值得改渲染分辨率。
+	 */
+	public static function renderProbe():Void
+	{
+		try
+		{
+			var L:Array<String> = [];
+			var stage = FlxG.stage;
+			var win = (stage != null) ? stage.window : null;
+
+			L.push('renderMethod=' + Std.string(FlxG.renderMethod) + ' renderTile=' + FlxG.renderTile + ' renderBlit=' + FlxG.renderBlit);
+			L.push('nativeResApply=' + Main.nativeResApplyLog);
+			L.push('probeNote=' + L_probeNote);
+			var lw:Int = 0, lh:Int = 0;
+			if (stage != null)
+			{
+				@:privateAccess {
+					lw = stage.__logicalWidth;
+					lh = stage.__logicalHeight;
+				}
+			}
+			L.push('stageLogical=' + lw + 'x' + lh);
+			final libStage = openfl.Lib.current != null ? openfl.Lib.current.stage : null;
+			L.push('sameStage=' + ((stage != null && libStage == stage))
+				+ ' libStage=' + ((libStage != null) ? libStage.stageWidth + 'x' + libStage.stageHeight : 'null'));
+			L.push('FlxG=' + FlxG.width + 'x' + FlxG.height + ' initial=' + FlxG.initialWidth + 'x' + FlxG.initialHeight);
+			L.push('stage=' + (stage != null ? stage.stageWidth + 'x' + stage.stageHeight + ' quality=' + Std.string(stage.quality) : 'null'));
+			L.push('scaleMode=' + ((stage != null) ? Std.string(stage.scaleMode) + ' align=' + Std.string(stage.align) : 'null')
+				+ ' nativeResEnv=' + Std.string(Main.nativeResRequested()));
+			L.push('window=' + (win != null ? win.width + 'x' + win.height + ' scale=' + win.scale + ' dpi=' + win.display.dpi : 'null'));
+			L.push('contextType=' + ((win != null && win.context != null) ? Std.string(win.context.type) : 'null'));
+			L.push('scaleMode=' + Type.getClassName(Type.getClass(FlxG.scaleMode))
+				+ ' scale=' + FlxG.scaleMode.scale.x + ',' + FlxG.scaleMode.scale.y
+				+ ' gameSize=' + FlxG.scaleMode.gameSize.x + ',' + FlxG.scaleMode.gameSize.y
+				+ ' deviceSize=' + FlxG.scaleMode.deviceSize.x + ',' + FlxG.scaleMode.deviceSize.y
+				+ ' offset=' + FlxG.scaleMode.offset.x + ',' + FlxG.scaleMode.offset.y);
+
+			if (FlxG.cameras != null && FlxG.cameras.list != null)
+			{
+				for (cam in FlxG.cameras.list)
+				{
+					L.push('cam#' + cam.ID + ' size=' + cam.width + 'x' + cam.height
+						+ ' zoom=' + cam.zoom + ' camScale=' + cam.scaleX + ',' + cam.scaleY
+						+ ' totalScale=' + cam.totalScaleX + ',' + cam.totalScaleY
+						+ ' aa=' + cam.antialiasing
+						+ ' buffer=' + (cam.buffer == null ? 'null' : cam.buffer.width + 'x' + cam.buffer.height)
+						+ ' canvas=' + (cam.canvas == null ? 'null' : 'present'));
+				}
+			}
+
+			// 1.5 倍缩放究竟发生在哪一层？
+			var lib = openfl.Lib.current;
+			L.push('lib.current scale=' + ((lib != null) ? lib.scaleX + ',' + lib.scaleY : 'null'));
+			L.push('FlxG.game scale=' + FlxG.game.scaleX + ',' + FlxG.game.scaleY + ' pos=' + FlxG.game.x + ',' + FlxG.game.y);
+			if (FlxG.cameras != null && FlxG.cameras.list != null)
+			{
+				for (cam in FlxG.cameras.list)
+				{
+					if (cam.canvas != null)
+						L.push('cam#' + cam.ID + '.canvas scale=' + cam.canvas.scaleX + ',' + cam.canvas.scaleY + ' pos=' + cam.canvas.x + ',' + cam.canvas.y);
+					if (cam.flashSprite != null)
+						L.push('cam#' + cam.ID + '.flashSprite scale=' + cam.flashSprite.scaleX + ',' + cam.flashSprite.scaleY
+							+ ' pos=' + cam.flashSprite.x + ',' + cam.flashSprite.y);
+				}
+			}
+
+			// 后缓冲（GL viewport）尺寸：判断 1.5 倍放大是"后缓冲被拉伸"还是"displayMatrix 缩放"
+			try
+			{
+				var vp = lime.graphics.opengl.GL.getParameter(lime.graphics.opengl.GL.VIEWPORT);
+				if (vp != null && vp.length >= 4)
+					L.push('glViewport=' + Std.int(vp[2]) + 'x' + Std.int(vp[3]));
+				else
+					L.push('glViewport=unexpected');
+			}
+			catch (e:Dynamic)
+			{
+				L.push('glViewport=err ' + Std.string(e));
+			}
+
+			if (stage != null)
+			{
+				var dmA:Float = 0, dmD:Float = 0;
+				@:privateAccess {
+					dmA = stage.__displayMatrix.a;
+					dmD = stage.__displayMatrix.d;
+				}
+				L.push('displayMatrix=' + dmA + ',' + dmD);
+			}
+
+			// 【实验】FlxText 超采样自检：验证"位图 ×N、逻辑尺寸不变"
+			try
+			{
+				var tp = new FlxText(0, 0, 0, 'SelfCheck AaBbGg 0123');
+				tp.setFormat(null, 16, 0xFFFFFF);
+				@:privateAccess tp.regenGraphic();
+				L.push('textProbe renderScale=' + FlxText.renderScale
+					+ ' bitmap=' + ((tp.graphic != null) ? tp.graphic.width + 'x' + tp.graphic.height : 'null')
+					+ ' frame=' + tp.frameWidth + 'x' + tp.frameHeight
+					+ ' width=' + tp.width + ' h=' + tp.height
+					+ ' scale=' + tp.scale.x);
+				tp.destroy();
+			}
+			catch (e:Dynamic)
+			{
+				L.push('textProbe err ' + Std.string(e));
+			}
+
+			// 【实验】makeGraphic 超采样自检
+			try
+			{
+				var sp = new flixel.FlxSprite();
+				sp.makeGraphic(100, 40, 0xFFFFFFFF);
+				L.push('spriteProbe density=' + flixel.FlxSprite.pixelDensity
+					+ ' bitmap=' + ((sp.graphic != null) ? sp.graphic.width + 'x' + sp.graphic.height : 'null')
+					+ ' frame=' + sp.frameWidth + 'x' + sp.frameHeight
+					+ ' width=' + sp.width + 'x' + sp.height
+					+ ' scale=' + sp.scale.x);
+				sp.destroy();
+			}
+			catch (e:Dynamic)
+			{
+				L.push('spriteProbe err ' + Std.string(e));
+			}
+
+			sys.io.File.saveContent('nova_render_probe.txt', L.join('\n') + '\n');
+		}
+		catch (e:Dynamic)
+		{
+			try sys.io.File.saveContent('nova_render_probe.txt', 'probe failed: ' + Std.string(e)) catch (e2:Dynamic) {}
+		}
+	}
+
+	private static var probeKey:String = '';
+	private static var lastWinW:Int = -1;
+	private static var lastWinH:Int = -1;
+
+	/** 【实验/修复验证】尺寸/缩放状态变化时重写探针文件，并在窗口尺寸变化后补一次 Stage.__resize()。 */
+	public static function probeWatch():Void
+	{
+		try
+		{
+			FlxG.signals.postUpdate.add(function()
+			{
+				var s = FlxG.stage;
+				if (s == null) return;
+				var w = s.window;
+
+				if (w != null && (w.width != lastWinW || w.height != lastWinH))
+				{
+					lastWinW = w.width;
+					lastWinH = w.height;
+					// 关键：OpenFL 只在窗口创建时调过一次 __setLogicalSize，
+					// 之后若 resize 事件没送达，stage/后缓冲就会停在创建尺寸，
+					// 画面被系统整体拉伸。这里主动补算一次。
+					@:privateAccess s.__resize();
+				}
+
+				var key = s.stageWidth + 'x' + s.stageHeight + '|' + ((w != null) ? w.width + 'x' + w.height + '@' + w.scale : '');
+				if (key != probeKey)
+				{
+					probeKey = key;
+					renderProbe();
+				}
+			});
+		}
+		catch (e:Dynamic) {}
+	}
+	#end
 
 	override public function create()
 	{
@@ -81,16 +412,105 @@ class InitState extends MusicBeatState
 
 		ClientPrefs.loadPrefs();
 
-		// 调试/自动化验证用：启动参数 -emk / --emk / emk 或环境变量 NOVAF_EMK=1
+		#if sys
+		// 【默认关闭】文字字形超采样 —— 实测会改动部分 UI 元素的排版，待查清后再启用。
+		//
+		// 机制说明：全屏时 OpenFL 会把整幅 1280x720 的画面按 displayMatrix 放大 1.5 倍
+		// 输出（已实测 a=1.5），字形若只按逻辑字号光栅化就会发虚。本机制让字形按
+		// N 倍精度光栅化，屏幕采样回到 1:1，从而恢复锐利。倍率取 1.5 最合算
+		// （正好抵消 displayMatrix，位图面积 x2.25 而非 x4）。
+		//
+		// 为什么默认关闭：与关闭状态做同机同界面 A/B 实测，
+		// 大差异像素(big>=60) 达 1.032%，而相同配置两次运行的基线噪声只有 0.013%
+		// （见 20260921.md 第十节）。big 级差异意味着元素的位置/形状真的变了，
+		// 不是单纯的边缘锐化 —— 用户反馈的"文字排版错位、缩放错误"即来源于此。
+		// 已知遗留：文字逻辑宽度会比原来少 1px（226->225），原因是字体字距在不同
+		// 字号下取整方式不同；对依赖 text.width 做布局/缩放的 UI 会造成可见偏移。
+		// 排查与适配完成前，保持原版行为，需要试用时设 DCE_TEXT_HD=1.5。
+		try
+		{
+			final hdV:String = Sys.getEnv('DCE_TEXT_HD');
+			if (hdV != null && hdV != '')
+			{
+				final hdF:Float = Std.parseFloat(hdV);
+				if (!Math.isNaN(hdF) && hdF >= 1.0 && hdF <= 4.0)
+					FlxText.renderScale = hdF;
+			}
+		}
+		catch (e:Dynamic) {}
+
+		// 【默认关闭】程序化位图（makeGraphic）超采样。
+		// 机制本身已验证有效，但开启后位图尺寸变为 N 倍，而下列代码直接操作
+		// `.pixels` 并使用硬编码像素坐标，会只覆盖一部分区域而错位：
+		//   substates/Prompt.hx（11 处 fillRect）、developer/editors/ChartingState.hx（波形）、
+		//   general/backend/CoolUtil.hx、options/base/NotesSubState.hx、scripts/lua/FunkinLua.hx
+		// 待这些调用点按倍率适配后再默认开启。现可用 DCE_PIXEL_DENSITY=2 手动试用。
+		try
+		{
+			final pdV:String = Sys.getEnv('DCE_PIXEL_DENSITY');
+			if (pdV != null && pdV != '')
+			{
+				final pdF:Float = Std.parseFloat(pdV);
+				if (!Math.isNaN(pdF) && pdF >= 1.0 && pdF <= 4.0)
+					flixel.FlxSprite.pixelDensity = pdF;
+			}
+		}
+		catch (e:Dynamic) {}
+		#end
+
+		#if sys
+		if (Main.nativeResRequested())
+		{
+			// 在 setupGame() 里设过一次，但那时 OpenFL 的窗口包装尚未完成，
+			// 会被 Window.new() 用 attributes.width/height 覆盖回创建尺寸。
+			// 这里在舞台完全就绪后再设一次，此时才会真正生效。
+			Main.applyNativeLogicalSize();
+		}
+		// 临时诊断改为按需启用：默认不叠加测试图案、不写 nova_render_probe.txt，
+		// 画面保持干净。
+		//   DCE_PROBE=1   → 输出渲染自检与探针文件
+		//   DCE_PATTERN=1 → 在 stage 顶层叠加"分辨率对比"测试图案
+		// 注意 probeWatch() 内含"窗口尺寸变化后补一次 Stage.__resize()"的修复，
+		// 若启用 DCE_RES=native / 2k 需要把它一并打开。
+		try
+		{
+			if (Sys.getEnv('DCE_PROBE') == '1')
+			{
+				renderProbe();
+				probeWatch();
+			}
+			if (Sys.getEnv('DCE_PATTERN') == '1')
+				renderProbePattern();
+		}
+		catch (e:Dynamic) {}
+		#end
+
+		// 调试/自动化验证用：启动参数 -emk / --emk / emk 或环境变量 DCE_EMK=1
 		// 等效于在维护设置里打开「调整移动端各Editor键位」（不弹浏览器）。
 		#if sys
 		try
 		{
 			var argHit:Bool = Sys.args().indexOf('-emk') != -1 || Sys.args().indexOf('--emk') != -1 || Sys.args().indexOf('emk') != -1;
 			var envHit:Bool = false;
-			try { envHit = Sys.getEnv('NOVAF_EMK') == '1'; } catch (e:Dynamic) {}
+			try { envHit = Sys.getEnv('DCE_EMK') == '1'; } catch (e:Dynamic) {}
 			if (argHit || envHit)
 				EditorMobileKeys.setEnabled(true, false);
+		}
+		catch (e:Dynamic) {}
+		#end
+
+		// 调试/自动化验证用：启动参数 -kvmenu / --kvmenu 或环境变量 DCE_KVMENU=1
+		// 启动后直接落到「皮肤设置 → 键盘反馈设置」，省掉一路点菜单（截图/回归验证用）。
+		// 只改启动落点，不动任何设置数据；真正跳转在 changeState() 里。
+		#if sys
+		try
+		{
+			var args = Sys.args();
+			var kvArg:Bool = args.indexOf('-kvmenu') != -1 || args.indexOf('--kvmenu') != -1;
+			var optionsArg:Bool = args.indexOf('-options') != -1 || args.indexOf('--options') != -1;
+			var kvEnv:Bool = false;
+			try { kvEnv = Sys.getEnv('DCE_KVMENU') == '1'; } catch (e:Dynamic) {}
+			if (kvArg || kvEnv || optionsArg) kvMenuRequested = true;
 		}
 		catch (e:Dynamic) {}
 		#end
@@ -114,7 +534,31 @@ class InitState extends MusicBeatState
 		FlxG.fullscreen = true;
 		#end
 
-		#if desktop FlxG.stage.addEventListener(KeyboardEvent.KEY_UP, Main.toggleFullScreen); #end
+		// ★ 软重启（FlxG.resetGame）会重新走一遍 InitState.create()，而 FlxG.stage /
+		//   FlxG.signals 是**跨重启存活**的全局对象：不加锁就会每次重启多挂一份监听，
+		//   而且永远摘不掉（旧闭包持有旧对象 → 真泄漏）。这里只挂一次。
+		if (!globalHooksInstalled)
+		{
+			globalHooksInstalled = true;
+
+			#if desktop FlxG.stage.addEventListener(KeyboardEvent.KEY_UP, Main.toggleFullScreen); #end
+
+			// shader coords fix
+			FlxG.signals.gameResized.add(function(w, h)
+			{
+				if (FlxG.cameras != null)
+				{
+					for (cam in FlxG.cameras.list)
+					{
+						if (cam != null && cam.filters != null)
+							Main.resetSpriteCache(cam.flashSprite);
+					}
+				}
+
+				if (FlxG.game != null)
+					Main.resetSpriteCache(FlxG.game);
+			});
+		}
 
 		#if android FlxG.android.preventDefaultKeys = [BACK]; #end
 
@@ -127,22 +571,6 @@ class InitState extends MusicBeatState
 		FlxG.mouse.visible = false;
 		#end
 
-		// shader coords fix
-		FlxG.signals.gameResized.add(function(w, h)
-		{
-			if (FlxG.cameras != null)
-			{
-				for (cam in FlxG.cameras.list)
-				{
-					if (cam != null && cam.filters != null)
-						Main.resetSpriteCache(cam.flashSprite);
-				}
-			}
-
-			if (FlxG.game != null)
-				Main.resetSpriteCache(FlxG.game);
-		});		
-
 		var maxTextureSize:Int = GL.getParameter(GL.MAX_TEXTURE_SIZE);
 		trace('maxTextureSize: ' + maxTextureSize);
 		Image.setMaxTextureSize(maxTextureSize);
@@ -153,8 +581,6 @@ class InitState extends MusicBeatState
 
 		Language.resetData();
 
-		originfunkin.OriginFunkinConfig.setStartVideoEnabled(ClientPrefs.data.skipTitleVideo ? false : true);
-
 		#if CHECK_FOR_UPDATES
 		if (ClientPrefs.data.checkForUpdates)
 		{
@@ -164,7 +590,7 @@ class InitState extends MusicBeatState
 				{
 					trace('checking for update');
 					// 版本检查必须指向本分支(修复版)自己的仓库，而不是已经停止维护的上游仓库
-					var http = new haxe.Http("https://raw.githubusercontent.com/D-C-LushiFu/NovaFlare-Engine-LushiFuFixedsss/refs/heads/main/gitVersion.txt");
+					var http = new haxe.Http("https://raw.githubusercontent.com/D-C-LushiFu/Different-Creatingness-Engine/refs/heads/main/gitVersion.txt");
 
 					http.onData = function(data:String)
 					{
@@ -176,10 +602,10 @@ class InitState extends MusicBeatState
 							var onlineDataLine:String = (lines.length > 1 ? lines[1] : '').trim();
 							var onlineEngine:Float = toVersionNumber(onlineEngineLine);
 							var onlineData:Float = toVersionNumber(onlineDataLine);
-							var localEngine:Float = toVersionNumber(MainMenuState.novaFlareEngineVersion);
-							var localData:Float = toVersionNumber(Std.string(MainMenuState.novaFlareEngineDataVersion));
+							var localEngine:Float = toVersionNumber(MainMenuState.dceEngineVersion);
+							var localData:Float = toVersionNumber(Std.string(MainMenuState.dceEngineDataVersion));
 
-							trace('version online: ' + onlineEngineLine + ', your version: ' + MainMenuState.novaFlareEngineVersion);
+							trace('version online: ' + onlineEngineLine + ', your version: ' + MainMenuState.dceEngineVersion);
 
 							if (onlineEngine > localEngine || onlineData > localData)
 							{
@@ -213,10 +639,16 @@ class InitState extends MusicBeatState
 		#end
 
 		#if mobile
-		if (ClientPrefs.data.filesCheck && !ignoreCopy)
+		// hotfix：iOS 上自动复制只尝试一次，失败或被中断后不再反复弹窗
+		//（配套 CopyState.hasAttemptedIOSCopy / markIOSCopyAttempted）
+		var allowAutomaticCopy:Bool = #if ios !CopyState.hasAttemptedIOSCopy() #else true #end;
+		if (allowAutomaticCopy && ClientPrefs.data.filesCheck && !ignoreCopy)
 		{
 			if (!CopyState.checkExistingFiles())
 			{
+				#if ios
+				CopyState.markIOSCopyAttempted();
+				#end
 				FlxG.switchState(new CopyState());
 				return;
 			}
@@ -224,20 +656,26 @@ class InitState extends MusicBeatState
 		ignoreCopy = false;
 
         // 检查assets/version.txt存不存在且里面保存的上一个版本号与当前的版本号一不一致，如果不一致或不存在，强制启动copy。
-        if (!FileSystem.exists(Paths.getSharedPath('version.txt')))
+        if (allowAutomaticCopy && !FileSystem.exists(Paths.getSharedPath('version.txt')))
         {
-            sys.io.File.saveContent(Paths.getSharedPath('version.txt'), 'now version: ' + Std.string(states.mainMenuState.MainMenuState.novaFlareEngineVersion) + '\n' + 'commit: ' + Std.string(states.mainMenuState.MainMenuState.novaFlareEngineCommit));
+            sys.io.File.saveContent(Paths.getSharedPath('version.txt'), 'now version: ' + Std.string(states.mainMenuState.MainMenuState.dceEngineVersion) + '\n' + 'commit: ' + Std.string(states.mainMenuState.MainMenuState.dceEngineCommit));
+            #if ios
+            CopyState.markIOSCopyAttempted();
+            #end
             FlxG.switchState(new CopyState(true));
             return;
         }
-        else
+        else if (allowAutomaticCopy)
         {
-            var expectedContent = 'now version: ' + Std.string(states.mainMenuState.MainMenuState.novaFlareEngineVersion) + '\n' + 'commit: ' + Std.string(states.mainMenuState.MainMenuState.novaFlareEngineCommit);
+            var expectedContent = 'now version: ' + Std.string(states.mainMenuState.MainMenuState.dceEngineVersion) + '\n' + 'commit: ' + Std.string(states.mainMenuState.MainMenuState.dceEngineCommit);
             var actualContent = sys.io.File.getContent(Paths.getSharedPath('version.txt'));
             
             if (actualContent != expectedContent)
             {
                 sys.io.File.saveContent(Paths.getSharedPath('version.txt'), expectedContent);
+                #if ios
+                CopyState.markIOSCopyAttempted();
+                #end
                 FlxG.switchState(new CopyState(true));
                 return;
             }
@@ -285,6 +723,12 @@ class InitState extends MusicBeatState
 		}
 
 		#if sys
+		var requestedEditor = developer.editors.EditorLaunch.fromArguments();
+		if (requestedEditor != null)
+		{
+			MusicBeatState.switchState(requestedEditor);
+			return;
+		}
 		if (startDiagnosticGameplay())
 			return;
 		#end
@@ -313,19 +757,19 @@ class InitState extends MusicBeatState
 	#if sys
 	function startDiagnosticGameplay():Bool
 	{
-		var requestedSong:String = Sys.getEnv('NOVAFLARE_DIAGNOSTIC_SONG');
+		var requestedSong:String = Sys.getEnv('DCE_DIAGNOSTIC_SONG');
 		if (requestedSong == null || requestedSong.trim().length == 0)
 			return false;
 
 		requestedSong = Paths.formatToSongPath(requestedSong.trim());
 
-		var requestedMod:String = Sys.getEnv('NOVAFLARE_DIAGNOSTIC_MOD');
+		var requestedMod:String = Sys.getEnv('DCE_DIAGNOSTIC_MOD');
 		if (requestedMod != null && requestedMod.trim().length > 0)
 			Mods.currentModDirectory = requestedMod.trim();
 
 		Difficulty.resetList();
 		var difficulty:Int = 1;
-		var requestedDifficulty:String = Sys.getEnv('NOVAFLARE_DIAGNOSTIC_DIFFICULTY');
+		var requestedDifficulty:String = Sys.getEnv('DCE_DIAGNOSTIC_DIFFICULTY');
 		if (requestedDifficulty != null && requestedDifficulty.trim().length > 0)
 		{
 			var requestedDifficultyValue:String = requestedDifficulty.trim();
@@ -340,7 +784,7 @@ class InitState extends MusicBeatState
 		}
 		difficulty = Std.int(Math.max(0, Math.min(Difficulty.list.length - 1, difficulty)));
 
-		var botplayValue:String = Sys.getEnv('NOVAFLARE_DIAGNOSTIC_BOTPLAY');
+		var botplayValue:String = Sys.getEnv('DCE_DIAGNOSTIC_BOTPLAY');
 		var botplay:Bool = botplayValue == null
 			|| !['0', 'false', 'off', 'no'].contains(botplayValue.trim().toLowerCase());
 
@@ -378,6 +822,7 @@ class InitState extends MusicBeatState
 	}
 	#end
 	
+
 	function startCutscenesIn()
 	{
 		if (!ClientPrefs.data.skipTitleVideo)
@@ -446,7 +891,48 @@ class InitState extends MusicBeatState
 	var videoFinished:Bool = false;
 	var videoHasFrame:Bool = false;
 	var videoWatchdog:FlxTimer;
-	
+	// 挂在视频 bitmap 信号上的闭包都会隐式捕获 this(=本 InitState)。匿名闭包**摘不掉**，
+	// 而视频位图会被 VLC 后端 / 显示树多活一会儿 → 每次启动的 InitState 被多钉住一段
+	// 时间（实测软重启循环里会同时存活 2~3 个）。所以统一存引用，收尾时逐个摘除。
+	var videoOnFormatSetup:Void->Void = null;
+	var videoOnError:String->Void = null;
+	var videoOnDisplay:Void->Void = null;
+
+	/** 摘掉视频信号上的全部监听（videoEnd 与 destroy 都要走一遍，防漏）。 */
+	function detachVideoSignals(?v:FlxVideoSprite):Void
+	{
+		if (v == null) v = video;
+		if (v != null && v.bitmap != null)
+		{
+			try v.bitmap.onEndReached.remove(videoEnd) catch (e:Dynamic) {}
+			if (videoOnFormatSetup != null) try v.bitmap.onFormatSetup.remove(videoOnFormatSetup) catch (e:Dynamic) {}
+			if (videoOnError != null) try v.bitmap.onEncounteredError.remove(videoOnError) catch (e:Dynamic) {}
+			if (videoOnDisplay != null) try v.bitmap.onDisplay.remove(videoOnDisplay) catch (e:Dynamic) {}
+		}
+		videoOnFormatSetup = null;
+		videoOnError = null;
+		videoOnDisplay = null;
+	}
+
+	/**
+	 * 彻底关掉一个视频精灵。
+	 *
+	 * 只 stop() 是不够了：hxvlc 的 VLC 播放器有自己的解码线程与原生句柄，官方文档要求
+	 * 用完 dispose()。不 dispose 时视频对象（以及挂在它信号上的闭包 → 捕获本状态的
+	 * 那些）会被原生侧多留很久，实测软重启循环里能看到每次启动的 InitState 都还活着。
+	 */
+	function teardownVideo(v:FlxVideoSprite):Void
+	{
+		if (v == null) return;
+		detachVideoSignals(v);
+		try v.stop() catch (e:Dynamic) {}
+		try
+		{
+			if (v.bitmap != null) v.bitmap.dispose();
+		}
+		catch (e:Dynamic) {}
+	}
+
 	function startVideo(name:String)
 	{
 		videoFinished = false;
@@ -479,9 +965,9 @@ class InitState extends MusicBeatState
 			video.bitmap.x -= FlxG.game.x;
 			video.bitmap.y -= FlxG.game.y;
 		}
-		video.bitmap.onFormatSetup.add(function():Void
+		videoOnFormatSetup = function():Void
 		{
-			if (video.bitmap != null && video.bitmap.bitmapData != null)
+			if (video != null && video.bitmap != null && video.bitmap.bitmapData != null)
 			{
 				final scale:Float = Math.min(FlxG.width / video.bitmap.bitmapData.width, FlxG.height / video.bitmap.bitmapData.height);
 	
@@ -489,14 +975,16 @@ class InitState extends MusicBeatState
 				video.updateHitbox();
 				video.screenCenter();
 			}
-		});
+		};
+		video.bitmap.onFormatSetup.add(videoOnFormatSetup);
 		video.bitmap.onEndReached.add(videoEnd);
-		video.bitmap.onEncounteredError.add(function(message:String):Void
+		videoOnError = function(message:String):Void
 		{
 			FlxG.log.error('Video playback failed: ' + message);
 			videoEnd();
-		});
-		video.bitmap.onDisplay.add(function():Void
+		};
+		video.bitmap.onEncounteredError.add(videoOnError);
+		videoOnDisplay = function():Void
 		{
 			if (videoHasFrame)
 				return;
@@ -506,7 +994,8 @@ class InitState extends MusicBeatState
 				videoWatchdog.cancel();
 				videoWatchdog = null;
 			}
-		});
+		};
+		video.bitmap.onDisplay.add(videoOnDisplay);
 		add(video);
 		if (!video.load(filepath))
 		{
@@ -558,14 +1047,12 @@ class InitState extends MusicBeatState
 		}
 		if (skipVideo != null) skipVideo.visible = false;
 		var oldVideo:FlxVideoSprite = video;
-		video = null;
 		if (oldVideo != null) {
-			if (oldVideo.bitmap != null)
-				oldVideo.bitmap.onEndReached.remove(videoEnd);
-			oldVideo.stop();
+			teardownVideo(oldVideo);
 			remove(oldVideo, true);
 			oldVideo.destroy();
 		}
+		video = null;
 		changeState();
 		trace("end");
 	}
@@ -577,6 +1064,24 @@ class InitState extends MusicBeatState
 		FlxTween.tween(skipVideo, {alpha: 0}, 1, {ease: FlxEase.quadIn, startDelay: 4});
 	}
 	#end
+
+	override function destroy()
+	{
+		#if VIDEOS_ALLOWED
+		// 跳过视频 / 中途切走时，视频可能还挂着会捕获 this 的监听闭包：
+		// 销毁前统一摘掉并释放播放器，否则解码线程/原生句柄会把本状态多留很久。
+		if (video != null)
+		{
+			teardownVideo(video);
+			if (videoWatchdog != null)
+			{
+				videoWatchdog.cancel();
+				videoWatchdog = null;
+			}
+		}
+		#end
+		super.destroy();
+	}
 
 	var changingState:Bool = false;
 
@@ -621,6 +1126,14 @@ class InitState extends MusicBeatState
 			FlxTransitionableState.skipNextTransOut = true;
 			MusicBeatState.switchState(new OutdatedState());
 		}
+		else if (kvMenuRequested)
+		{
+			// -kvmenu 调试落点：直接进设置界面（OptionsState 会自己再打开键盘反馈子界面）
+			kvMenuRequested = false;
+			FlxTransitionableState.skipNextTransIn = true;
+			FlxTransitionableState.skipNextTransOut = true;
+			MusicBeatState.switchState(new options.OptionsState());
+		}
 		else
 		{
 			FlxTransitionableState.skipNextTransIn = true;
@@ -628,4 +1141,7 @@ class InitState extends MusicBeatState
 			MusicBeatState.switchState(new TitleState());
 		}
 	}
+
+	/** -kvmenu / DCE_KVMENU=1：启动后直接打开「键盘反馈设置」（仅启动落点，不改数据） */
+	public static var kvMenuRequested:Bool = false;
 }

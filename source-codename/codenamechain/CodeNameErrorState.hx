@@ -13,16 +13,25 @@ class CodeNameErrorState extends FlxState
 		FlxG.camera.bgColor = FlxColor.BLACK;
 		var text:FlxText = new FlxText(48, 80, FlxG.width - 96,
 			"CodeName could not start.\n\n" + (CodeNameMode.preparationError ?? "Unknown startup error")
-			+ "\n\nPress Enter or Escape to return to NovaFlare on the next launch.", 24);
+			+ (#if mobile "\n\nTap anywhere to return to D.C.E. on the next launch."
+			#else "\n\nPress Enter or Escape to return to D.C.E. on the next launch." #end), 24);
 		text.setFormat(null, 24, FlxColor.WHITE, LEFT);
 		add(text);
 	}
 
 	override public function update(elapsed:Float):Void
 	{
-		if (FlxG.keys.justPressed.ENTER || FlxG.keys.justPressed.ESCAPE)
+		var touchPressed:Bool = false;
+		#if FLX_TOUCH
+		for (touch in FlxG.touches.list)
+			if (touch.justPressed) {
+				touchPressed = true;
+				break;
+			}
+		#end
+		if (FlxG.keys.justPressed.ENTER || FlxG.keys.justPressed.ESCAPE || touchPressed)
 		{
-			originfunkin.OriginFunkinConfig.requestNovaFlare();
+			originfunkin.OriginFunkinConfig.requestDCE();
 			lime.system.System.exit(0);
 			return;
 		}

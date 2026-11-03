@@ -16,7 +16,10 @@ interface ITreeOption {
 	function select():Void;
 }
 
-interface ITreeFloatOption extends ITreeOption {
+/** An option whose value is changed with the left and right controls. */
+interface ITreeHorizontalOption extends ITreeOption {}
+
+interface ITreeFloatOption extends ITreeHorizontalOption {
 	function changeValue(change:Float):Void;
 }
 
@@ -48,6 +51,9 @@ class TreeMenu extends UIState {
 
 	override function create() {
 		super.create();
+		#if mobile
+		FlxG.mouse.visible = !controls.touchC;
+		#end
 
 		bgLabel = new FlxSprite().makeGraphic(1, 1, FlxColor.BLACK);
 		bgLabel.alpha = 0.25;
@@ -201,6 +207,9 @@ class TreeMenu extends UIState {
 		if (treeLength == 0) exit();
 		else {
 			updateLabels();
+			#if TOUCH_CONTROLS
+			tree.last().refreshMobileControls();
+			#end
 
 			if (menuChangeTween != null && menuChangeTween.active) menuChangeTween.cancel();
 			menuChangeTween = FlxTween.tween(FlxG.camera.scroll, {x: tree.last().x}, 1.5, {ease: menuTransitionEase, onComplete: (t) -> {

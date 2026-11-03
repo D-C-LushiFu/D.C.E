@@ -21,6 +21,27 @@ class Script extends FlxBasic implements IFlxDestroyable {
 	 * Gets the default variables for a script.
 	 */
 	public static function getDefaultVariables(?script:Script):Map<String, Dynamic> {
+		var vars = _defaultVariablesTemplate != null ? _defaultVariablesTemplate : (_defaultVariablesTemplate = buildDefaultVariables());
+		var copy = vars.copy();
+		copy.set("state", flixel.FlxG.state); // `state` changes on state switch, so it can't be cached
+		copy.set("window", lime.app.Application.current.window); // same for `window`: evaluated at script creation time like before
+		// This object is script-mutable; never share it through the template.
+		copy.set("engine", {
+			commit: Flags.COMMIT_NUMBER,
+			hash: Flags.COMMIT_HASH,
+			build: 2675,
+			name: "Codename Engine"
+		});
+		return copy;
+	}
+
+	/**
+	 * Cached template of the default variables.
+	 * Built once (including the `Type.resolveClass` lookups) and shallow-copied per script.
+	 */
+	private static var _defaultVariablesTemplate:Map<String, Dynamic> = null;
+
+	private static function buildDefaultVariables():Map<String, Dynamic> {
 		return [
 			// Haxe related stuff
 			"Std"				=> Std,
@@ -38,10 +59,8 @@ class Script extends FlxBasic implements IFlxDestroyable {
 			"Assets"			=> openfl.utils.Assets,
 			"Application"		=> lime.app.Application,
 			"Main"				=> codename.funkin.backend.system.Main,
-			"window"			=> lime.app.Application.current.window,
 
 			// Flixel related stuff
-			"state"				=> flixel.FlxG.state,
 			"FlxG"				=> flixel.FlxG,
 			"FlxSprite"			=> flixel.FlxSprite,
 			"FlxBasic"			=> flixel.FlxBasic,
@@ -156,6 +175,21 @@ class Script extends FlxBasic implements IFlxDestroyable {
 		// Old State Names
 		redirects["codename.funkin.menus.BetaWarningState"] 			= "codename.funkin.menus.WarningState";
 
+		// Voiid Chronicles shipped `Input` with a lowercase `l`. Point that
+		// historical spelling at the real gamepad enum-abstract wrapper.
+		redirects["flixel.input.gamepad.FlxGamepadlnputID"] = "flixel.input.gamepad.FlxGamepadInputID";
+
+		// Legacy built-in asset scripts still use the original pre-namespace
+		// packages. These redirects cover Week 6's stage/pause UI and Week 7's
+		// cutscene sprite class before those asset scripts start running.
+		redirects["funkin.game.HudCamera"] = "codename.funkin.game.HudCamera";
+		redirects["funkin.ui.FunkinText"] = "codename.funkin.backend.FunkinText";
+		redirects["funkin.system.FunkinSprite"] = "codename.funkin.backend.FunkinSprite";
+		// HScript normalizes legacy `funkin.*` imports before resolving them, so
+		// keep the normalized spellings as well for built-in asset scripts.
+		redirects["codename.funkin.ui.FunkinText"] = "codename.funkin.backend.FunkinText";
+		redirects["codename.funkin.system.FunkinSprite"] = "codename.funkin.backend.FunkinSprite";
+
 		// Mods are authored against Codename's original `funkin.*` package.
 		// Keep those historical redirect keys while targeting the namespaced classes.
 		var aliases = [for (key => value in redirects) {key: key, value: value}];
@@ -193,6 +227,11 @@ class Script extends FlxBasic implements IFlxDestroyable {
 	 * Currently executing script.
 	 */
 	public static var curScript:Script = null;
+
+	/**
+	 * Shared empty argument array, used when calling scripts without parameters (avoids allocations).
+	 */
+	private static var _EMPTY_ARGS:Array<Dynamic> = [];
 
 	/**
 	 * Script name (with extension)
@@ -335,7 +374,7 @@ class Script extends FlxBasic implements IFlxDestroyable {
 		var oldScript = curScript;
 		curScript = this;
 
-		var result = onCall(func, parameters == null ? [] : parameters);
+		var result = onCall(func, parameters);
 
 		curScript = oldScript;
 		return result;

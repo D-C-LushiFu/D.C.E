@@ -119,6 +119,13 @@ class UIContextMenu extends MusicBeatSubstate {
 	}
 
 	public override function update(elapsed:Float) {
+		#if mobile
+		if (controls.BACK) {
+			closeWithParents();
+			return;
+		}
+		#end
+
 		if (__oobDeletion && FlxG.mouse.justPressed && !bg.hoveredByChild && !hoveringAnyChildren())
 			closeWithParents();
 

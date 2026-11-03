@@ -151,7 +151,8 @@ class StoryMenuState extends MusicBeatState {
 			}
 
 			changeDifficulty((controls.LEFT_P ? -1 : 0) + (controls.RIGHT_P ? 1 : 0));
-			changeWeek((controls.UP_P ? -1 : 0) + (controls.DOWN_P ? 1 : 0) - FlxG.mouse.wheel);
+			var scroll = controls.touchC ? 0 : FlxG.mouse.wheel;
+			changeWeek((controls.UP_P ? -1 : 0) + (controls.DOWN_P ? 1 : 0) - scroll);
 
 			if (controls.ACCEPT)
 				selectWeek();

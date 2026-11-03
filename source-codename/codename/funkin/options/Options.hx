@@ -40,13 +40,35 @@ class Options
 	public static var splashesEnabled:Bool = true;
 	@:dox(hide) @:doNotSave public static var hitWindow:Float = 250; // DEPRECATED
 	public static var songOffset:Float = 0;
-	public static var framerate:Int = 120;
-	public static var gpuOnlyBitmaps:Bool = #if (mac || web) false #else true #end; // causes issues on mac and web
+	public static var framerate:Int = #if mobile 60 #else 120 #end;
+	public static var gpuOnlyBitmaps:Bool = #if (mac || web || mobile) false #else true #end; // causes issues on mac, web and mobile
 	public static var language = "en"; // default to english, Flags.DEFAULT_LANGUAGE should not modify this
-	public static var streamedMusic:Bool = false;
-	public static var streamedVocals:Bool = false;
+	public static var streamedMusic:Bool = #if mobile true #else false #end;
+	public static var streamedVocals:Bool = #if mobile true #else false #end;
 	public static var quality:Int = 1;
 	public static var allowConfigWarning:Bool = true;
+	/** Scale of D.C.E.'s watermark while the Codename state chain is active. */
+	public static var watermarkScale:Float = 1;
+	/** Enables D.C.E.'s pointer trail and click effects outside gameplay. */
+	public static var mouseEffects:Bool = true;
+	/** Skips D.C.E.'s startup video when entering the Codename state chain. */
+	public static var skipTitleVideo:Bool = false;
+	#if TOUCH_CONTROLS
+	/** Saved appearance of D.C.E.'s Codename virtual pad. */
+	public static var touchPadAlpha:Float = 0.6;
+	public static var oldPadTexture:Bool = false;
+	/** Saved appearance and optional guide lanes for the gameplay hitbox. */
+	public static var hitboxAlpha:Float = 0.6;
+	public static var hitboxType:String = "gradient";
+	public static var hitboxPos:Bool = true;
+	public static var extraHints:String = "NONE";
+	#end
+	#if mobile
+	/** Allows Android to follow the device's normal idle-sleep policy. */
+	public static var screenTimeOut:Bool = false;
+	/** Automatically converts desktop GLSL programs for the active OpenGL ES context. */
+	public static var autoShaderConversion:Bool = true;
+	#end
 	#if MODCHARTING_FEATURES
 	public static var modchartingHoldSubdivisions:Int = 4;
 	#end
@@ -56,14 +78,15 @@ class Options
 	/**
 	 * EDITORS SETTINGS
 	 */
-	public static var intensiveBlur:Bool = true;
+	public static var intensiveBlur:Bool = #if mobile false #else true #end;
 	public static var editorSFX:Bool = true;
+	public static var charterSwapEventSides:Bool = false;
 
 	public static var editorCharterPrettyPrint:Bool = false;
 	public static var editorCharacterPrettyPrint:Bool = true;
 	public static var editorStagePrettyPrint:Bool = true;
 
-	public static var editorsResizable:Bool = true;
+	public static var editorsResizable:Bool = #if mobile false #else true #end;
 	public static var bypassEditorsResize:Bool = false;
 	public static var maxUndos:Int = 120;
 	public static var songOffsetAffectEditors:Bool = false;
@@ -200,13 +223,29 @@ class Options
 	public static var SOLO_DEV_CONSOLE(get, null):Array<FlxKey>;
 	public static var SOLO_DEV_RELOAD(get, null):Array<FlxKey>;
 
-	public static function load() {
+	static function bindSave():Void {
 		var path = haxe.macro.Compiler.getDefine("SAVE_OPTIONS_PATH"), name = haxe.macro.Compiler.getDefine("SAVE_OPTIONS_NAME");
 		if (path == null) path = 'CodenameEngine';
 		if (name == null) name = 'options';
 
 		if (__save == null) __save = new FlxSave();
 		__save.bind(name, path);
+	}
+
+	/** Reads only settings needed before the Codename runtime is initialized. */
+	public static function loadStartupSettings():Void {
+		bindSave();
+		if (__save.data.skipTitleVideo != null)
+			skipTitleVideo = __save.data.skipTitleVideo;
+		#if mobile
+		if (__save.data.autoShaderConversion != null)
+			autoShaderConversion = __save.data.autoShaderConversion;
+		general.shaders.MobileShaderConverter.setEnabled(autoShaderConversion);
+		#end
+	}
+
+	public static function load() {
+		bindSave();
 		__load();
 
 		if (!__eventAdded) {
@@ -231,6 +270,9 @@ class Options
 
 		FlxG.sound.defaultMusicGroup.volume = volumeMusic;
 		FlxG.autoPause = autoPause;
+		#if mobile
+		general.shaders.MobileShaderConverter.setEnabled(autoShaderConversion);
+		#end
 		if (FlxG.updateFramerate < framerate) FlxG.drawFramerate = FlxG.updateFramerate = framerate;
 		else FlxG.updateFramerate = FlxG.drawFramerate = framerate;
 	}

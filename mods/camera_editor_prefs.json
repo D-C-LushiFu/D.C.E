@@ -1,0 +1,42 @@
+{
+	"recentCharts": [],
+	"layers": [
+		{
+			"typeName": "",
+			"name": "Default",
+			"color": -6700648
+		},
+		{
+			"typeName": "",
+			"name": "Layer 2",
+			"color": -9398883
+		}
+	],
+	"scrollMs": 0,
+	"panelAX": 1472,
+	"panelAY": 100,
+	"panelBX": 1464,
+	"panelBY": 412,
+	"layerVisible": [
+		true,
+		true
+	],
+	"durationSteps": false,
+	"strumPreviewVisible": true,
+	"snapEnabled": true,
+	"quantOptionIndex": 3,
+	"showPassepartout": false,
+	"shaderEnabled": true,
+	"layerColors": [
+		-6700648,
+		-9398883
+	],
+	"keybindings": null,
+	"autoScrollMode": 1,
+	"showExtendedBounds": false,
+	"bookmarks": {
+		"times": [],
+		"song": "Tutorial"
+	},
+	"pxPerMs": 0.05
+}

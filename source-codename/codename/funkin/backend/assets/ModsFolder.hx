@@ -2,6 +2,8 @@ package codename.funkin.backend.assets;
 
 import flixel.util.FlxSignal.FlxTypedSignal;
 import codename.funkin.backend.system.MainState;
+import codename.funkin.backend.utils.CoolUtil;
+import haxe.ds.StringMap;
 import haxe.io.Path;
 import lime.text.Font;
 import openfl.text.Font as OpenFLFont;
@@ -42,6 +44,8 @@ class ModsFolder {
 	 * Whenever its the first time mods has been reloaded.
 	 */
 	private static var __firstTime:Bool = true;
+
+	@:dox(hide) public static var modsListSortCache:StringMap<Array<String>> = new StringMap();
 
 	/**
 	 * Initializes `mods` folder.
@@ -94,25 +98,52 @@ class ModsFolder {
 		#end
 	}
 
-	public static function getModsList():Array<String> {
+	public static function getModsList(?sortingOptions:ModSortingOptions):Array<String> {
 		var mods:Array<String> = [];
 		#if MOD_SUPPORT
 		// Mods directory does not exist yet, create it
 		if (!FileSystem.exists(modsPath)) FileSystem.createDirectory(modsPath);
-		
+
 		final modsList:Array<String> = FileSystem.readDirectory(modsPath);
 
 		if (modsList == null || modsList.length <= 0) return mods;
 
 		for (modFolder in modsList) {
 			if (FileSystem.isDirectory(modsPath + modFolder)) mods.push(modFolder);
-			else if (Flags.ALLOWED_ZIP_EXTENSIONS.contains(Path.extension(modFolder))) mods.push(Path.withoutExtension(modFolder));
+			else {
+				var extension = Path.extension(modFolder);
+				if (extension != null && Flags.ALLOWED_ZIP_EXTENSIONS.contains(extension.toLowerCase()))
+					mods.push(Path.withoutExtension(modFolder));
+			}
+		}
+
+		if (sortingOptions != null) {
+		    var sortForge:StringBuf = new StringBuf();
+			for (i in mods) {
+			    sortForge.add(i);
+				sortForge.add("::");
+			}
+
+			sortForge.add(Std.string(sortingOptions.descending ? 1 : 0));
+
+			sortForge.add(sortingOptions.mode);
+
+			final sortForgePure:String = sortForge.toString();
+
+			if (modsListSortCache.exists(sortForgePure))
+			    mods = modsListSortCache.get(sortForgePure);
+				if (mods.length > 0 && mods[mods.length - 1] == null) mods.pop();
+			else {
+			    ModSortingController.sort(sortingOptions, mods);
+				modsListSortCache.set(sortForgePure, mods);
+			}
 		}
 		#end
 		return mods;
 	}
-	public static function getLoadedModsLibs(skipTranslated:Bool = false):Array<IModsAssetLibrary> {
+	public static function getLoadedModsLibs(skipTranslated:Bool = false, uniqueByModName:Bool = false):Array<IModsAssetLibrary> {
 		var libs = [];
+		var seen:Map<String, Bool> = [];
 		for (i in Paths.assetsTree.libraries) {
 			var l = AssetsLibraryList.getCleanLibrary(i);
 			#if TRANSLATIONS_SUPPORT
@@ -120,12 +151,17 @@ class ModsFolder {
 			#end
 			// No need to check for it being a `ScriptedAssetLibrary`, if `ScriptedAssetLibrary` extends ModsFolderLibrary, which implements `IModsAssetLibrary`
 			// If you have to revert this change then uhhhhh wasn't me, trust 🙏
-			if (/*l is ScriptedAssetLibrary ||*/ l is IModsAssetLibrary) libs.push(cast(l, IModsAssetLibrary));
+			if (/*l is ScriptedAssetLibrary ||*/ l is IModsAssetLibrary) {
+				var modLib:IModsAssetLibrary = cast l;
+				if (uniqueByModName && seen.exists(modLib.modName)) continue;
+				if (uniqueByModName) seen.set(modLib.modName, true);
+				libs.push(modLib);
+			}
 		}
 		return libs;
 	}
-	public static function getLoadedMods(skipTranslated:Bool = false):Array<String>
-		return [for (modLib in getLoadedModsLibs(skipTranslated)) modLib.modName];
+	public static function getLoadedMods(skipTranslated:Bool = false, uniqueByModName:Bool = false):Array<String>
+		return [for (modLib in getLoadedModsLibs(skipTranslated, uniqueByModName)) modLib.modName];
 
 	public static function prepareLibrary(libName:String, force:Bool = false) {
 		var assets:AssetManifest = new AssetManifest();
@@ -166,4 +202,49 @@ class ModsFolder {
 		return prepareModLibrary(libName, new ZipFolderLibrary(zipPath, libName, modName), force, tag);
 	}
 	#end
+}
+
+/**
+ * Describes how mods should be sorted when getting the mods list.
+ */
+typedef ModSortingOptions = {
+    /**
+     * Whether or not the list should go in descending order (e.g. `[2, 1, 0]`).
+     */
+    var descending:Bool;
+    /**
+     * The sorting mode to use.
+     */
+    var mode:ModSortingMode;
+}
+
+/**
+ * This class performs the actual sorting for the mods list.
+ */
+class ModSortingController {
+    /**
+     * Sort the mods list, according to the provided sorting options.
+     */
+    public static function sort(sortingOptions:ModSortingOptions, list:Array<String>):Void {
+        switch (sortingOptions.mode) {
+            case ModSortingMode.CLEAN: {}
+            case ModSortingMode.ALPHABETICAL: CoolUtil.sortAlphabetically(list);
+        }
+        if (sortingOptions.descending) list.reverse();
+    }
+}
+
+/**
+ * The mods list can be sorted in all of the ways provided by this enum.
+ */
+enum abstract ModSortingMode(String) {
+    /**
+     * Use the original list received from reading the directory. This may depend
+     * on the current platform, but remains for legacy purposes.
+     */
+    var CLEAN;
+    /**
+     * The list should be in alphabetical order.
+     */
+    var ALPHABETICAL;
 }

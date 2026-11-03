@@ -19,6 +19,6 @@ class BlendModesShader extends FlxRuntimeShader
   {
     this.cameraData = cameraData;
 
-    this.setBitmapData('camera', this.cameraData);
+    this.setSampler2D('camera', cameraData);
   }
 }

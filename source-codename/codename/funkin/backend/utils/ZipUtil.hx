@@ -25,7 +25,7 @@ using StringTools;
 // import ZipUtils; var e = ZipUtils.createZipFile("file.ycemod"); ZipUtils.writeFolderToZip(e, "./mods/Friday Night Funkin'/", "Friday Night Funkin'/"); e.flush(); e.close();
 
 final class ZipUtil {
-	public static var bannedNames:Array<String> = [".git", ".gitignore", ".github", ".vscode", ".gitattributes", "readme.txt"];
+	public static var bannedNames:Array<String> = [".git", ".gitignore", ".github", ".gitattributes", "readme.txt"];
 
 	/**
 	 * [Description] Decompresses a `zip` into the `destFolder` folder

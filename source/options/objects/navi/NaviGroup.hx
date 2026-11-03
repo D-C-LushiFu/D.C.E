@@ -46,15 +46,15 @@ class NaviGroup extends FlxSpriteGroup
 
 	// ── 垂直栏：以视口高 H 为基准（括号里是 HTML 原型里的值）──────────
 	inline static var V_PAD_TOP:Float = 0.015;     // 1.5vh  顶部内边距
-	inline static var V_BRAND_H:Float = 0.09;      // 9vh    品牌行高 .nav-group
+	inline static var V_BRAND_H:Float = 0.13;      // 13vh   Freeplay 顶栏下方的留白与品牌区
 	inline static var V_BRAND_GAP:Float = 0.009;   // 0.9vh  品牌行下边距
 	inline static var V_MEMBER_H:Float = 0.066;    // 6.6vh  分类项高 .nav-item
 	inline static var V_LANG_GAP:Float = 0.015;    // 1.5vh  语言按钮上边距
-	inline static var V_ICON:Float = 0.044;        // 4.4vh  .gicon / .mode-btn
+	inline static var V_ICON:Float = 0.044;        // 4.4vh  分类图标
 	inline static var V_NAME:Float = 0.018;        // ≈1.7vh 品牌名字号
 	inline static var V_TAG:Float = 0.0124;        // ≈1.14vh 副标题
 	inline static var V_CHEV:Float = 0.021;        // 2.1vh  折叠箭头 .chev
-	inline static var V_SIDE_PAD:Float = 0.055;    // 侧边距（占栏宽）
+	inline static var V_SIDE_PAD:Float = 0.03;     // 侧边距（收紧品牌行，让侧栏更靠左）
 
 	// ── 横向栏：以栏高 baseHeight 为基准 ────────────────────────────
 	inline static var H_PAD:Float = 0.14;
@@ -95,11 +95,6 @@ class NaviGroup extends FlxSpriteGroup
 	var chevron:FlxText;          // 折叠箭头
 	var brandHit:Rect;            // 品牌行命中区（点击 = 折叠/展开）
 
-	var modeBg:Rect;              // 模式切换按钮底
-	var modeBar:Rect;             // 模式图标：条
-	var modeBlock:Rect;           // 模式图标：块
-	var modeHit:Rect;
-	var modeSize:Float = 0;
 
 	// ── 语言列表（常态显示：每个可选语言一个条目，视觉与分类项一致）──
 	//
@@ -171,13 +166,12 @@ class NaviGroup extends FlxSpriteGroup
 		//   rgba(41,40,52,.60), rgba(24,23,31,.70))：Slab 内部的竖向渐变是
 		//   「基准 α × 0.86 → 基准 α」，所以基准取 0.70 才能得到 .60→.70。
 		//   以前写 0.62（= .53→.62），比原型透，模糊层透出来太多就成了"一片雾"。
-		barBG = new Slab(color, 0.70, 0xFFFFFF, horizontal ? 0.07 : 0.06,
-			false, horizontal, false, !horizontal);
+		barBG = new Slab(color, horizontal ? 0.62 : 0.0, 0xFFFFFF, horizontal ? 0.07 : 0.0,
+			false, horizontal, false, false);
 		add(barBG);
 		barBG.setRect(0, 0, width, height);
 
 		buildBrand();
-		buildModeButton();
 		// ★ 语言条目不在这里建：它的行高要看「分类项有几条」才能算出来（见 buildLangList），
 		//   而分类项是 OptionsState 拿到分类列表之后才调 buildMembers() 建的。
 	}
@@ -188,7 +182,7 @@ class NaviGroup extends FlxSpriteGroup
 	{
 		var iconSize:Float = horizontal ? baseHeight * H_ICON : FlxG.height * V_ICON;
 
-		brandIcon = new FlxSprite().loadGraphic(Paths.image('menuExtend/OptionsState/icons/NovaFlare Engine'));
+		brandIcon = new FlxSprite().loadGraphic(Paths.image('menuExtend/OptionsState/icons/DCE'));
 		brandIcon.setGraphicSize(Std.int(iconSize));
 		brandIcon.updateHitbox();
 		brandIcon.antialiasing = ClientPrefs.data.antialiasing;
@@ -197,7 +191,7 @@ class NaviGroup extends FlxSpriteGroup
 
 		var nameSize:Int = Std.int(horizontal ? baseHeight * H_NAME : FlxG.height * V_NAME);
 
-		brandName = new FlxText(0, 0, 0, 'NovaFlare Engine', nameSize);
+		brandName = new FlxText(0, 0, 0, 'D.C.E.', nameSize);
 		brandName.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), nameSize, FlxColor.WHITE, LEFT);
 		brandName.borderStyle = NONE;
 		brandName.antialiasing = ClientPrefs.data.antialiasing;
@@ -210,7 +204,7 @@ class NaviGroup extends FlxSpriteGroup
 		}
 		else
 		{
-			brandTag = new FlxText(0, 0, 0, 'v1.2.2', Std.int(FlxG.height * V_TAG));
+			brandTag = new FlxText(0, 0, 0, 'v' + states.mainMenuState.MainMenuState.dceEngineVersion, Std.int(FlxG.height * V_TAG));
 			brandTag.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(FlxG.height * V_TAG), 0x9BA1B8, LEFT);
 			brandTag.borderStyle = NONE;
 			brandTag.antialiasing = ClientPrefs.data.antialiasing;
@@ -280,11 +274,7 @@ class NaviGroup extends FlxSpriteGroup
 	}
 
 	/**
-	 * 箭头贴着模式按钮左边，不跟它重叠。
-	 *
-	 * ★ 这里用公式算出模式按钮的左缘，而不是读 modeBg.x ——
-	 *   buildBrand()（建箭头）在 buildModeButton()（建 modeBg）**之前**执行，
-	 *   直接读 modeBg.x 在构造阶段会拿到 null。
+	 * 箭头跟在品牌文字后面；布局切换按钮已移除。
 	 */
 	function layoutChevron()
 	{
@@ -296,87 +286,14 @@ class NaviGroup extends FlxSpriteGroup
 		else
 		{
 			var H:Float = FlxG.height;
-			var modeLeft:Float = offX + baseWidth - baseWidth * V_SIDE_PAD - H * V_ICON;
-			chevron.x = modeLeft - H * 0.012 - chevron.width;
+			chevron.x = brandName.x + brandName.width + H * 0.014;
 			chevron.y = offY + H * V_PAD_TOP + H * V_BRAND_H / 2 - chevron.height / 2;
 		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
 
-	function buildModeButton()
-	{
-		modeSize = horizontal ? baseHeight * H_ICON : FlxG.height * V_ICON;
-
-		modeBg = new Rect(0, 0, modeSize, modeSize, modeSize * 0.25, modeSize * 0.25, EngineSet.mainColor, 0.35);
-		add(modeBg);
-
-		// 图标：一条「栏」+ 一块「内容区」，模拟竖栏/横栏两种布局
-		modeBar = new Rect(0, 0, modeSize * 0.62, modeSize * 0.24, 2, 2, EngineSet.mainColor);
-		modeBlock = new Rect(0, 0, modeSize * 0.62, modeSize * 0.34, 2, 2, EngineSet.mainColor, 0.45);
-		add(modeBar);
-		add(modeBlock);
-
-		modeHit = new Rect(0, 0, modeSize * 0.94, modeSize * 0.94, 0, 0, 0x1A1A22, HIDDEN_ALPHA);
-		add(modeHit);
-
-		layoutModeButton();
-	}
-
-	/** 图标方向随目标模式变化：竖向时显示「切到横向」的示意图，反之亦然 */
-	function layoutModeButton()
-	{
-		var size:Float = modeSize;
-		var bx:Float;
-		var by:Float;
-
-		if (horizontal)
-		{
-			bx = chevron.x + chevron.width + baseHeight * 0.32;
-			by = offY + (baseHeight - size) / 2;
-		}
-		else
-		{
-			var H:Float = FlxG.height;
-			bx = offX + baseWidth - baseWidth * V_SIDE_PAD - size;
-			by = offY + H * V_PAD_TOP + (H * V_BRAND_H - size) / 2;
-		}
-
-		modeBg.x = bx;
-		modeBg.y = by;
-		modeHit.x = bx;
-		modeHit.y = by;
-
-		var cx:Float = bx + (size - modeBar.width) / 2;
-		var cy:Float = by + (size - (modeBar.height + modeBlock.height + 2)) / 2;
-
-		if (horizontal)
-		{
-			// 目标是竖向：左窄条 + 右宽块
-			modeBar.setGraphicSize(Std.int(size * 0.24), Std.int(size * 0.62));
-			modeBlock.setGraphicSize(Std.int(size * 0.34), Std.int(size * 0.62));
-			modeBar.updateHitbox();
-			modeBlock.updateHitbox();
-			modeBar.x = cx - modeBar.width / 2 - 1;
-			modeBar.y = cy;
-			modeBlock.x = modeBar.x + modeBar.width + 2;
-			modeBlock.y = cy;
-		}
-		else
-		{
-			// 目标是横向：上窄条 + 下宽块
-			modeBar.setGraphicSize(Std.int(size * 0.62), Std.int(size * 0.24));
-			modeBlock.setGraphicSize(Std.int(size * 0.62), Std.int(size * 0.34));
-			modeBar.updateHitbox();
-			modeBlock.updateHitbox();
-			modeBar.x = cx;
-			modeBar.y = cy - modeBar.height / 2 - 1;
-			modeBlock.x = cx;
-			modeBlock.y = modeBar.y + modeBar.height + 2;
-		}
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////
 	// 语言列表（常态可见，不是下拉）
@@ -708,10 +625,12 @@ class NaviGroup extends FlxSpriteGroup
 			return;
 		}
 
-		var y:Float = offY + memberTopY();
+		var firstY:Float = offY + memberTopY();
+		var y:Float = firstY;
 		for (m in parent)
 		{
-			m.baseX = offX + baseWidth * 0.02;
+			// Match Freeplay's descending song rows with the same 15-degree slope.
+			m.baseX = offX + baseWidth * 0.46 - (y - firstY) * states.freeplayState.objects.PhiPanel.SLOPE;
 			m.x = m.baseX;
 			m.y = y;
 			y += m.mainHeight;
@@ -813,11 +732,11 @@ class NaviGroup extends FlxSpriteGroup
 		}
 	}
 
-	/** 横向栏里分类/语言这一段的左边界：品牌 + 折叠箭头 + 模式按钮之后 */
+	/** 横向兼容布局中分类/语言这一段的左边界：品牌与折叠箭头之后 */
 	function langStripLeft():Float
 	{
 		if (!horizontal) return 0;
-		return modeBg.x + modeSize + baseHeight * 0.3;
+		return brandName.x + brandName.width + baseHeight * 0.42;
 	}
 
 	/** 折叠/展开一级列表：整列向左侧滑出去（高度不变），逐项错开 LIST_STAGGER(15ms) */
@@ -959,7 +878,6 @@ class NaviGroup extends FlxSpriteGroup
 		if (!horizontal)
 		{
 			layoutBrand();
-			layoutModeButton();
 			layoutMembers();
 		}
 	}
@@ -970,26 +888,20 @@ class NaviGroup extends FlxSpriteGroup
 		barBG.setRect(offX, offY, FlxG.width, h);
 		if (horizontal)
 		{
-			// 注意：modeSize 不跟着改 —— Rect 的贴图尺寸在构造时就定死了，
-			// 只改这个数字会让按钮的"命中区/图标"和可见的底板对不上
 			layoutBrand();
-			layoutModeButton();
 			layoutMembers();
 		}
 	}
 
 	public var onFocus:Bool = false;
 	public var chevronFocus:Bool = false;
-	public var modeFocus:Bool = false;
-
 	override function update(elapsed:Float)
 	{
 		super.update(elapsed);
 
 		var mouse = OptionsState.instance.mouseEvent;
-		onFocus = mouse.overlaps(brandHit) || mouse.overlaps(modeHit);
+		onFocus = mouse.overlaps(brandHit);
 		chevronFocus = mouse.overlaps(brandHit);
-		modeFocus = mouse.overlaps(modeHit);
 
 		// 语言条目的悬停高亮 / 点击切换（常态可见，没有下拉面板）
 		updateLangRows(mouse);
@@ -1007,9 +919,7 @@ class NaviGroup extends FlxSpriteGroup
 		//   setOff(整条栏平移) 互相覆盖 —— 结果是横栏已经进来了，竖向的分类项
 		//   却还留在屏幕左边（而且栏底磨砂已经移走，看起来像浮在背景上）。
 		//   模式按钮是更小、更明确的目标，点击时优先它。
-		if (modeFocus && mouse.justReleased)
-			OptionsState.instance.toggleMode();
-		else if (chevronFocus && mouse.justReleased)
+		if (chevronFocus && mouse.justReleased)
 			setListOpen(!isOpened, true);
 	}
 
@@ -1029,7 +939,6 @@ class NaviGroup extends FlxSpriteGroup
 		for (m in parent) m.changeLanguage();
 		// 顺序要紧：品牌名宽度变了 → 箭头位置变 → 模式按钮和整条内容条跟着挪
 		layoutBrand();
-		layoutModeButton();
 		layoutMembers();
 	}
 }

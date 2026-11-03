@@ -51,7 +51,9 @@ class FlxShader extends OriginalFlxShader
 		@:privateAccess
 		var gl = __context.gl;
 
-		#if lime_opengles
+		#if mobile
+		var prefix = '';
+		#elseif lime_opengles
 		var prefix = "#version 300 es\n";
 		#else
 		var prefix = "#version 330\n";
@@ -65,7 +67,16 @@ class FlxShader extends OriginalFlxShader
 				+ "#endif\n" : "precision lowp float;\n")
 			+ "#endif\n\n";
 
-		#if lime_opengles
+		#if mobile
+		var vertex = prefix + glVertexSource;
+		var fragment = prefix + glFragmentSource;
+		@:privateAccess
+		var preparedSources = __prepareMobileGLSLProgram(vertex, fragment);
+		vertex = preparedSources.vertex;
+		fragment = preparedSources.fragment;
+		var id = preparedSources.cacheKey + '\nvertex:' + vertex.length + '\n' + vertex
+			+ '\nfragment:' + fragment.length + '\n' + fragment;
+		#elseif lime_opengles
 		prefix += 'out vec4 output_FragColor;\n';
 		var vertex = prefix
 			+ glVertexSource.replace("attribute", "in")
@@ -73,12 +84,12 @@ class FlxShader extends OriginalFlxShader
 				.replace("texture2D", "texture")
 				.replace("gl_FragColor", "output_FragColor");
 		var fragment = prefix + glFragmentSource.replace("varying", "in").replace("texture2D", "texture").replace("gl_FragColor", "output_FragColor");
+		var id = vertex + fragment;
 		#else
 		var vertex = prefix + glVertexSource;
 		var fragment = prefix + glFragmentSource;
-		#end
-
 		var id = vertex + fragment;
+		#end
 		@:privateAccess
 		if (__context.__programs.exists(id) && save)
 		{
@@ -98,6 +109,12 @@ class FlxShader extends OriginalFlxShader
 
 		if (program != null)
 		{
+			#if mobile
+			@:privateAccess
+			__glTransformRevision = general.shaders.MobileShaderConverter.revision;
+			@:privateAccess
+			__glProgramDirty = false;
+			#end
 			@:privateAccess
 			glProgram = program.__glProgram;
 

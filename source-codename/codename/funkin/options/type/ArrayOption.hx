@@ -1,6 +1,8 @@
 package codename.funkin.options.type;
 
-class ArrayOption extends TextOption {
+import codename.funkin.options.TreeMenu.ITreeHorizontalOption;
+
+class ArrayOption extends TextOption implements ITreeHorizontalOption {
 	public var changedCallback:String->Void;
 
 	public var options:Array<Dynamic>;

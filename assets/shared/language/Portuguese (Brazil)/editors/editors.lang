@@ -11,3 +11,15 @@ noteSplashDebug => Depuração de Splash de Nota
 # ===== Aviso de diretório de mod (barra de status inferior) =====
 noModDirectory => < Nenhum Diretório de Mod Carregado >
 loadedModDirectory => < Diretório de Mod Carregado:
+
+history_undo => Desfazer
+history_redo => Refazer
+history_open => Histórico
+history_opened => Documento aberto
+history_changed => Documento editado
+history_saved => Sem alterações
+history_unsaved => Não salvo
+history_discard => Descartar as alterações não salvas e continuar?
+history_imported => Configuração importada
+
+history_save => Salvar

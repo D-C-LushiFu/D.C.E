@@ -29,7 +29,7 @@ class UpdateUtil {
 
 	public static function init() {
 		// deletes old bak file if it exists
-		#if sys
+		#if (sys && !mobile)
 		var bakPath = '${Path.withoutExtension(Sys.programPath())}.bak';
 		if (FileSystem.exists(bakPath)) FileSystem.deleteFile(bakPath);
 		#end
@@ -121,7 +121,7 @@ class UpdateUtil {
 			var i = index;
 
 			var release = releases[i];
-			var containsBinary = skipNextBinaryChecks;
+			var containsBinary = #if mobile true #else skipNextBinaryChecks #end;
 			if (!containsBinary) {
 				for(asset in release.assets) {
 					if (asset.name.toLowerCase() == AsyncUpdater.executableGitHubName.toLowerCase()) {

@@ -24,12 +24,12 @@ $previousCpu = 0.0
 $previousElapsed = 0.0
 $sample = 0
 
-if (-not ('NovaFlareProcessMonitorNative' -as [type])) {
+if (-not ('DCEProcessMonitorNative' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
 
-public static class NovaFlareProcessMonitorNative
+public static class DCEProcessMonitorNative
 {
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT
@@ -90,7 +90,7 @@ try {
 
         $window = $process.MainWindowHandle
         $foregroundWindow =
-            [NovaFlareProcessMonitorNative]::GetForegroundWindow()
+            [DCEProcessMonitorNative]::GetForegroundWindow()
         $isForeground = if ($window -eq [IntPtr]::Zero) {
             -1
         }
@@ -101,13 +101,13 @@ try {
             -1
         }
         else {
-            [int][NovaFlareProcessMonitorNative]::IsWindowVisible($window)
+            [int][DCEProcessMonitorNative]::IsWindowVisible($window)
         }
         $isIconic = if ($window -eq [IntPtr]::Zero) {
             -1
         }
         else {
-            [int][NovaFlareProcessMonitorNative]::IsIconic($window)
+            [int][DCEProcessMonitorNative]::IsIconic($window)
         }
         $isCloaked = -1
         $windowLeft = 0
@@ -117,15 +117,15 @@ try {
         if ($window -ne [IntPtr]::Zero) {
             $cloakedValue = 0
             $dwmResult =
-                [NovaFlareProcessMonitorNative]::DwmGetWindowAttribute(
+                [DCEProcessMonitorNative]::DwmGetWindowAttribute(
                     $window, 14, [ref]$cloakedValue, 4)
             if ($dwmResult -eq 0) {
                 $isCloaked = [int]($cloakedValue -ne 0)
             }
 
-            $rect = New-Object NovaFlareProcessMonitorNative+RECT
+            $rect = New-Object DCEProcessMonitorNative+RECT
             if (
-                [NovaFlareProcessMonitorNative]::GetWindowRect(
+                [DCEProcessMonitorNative]::GetWindowRect(
                     $window, [ref]$rect)
             ) {
                 $windowLeft = $rect.Left

@@ -1,12 +1,13 @@
 package options.objects.backend;
 
 import flixel.math.FlxRect;
+import states.freeplayState.objects.PhiPanel;
 
 class StringSelect extends FlxSpriteGroup
 {
     public var follow:Option;
 
-    public var bg:Rect;
+    public var bg:PhiPanel;
     public var slider:Rect;
 
     public var options:Array<String>;
@@ -43,7 +44,8 @@ class StringSelect extends FlxSpriteGroup
         // 白字浮在设置面板上（原来这里是 0xffffff + alpha 0.1，淡到几乎看不见，
         // 对照 HTML 原型 .selmenu{background:rgba(20,19,27,.97)}）。
         // alpha 由 StringRect.change() 在展开/收起时补间。
-        bg = new Rect(0, 0, width, calcHeight, width / 75, width / 75, 0x14131D, 0);
+        bg = new PhiPanel(0, 0, Std.int(width), Std.int(calcHeight), 0x14131D);
+        bg.alpha = 0;
         add(bg);
 
         var init = 80;
@@ -174,7 +176,7 @@ class StringSelect extends FlxSpriteGroup
 
 
 class ChooseRect extends FlxSpriteGroup {
-    public var bg:Rect;
+    public var bg:PhiPanel;
     public var textDis:FlxText;
 
     public var optionSort:Int;
@@ -196,7 +198,8 @@ class ChooseRect extends FlxSpriteGroup {
 
         optionSort = sort;
 
-        bg = new Rect(0, 0, width, height, height / 5, height / 5, 0x96B5FF, 0);
+        bg = new PhiPanel(0, 0, Std.int(width), Std.int(height), 0x96B5FF);
+        bg.alpha = 0;
         add(bg);
 
         textDis = new FlxText(0, 0, 0, displayName, Std.int(height * 0.15));

@@ -16,6 +16,21 @@ class ShaderFunctions
 	private static var storedFilters:Map<String, ShaderFilter> = [];
 	#end
 
+	/**
+	 * 清空静态滤镜表。
+	 *
+	 * storedFilters 是 **static**：mod 调 addShaderToCam() 加进去却忘了 removeCamShader()
+	 * 时，ShaderFilter（及其 FlxRuntimeShader / GL program）会永久留在这张表里跨状态存活 ——
+	 * 每进一次歌/重开一次谱面就多攒一份，属于最典型的"脚本层泄漏"。
+	 * 玩法状态销毁（脚本即将全部 stop）时调用它收口。
+	 */
+	public static function clearStoredFilters():Void
+	{
+		#if (!flash && MODS_ALLOWED && sys)
+		storedFilters.clear();
+		#end
+	}
+
 	public static function implement(funk:FunkinLua)
 	{
 		// shader shit

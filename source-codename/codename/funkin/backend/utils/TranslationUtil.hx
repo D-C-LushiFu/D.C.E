@@ -111,6 +111,7 @@ final class TranslationUtil
 		for(mod in ModsFolder.getLoadedModsLibs(false))
 			if(mod is TranslatedAssetLibrary)
 				cast(mod, TranslatedAssetLibrary).langFolder = name;
+		Paths.assetsTree.invalidateLookupCaches();
 
 		config = getConfig(name);
 		stringMap = loadLanguage(name);
@@ -206,7 +207,7 @@ final class TranslationUtil
 						config[key] = value;
 			} else { // if there was no config.ini, use the file name as the language name
 				for(file in Paths.getFolderContent(mainPath + lang).sortAlphabetically()) {
-					if(Path.extension(file) == "xml") {
+					if(Path.extension(file).toLowerCase() == "xml") {
 						config["name"] = Path.withoutExtension(file);
 						break;
 					}

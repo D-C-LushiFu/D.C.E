@@ -2,7 +2,7 @@ package developer.display;
 
 /*
     GraphMonitor - Performance Visualization Tool
-    Author: [beihu235（北狐丶望舒），AI]
+    Author: D.C.LushiFu
     
     A customizable performance monitor that displays real-time data graphs (FPS, Memory, etc.)
     with support for multiple tabs, auto-scaling, and extensive styling options.

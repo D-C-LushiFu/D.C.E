@@ -21,13 +21,13 @@ New-Item -ItemType Directory -Path $runPath -Force | Out-Null
 $csvPath = Join-Path $runPath 'frame-rate-samples.csv'
 $statusPath = Join-Path $runPath 'frame-rate-monitor-status.txt'
 
-if (-not ('NovaFlareFrameMonitor.Native' -as [type])) {
+if (-not ('DCEFrameMonitor.Native' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
-namespace NovaFlareFrameMonitor {
+namespace DCEFrameMonitor {
     public static class Native {
         [StructLayout(LayoutKind.Sequential)]
         public struct MEMORY_BASIC_INFORMATION {
@@ -333,7 +333,7 @@ namespace NovaFlareFrameMonitor {
 $process = Get-Process -Id $TargetProcessId -ErrorAction Stop
 $moduleBase = $process.MainModule.BaseAddress.ToInt64()
 $moduleSize = [int64]$process.MainModule.ModuleMemorySize
-$handle = [NovaFlareFrameMonitor.Native]::OpenProcess(0x410, $false, $TargetProcessId)
+$handle = [DCEFrameMonitor.Native]::OpenProcess(0x410, $false, $TargetProcessId)
 if ($handle -eq [IntPtr]::Zero) {
     throw "OpenProcess failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
 }
@@ -343,7 +343,7 @@ try {
     $writer.WriteLine('sample,elapsed_ms,utc,tps,fps,update_ms,draw_ms,gc_used_mb,app_private_mb,update_low_fps,draw_low_fps,update_worst_ms,draw_worst_ms')
     $writer.Flush()
     $counterBase = $moduleBase + $CounterBaseRvaHint
-    if (-not [NovaFlareFrameMonitor.Native]::PlausibleCounterBlock(
+    if (-not [DCEFrameMonitor.Native]::PlausibleCounterBlock(
             $handle, $counterBase)) {
         $counterBase = 0L
     }
@@ -352,20 +352,20 @@ try {
     # publication instead of giving up before the title screen exists.
     $resolveDeadline = [DateTime]::UtcNow.AddSeconds(240)
     do {
-        $counterBase = [NovaFlareFrameMonitor.Native]::ResolveCounterBaseFast(
+        $counterBase = [DCEFrameMonitor.Native]::ResolveCounterBaseFast(
             $handle, $moduleBase, $moduleSize)
         if ($counterBase -eq 0) {
             # Generated hxcpp static RVAs move whenever compiled classes change.
             # Scan committed module pages in large blocks for the adjacent
             # draw/update target-FPS fields, then derive DataCalc's counter
             # block using the stable generated-data layout.
-            $drawTarget = [NovaFlareFrameMonitor.Native]::ResolveDrawTarget(
+            $drawTarget = [DCEFrameMonitor.Native]::ResolveDrawTarget(
                 $handle, $moduleBase, $moduleSize,
                 [int64]($moduleSize / 2), [int64]$moduleSize)
             if ($drawTarget -ne 0) {
-                $candidate = [NovaFlareFrameMonitor.Native]::CounterBaseFromDrawTarget(
+                $candidate = [DCEFrameMonitor.Native]::CounterBaseFromDrawTarget(
                     $drawTarget)
-                if ([NovaFlareFrameMonitor.Native]::PlausibleCounterBlock(
+                if ([DCEFrameMonitor.Native]::PlausibleCounterBlock(
                         $handle, $candidate)) {
                     $counterBase = $candidate
                 }
@@ -383,7 +383,7 @@ try {
     while ($started.Elapsed.TotalSeconds -lt $MaximumSeconds -and
            (Get-Process -Id $TargetProcessId -ErrorAction SilentlyContinue)) {
         if (($sample % 40) -eq 0 -and
-            -not [NovaFlareFrameMonitor.Native]::CounterBlockStillPlausible(
+            -not [DCEFrameMonitor.Native]::CounterBlockStillPlausible(
                 $handle, $counterBase)) {
             $counterInvalid = $true
             break
@@ -393,16 +393,16 @@ try {
             $sample,
             [Math]::Round($started.Elapsed.TotalMilliseconds, 3),
             [DateTime]::UtcNow.ToString('o'),
-            [Math]::Round([NovaFlareFrameMonitor.Native]::CounterUpdateFps($handle, $counterBase), 3),
-            [Math]::Round([NovaFlareFrameMonitor.Native]::CounterDrawFps($handle, $counterBase), 3),
-            [Math]::Round([NovaFlareFrameMonitor.Native]::CounterUpdateFrame($handle, $counterBase), 6),
-            [Math]::Round([NovaFlareFrameMonitor.Native]::CounterDrawFrame($handle, $counterBase), 6),
-            [Math]::Round([NovaFlareFrameMonitor.Native]::CounterGcMem($handle, $counterBase), 3),
-            [Math]::Round([NovaFlareFrameMonitor.Native]::CounterAppMem($handle, $counterBase), 3),
-            [Math]::Round([NovaFlareFrameMonitor.Native]::CounterUpdateLowFps($handle, $counterBase), 3),
-            [Math]::Round([NovaFlareFrameMonitor.Native]::CounterDrawLowFps($handle, $counterBase), 3),
-            [Math]::Round([NovaFlareFrameMonitor.Native]::CounterUpdateWorstFrame($handle, $counterBase), 6),
-            [Math]::Round([NovaFlareFrameMonitor.Native]::CounterDrawWorstFrame($handle, $counterBase), 6)
+            [Math]::Round([DCEFrameMonitor.Native]::CounterUpdateFps($handle, $counterBase), 3),
+            [Math]::Round([DCEFrameMonitor.Native]::CounterDrawFps($handle, $counterBase), 3),
+            [Math]::Round([DCEFrameMonitor.Native]::CounterUpdateFrame($handle, $counterBase), 6),
+            [Math]::Round([DCEFrameMonitor.Native]::CounterDrawFrame($handle, $counterBase), 6),
+            [Math]::Round([DCEFrameMonitor.Native]::CounterGcMem($handle, $counterBase), 3),
+            [Math]::Round([DCEFrameMonitor.Native]::CounterAppMem($handle, $counterBase), 3),
+            [Math]::Round([DCEFrameMonitor.Native]::CounterUpdateLowFps($handle, $counterBase), 3),
+            [Math]::Round([DCEFrameMonitor.Native]::CounterDrawLowFps($handle, $counterBase), 3),
+            [Math]::Round([DCEFrameMonitor.Native]::CounterUpdateWorstFrame($handle, $counterBase), 6),
+            [Math]::Round([DCEFrameMonitor.Native]::CounterDrawWorstFrame($handle, $counterBase), 6)
         )
         $writer.WriteLine(($row -join ','))
         if (($sample % 40) -eq 0) { $writer.Flush() }
@@ -416,5 +416,5 @@ try {
 }
 finally {
     $writer.Dispose()
-    [void][NovaFlareFrameMonitor.Native]::CloseHandle($handle)
+    [void][DCEFrameMonitor.Native]::CloseHandle($handle)
 }

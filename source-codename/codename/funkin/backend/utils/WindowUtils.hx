@@ -29,6 +29,7 @@ final class WindowUtils {
 	public static inline function resetClosing() __triedClosing = false;
 
 	@:dox(hide) public static inline function init() {
+		#if !mobile
 		Lib.application.window.onClose.add(function () {
 			if (preventClosing && !__triedClosing) {
 				Lib.application.window.onClose.cancel();
@@ -36,6 +37,7 @@ final class WindowUtils {
 			}
 			if (onClosing != null) onClosing();
 		});
+		#end
 	}
 
 	/**
@@ -64,13 +66,15 @@ final class WindowUtils {
 	{
 		// TODO: Implement ICON SIZES in Flags.
 		#if CODENAME_ENGINE_COMPAT
-		WindowUtils.title = "NovaFlare Engine";
+		WindowUtils.title = "D.C.E.";
 		#else
 		WindowUtils.title = title != null ? title : (Flags.WINDOW_TITLE_USE_MOD_NAME ? Flags.MOD_NAME : Flags.TITLE);
 		#end
 
 		var iconPath = image != null ? image : Flags.MOD_ICON;
+		#if !mobile
 		if (Assets.exists(Paths.image(iconPath))) Lib.application.window.setIcon(lime.graphics.Image.fromBytes(Assets.getBytes(Paths.image(iconPath))));
+		#end
 	}
 
 	/**
@@ -78,7 +82,7 @@ final class WindowUtils {
 	**/
 	public static inline function updateTitle()
 		#if CODENAME_ENGINE_COMPAT
-		Lib.application.window.title = "NovaFlare Engine";
+		Lib.application.window.title = "D.C.E.";
 		#else
 		Lib.application.window.title = '$prefix$title$suffix';
 		#end

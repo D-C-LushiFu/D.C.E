@@ -8,7 +8,7 @@ extern class GCManager {
       /**
        直接替代了NativeGC，接入自己改的hxcpp的内容
        底下的注释都是ai写的，凑合看吧
-       --by 北狐
+       --by D.C.LushiFu
       */
 
 
@@ -280,7 +280,7 @@ class LegacyGCManager {
 
 /**
  * Engine-side lifecycle for Immix's low-latency gameplay mode.
- * NovaGC builds keep their own policy and compile these calls out.
+ * D.C.GC builds keep their own policy and compile these calls out.
  */
 class GameplayGC {
 	public static var active(get, never):Bool;

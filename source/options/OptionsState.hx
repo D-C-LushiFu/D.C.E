@@ -2,19 +2,26 @@ package options;
 
 import states.mainMenuState.MainMenuState;
 import states.freeplayState.FreeplayState;
+import states.freeplayState.objects.PhiPanel;
+import states.freeplayState.objects.PhiItalicText;
+import states.freeplayState.objects.PhigrosFreeplayView;
+import options.objects.ResizablePhiPanel;
 
 import options.base.NewControlsSubState;
 import options.base.KeyBindsSubState;
 
 import mobile.substates.MobileControlSelectSubState;
 import mobile.substates.MobileExtraControl;
+#if mobile
 import mobile.states.CopyState;
+#end
 
 import games.backend.StageData;
 import general.backend.ui.PsychUIInputText;
 
 import options.objects.Option.OptionType;
 
+import openfl.Lib;
 import openfl.display.BitmapData;
 import openfl.geom.Matrix;
 import openfl.geom.Rectangle;
@@ -26,12 +33,9 @@ import flixel.math.FlxRect;
 /**
  * 新版设置界面。
  *
- * 布局与 HTML 原型一致：
- *   · 左侧竖栏（17% 宽，展开时 18.5%）/ 顶部横栏（7vh 高）二选一，用品牌行右侧的按钮切换
- *   · 语言不再单独占一个分类，改成「维护设置」下面的 CN / EN 胶囊
- *   · 点分类时播放三段动画：① 从该菜单行向右延伸 → ② 一分为二 → ③ 拉高到 100%
- *     切换分类时先反跑 ③②① 再对新分类重跑 ①②③
- *   · 返回按钮固定在左下角
+ * Freeplay 风格的固定设置界面：左侧分类列表、上方快捷工具、右侧斜切内容面板。
+ * 选择分类时面板从分类行展开，最后铺满整个视口高度；没有横竖布局切换入口。
+ * 返回主菜单的文字使用 Freeplay 的语言键。
  *
  * 设置项内容沿用原有体系（OptionCata / Option / groupData / backend 控件），
  * 所有分类的 OptionCata 都预先摆在同一个面板内容区、只切换可见性 ——
@@ -48,17 +52,13 @@ class OptionsState extends MusicBeatState
 	// 布局比例（与 HTML 原型一致）
 	///////////////////////////////////////////////////////////////////////////////
 
-	inline static var SB_W:Float = 0.17;        // 竖向侧边栏宽
-	inline static var SB_W_OPEN:Float = 0.185;  // 展开后（吸收缝隙）
-	inline static var P_LEFT_START:Float = 0.17; // 面板起点左缘 = 侧边栏右缘
-	inline static var P_LEFT_OPEN:Float = 0.20;  // 面板展开后左缘
-	inline static var P_RIGHT:Float = 0.08;      // 面板右留白
-	inline static var BAR_H:Float = 0.07;        // 横向顶栏高
-	inline static var BOTTOM_H:Float = 0.1;      // 底部「返回」栏高（见 buildBottomBar）
-	inline static var TIP_LINES:Int = 2;         // 底部「选项说明」最多显示几行（放不下就滚）
-	inline static var TIP_X:Float = 0.19;        // 底部说明文本的左缘（避让左下角的「返回」按钮）
-	inline static var BAR_GAP:Float = 0.016;     // 顶栏与面板之间的缝隙
-	inline static var BAR_SIDE:Float = 0.08;     // 横向模式左右留白（按宽度）
+	inline static var SB_W:Float = 0.32;        // Freeplay 式左侧列表栏宽度
+	inline static var SB_W_OPEN:Float = 0.34;  // 面板展开后（留出斜切间距）
+	inline static var P_LEFT_START:Float = 0.32; // 面板起点左缘 = 侧栏右缘
+	inline static var P_LEFT_OPEN:Float = 0.36;  // 展开后右侧详情区左缘
+	inline static var P_RIGHT:Float = 0.025;      // 右侧留白
+	inline static var BOTTOM_H:Float = 0.075;      // 保持右侧设置列表的可视高度
+	inline static var TIP_X:Float = 0.03;        // 说明文本使用整行宽度
 	inline static var HEAD_H:Float = 0.105;      // 面板标题栏高
 	inline static var MIN_W:Float = 3;           // 面板动画起点宽度（不能是 0，圆角会算成负数）
 
@@ -67,7 +67,7 @@ class OptionsState extends MusicBeatState
 	 * ★ 这是「材质」的透明度，和 setPanelAlpha 的「整体可见度」是两回事，
 	 *   以前两者共用一个 alpha，展开时把面板写成了完全不透明，磨砂效果就没了。
 	 */
-	inline static var GLASS_ALPHA:Float = 0.74;
+	inline static var GLASS_ALPHA:Float = 0.78;
 	/**
 	 * 模糊贴图的短边像素数（越小越糊）。
 	 *
@@ -142,6 +142,17 @@ class OptionsState extends MusicBeatState
 	 */
 	inline static var HIDE_LEGACY_CATA_TITLE:Bool = true;
 
+	/** Freeplay 三段式顶栏：返回、设置工具条、D.C.E. 状态牌。 */
+	var fpBack:PhiPanel;
+	var fpBackText:PhiItalicText;
+	var fpBar:PhiPanel;
+	var fpTitle:FlxText;
+	var fpSubtitle:FlxText;
+	var fpVariableText:FlxText;
+	var fpFooterLine:Rect;
+	var fpTools:Array<{panel:PhiPanel, action:String}> = [];
+	var fpToolLabels:Array<{label:FlxText, action:String}> = [];
+
 	// ★ 硬规则：**任何一组动画的总时长都不超过 0.5s**。
 	//   ★★ 关键：`showContent()` 结尾的 `fadeContent(1, …)` 是**串行**接在结构补间后面的，
 	//      它必须一起算进这一组的预算里 —— 否则「0.5s 的结构 + 0.22s 的淡入 = 0.72s」，
@@ -160,8 +171,6 @@ class OptionsState extends MusicBeatState
 	inline static var R1:Float = 0.085;
 	inline static var R2:Float = 0.075;
 	inline static var R3:Float = 0.09;
-	inline static var MA:Float = 0.19;
-	inline static var MB:Float = 0.19;
 
 	/** 结构动画（展开 / 模式切换）收尾时内容淡入的时长 —— 串行加在结构补间之后，必须计入 0.5s 预算 */
 	inline static var REVEAL:Float = 0.10;
@@ -174,7 +183,7 @@ class OptionsState extends MusicBeatState
 	///////////////////////////////////////////////////////////////////////////////
 
 	public var baseColor = 0x302E3A;
-	public var mainColor = 0x24232C;
+	public var mainColor = 0x171922;
 
 	public var mouseEvent:MouseEvent;
 	public var stringCount:Array<StringSelect> = [];
@@ -188,15 +197,15 @@ class OptionsState extends MusicBeatState
 	public var cataGroup:Array<OptionCata> = [];
 
 	var barV:NaviGroup;
-	var barH:NaviGroup;
 	/** 面板的磨砂玻璃底：整块「一个 quad」的直角平板（见 Slab 的注释，为什么不用 RoundRect） */
 	var panelBG:Slab;
+	/** Freeplay 15°主体斜切面板；按当前动画几何缩放，保持一张贴图。 */
+	var panelShape:ResizablePhiPanel;
 
 	/** 磨砂玻璃层：背景的模糊版，用 clipRect 裁到面板 / 两条栏的范围 */
 	var frostGfx:FlxGraphic;
 	var frostPanel:FlxSprite;
 	var frostBarV:FlxSprite;
-	var frostBarH:FlxSprite;
 	var frostCache:Map<FlxSprite, FlxRect> = new Map();
 	var panelTitle:FlxText;
 	var panelSub:FlxText;
@@ -215,6 +224,7 @@ class OptionsState extends MusicBeatState
 	 */
 	var tipMaxScroll:Int = 0;
 	var tipScrollV:Int = 0;
+	var tipOwner:Option = null;
 	/** 说明文本的"两行窗口"是懒量的：文本刚 set 时 textHeight 还没算出来 */
 	var tipNeedFit:Bool = false;
 	var tipFitDelay:Int = 0;
@@ -235,8 +245,6 @@ class OptionsState extends MusicBeatState
 	 */
 	var bgTint:FlxSprite;
 
-	/** 'v' 竖向侧边栏 / 'h' 横向顶栏 */
-	public var mode:String = 'v';
 	var currentCata:OptionCata = null;
 
 	var panelX:Float = 0;
@@ -278,11 +286,15 @@ class OptionsState extends MusicBeatState
 	 */
 	inline function contentPad():Float return Math.max(4, FlxG.height * 0.008);
 
-	/** 内容可视区上缘（面板标题栏下沿 + padding） */
+	/** 内容可视区上缘：全高内容面板仍需避开悬浮的 Freeplay 顶部工具栏。 */
 	function contentViewTop():Float
-		return (panelW > MIN_W ? panelY : 0) + headH + contentPad();
+	{
+		var panelTop:Float = (panelW > MIN_W ? panelY : 0) + headH;
+		var toolbarBottom:Float = FlxG.height * (0.05 + 0.092);
+		return Math.max(panelTop, toolbarBottom) + contentPad();
+	}
 
-	/** 内容可视区下缘（面板底 / 返回栏上沿取小者 − padding） */
+	/** 内容列表下缘：底部整行留给设置说明文本。 */
 	function contentViewBottom():Float
 		return Math.min((panelW > MIN_W ? panelY : 0) + panelH, bottomBarTop()) - contentPad();
 
@@ -302,6 +314,15 @@ class OptionsState extends MusicBeatState
 		persistentUpdate = persistentDraw = true;
 		instance = this;
 		contentScrollPos = 0;
+		// A hidden developer-only language can remain in an old save. Normalize it
+		// before building settings labels so the selector always points at an
+		// installed language that is actually present in the visible list.
+		var installedLanguages:Array<String> = getLanguageList();
+		if (installedLanguages.length > 0 && !installedLanguages.contains(ClientPrefs.data.language))
+		{
+			ClientPrefs.data.language = installedLanguages.contains('Chinese') ? 'Chinese' : installedLanguages[0];
+			Language.resetData();
+		}
 
 		mouseEvent = new MouseEvent();
 		add(mouseEvent);
@@ -330,27 +351,14 @@ class OptionsState extends MusicBeatState
 		//   比原来侧栏底部那列小字直观得多。
 		var groups:Array<String> = CATA_NAMES.copy();
 		groups.insert(0, 'Language');
-		naviArray = [new NaviData('NovaFlare Engine', groups)];
+		naviArray = [new NaviData('D.C.E.', groups)];
 		collectModGroups(groups);
 
-		// 两条侧边栏（竖向 / 横向），内容相同、排布不同
-		// ★ 两条栏的 x/y 永远是 0：FlxSpriteGroup 的子元素存的是屏幕绝对坐标，
-		//   用 group.y 隐藏会在下一次布局时被绝对值覆盖（顶部浮出菜单项）。
-		//   隐藏统一走 setOff / hideNow。
+		// Freeplay 式纵向分类列表，始终铺满视口高度。
 		barV = new NaviGroup(false, FlxG.width * SB_W, FlxG.height, mainColor);
 		add(barV);
-		barH = new NaviGroup(true, FlxG.width, FlxG.height * BAR_H, mainColor);
-		add(barH);
 
 		barV.buildMembers(naviArray[0].group);
-		barH.buildMembers(naviArray[0].group);
-		// 必须在 buildMembers 之后才隐藏：布局函数写的是屏幕绝对坐标
-		barH.hideNow();
-
-		// 两条栏的语言条目在进入时必须是"展开态"（isOpened=true → alpha=1）。
-		//   setListOpen(true, false) 会把分类项 + 语言条目一次性硬落到展开位置，
-		//   省得还要单独记一套"语言条目的初始 alpha"。
-		barH.setListOpen(true, false);
 		barV.setListOpen(true, false);
 
 		// 所有分类的内容都建出来，统一摆到面板内容区，只切可见性
@@ -370,6 +378,7 @@ class OptionsState extends MusicBeatState
 		resetContentPosition();
 
 		buildBottomBar();
+		buildFreeplayChrome();
 
 		// 内容滚动（原实现里控件会读 cataMove.velocity / inputAllow）
 		contentMaxScroll = 0;
@@ -385,6 +394,9 @@ class OptionsState extends MusicBeatState
 		// 面板标题栏的命中区：控件用它判断「鼠标压在 UI 上」
 		specBG = new Rect(0, 0, FlxG.width, headH, 0, 0, mainColor, 0.0000001);
 		add(specBG);
+		// Keep Reset above the full-screen header hit target and every header plate.
+		remove(resetButton, false);
+		add(resetButton);
 
 		// 初始状态：只有两条栏 + 中间提示，面板不可见
 		setPanelAlpha(0);
@@ -392,7 +404,39 @@ class OptionsState extends MusicBeatState
 
 		updateStaticText();
 		super.create();
+
+		// 调试/自动化验证用：`-kvmenu` / `--kvmenu` / DCE_KVMENU=1 时，设置界面建好后
+		// 直接打开「键盘反馈设置」子界面（配合 InitState.changeState 的落点）。
+		// 只影响启动落到哪个界面，不写任何设置数据。
+		#if sys
+		try
+		{
+			var hit:Bool = Sys.args().indexOf('-kvmenu') != -1 || Sys.args().indexOf('--kvmenu') != -1;
+			var envHit:Bool = false;
+			try { envHit = Sys.getEnv('DCE_KVMENU') == '1'; } catch (e:Dynamic) {}
+			// ★ 只能用一次：命令行参数会一直在 Sys.args() 里，不用标志位的话
+			//   玩家每次关掉子界面都会被重新弹开。
+			if ((hit || envHit) && !kvMenuConsumed)
+			{
+				kvMenuConsumed = true;
+				moveState(9);
+			}
+			else if (barV.parent.length > 0)
+			{
+				// 每次进入设置都固定打开语言项，不沿用上一次浏览的分类。
+				var languageMember:NaviMember = null;
+				for (member in barV.parent)
+					if (member.memberName == 'Language') { languageMember = member; break; }
+				if (languageMember == null) languageMember = barV.parent[0];
+				onMemberClick(languageMember);
+			}
+		}
+		catch (e:Dynamic) {}
+		#end
 	}
+
+	/** `-kvmenu` 调试落点是否已经用过（只弹一次） */
+	public static var kvMenuConsumed:Bool = false;
 
 	function collectModGroups(groups:Array<String>)
 	{
@@ -467,7 +511,7 @@ class OptionsState extends MusicBeatState
 	function buildBgTint():FlxSprite
 	{
 		final DIV:Int = 4;
-		final COL_R:Int = 11, COL_G:Int = 10, COL_B:Int = 17;   // rgba(11,10,17)
+		final COL_R:Int = 91, COL_G:Int = 36, COL_B:Int = 62;   // stronger Freeplay mauve wash
 		var W:Float = FlxG.width;
 		var H:Float = FlxG.height;
 		var w:Int = Math.ceil(W / DIV);
@@ -484,9 +528,9 @@ class OptionsState extends MusicBeatState
 
 			// 竖向分段线性：0% → .34；26% → .05；72% → .10；100% → .42
 			var aLin:Float =
-				(t < 0.26) ? 0.34 + (0.05 - 0.34) * (t / 0.26) :
-				(t < 0.72) ? 0.05 + (0.10 - 0.05) * ((t - 0.26) / 0.46) :
-				             0.10 + (0.42 - 0.10) * ((t - 0.72) / 0.28);
+				(t < 0.26) ? 0.44 + (0.15 - 0.44) * (t / 0.26) :
+				(t < 0.72) ? 0.15 + (0.22 - 0.15) * ((t - 0.26) / 0.46) :
+				             0.22 + (0.50 - 0.22) * ((t - 0.72) / 0.28);
 
 			var dy:Float = (y - H * 0.50) / (H * 0.85);
 			var dy2:Float = dy * dy;
@@ -501,8 +545,8 @@ class OptionsState extends MusicBeatState
 
 				// 径向分段线性：0% → .60；52% → .20；100% → .02
 				var aRad:Float =
-					(d <= 0.52) ? 0.60 + (0.20 - 0.60) * (d / 0.52) :
-					             0.20 + (0.02 - 0.20) * ((d - 0.52) / 0.48);
+					(d <= 0.52) ? 0.72 + (0.36 - 0.72) * (d / 0.52) :
+					             0.36 + (0.10 - 0.36) * ((d - 0.52) / 0.48);
 
 				var a:Float = aRad + aLin * (1 - aRad);
 				if (a < 0) a = 0 else if (a > 1) a = 1;
@@ -564,7 +608,6 @@ class OptionsState extends MusicBeatState
 
 		frostPanel = makeFrostSprite();
 		frostBarV = makeFrostSprite();
-		frostBarH = makeFrostSprite();
 	}
 
 	function makeFrostSprite():FlxSprite
@@ -931,14 +974,15 @@ class OptionsState extends MusicBeatState
 		else
 			setFrostRect(frostPanel, 0, 0, 0, 0);
 
-		// 两条栏：哪个在屏幕内就铺哪条（切换动画期间两条可能各露一部分）
+		// 纵向分类列表不铺整条矩形磨砂底。
 		applyBarFrost(frostBarV, barV);
-		applyBarFrost(frostBarH, barH);
 	}
 
 	function applyBarFrost(spr:FlxSprite, bar:NaviGroup)
 	{
 		if (spr == null || bar == null) return;
+		// Freeplay 式竖向分类列表直接浮在背景上，不铺整条矩形磨砂栏。
+		if (!bar.horizontal) { setFrostRect(spr, 0, 0, 0, 0); return; }
 		var x:Float = bar.offX;
 		var y:Float = bar.offY;
 		var w:Float = bar.getBarW();
@@ -950,9 +994,13 @@ class OptionsState extends MusicBeatState
 
 	function buildPanel()
 	{
-		// 直角平板 + 顶边 1px 高光（web 原型 #panel 的 inset 0 1px 0 rgba(255,255,255,.07)）
-		panelBG = new Slab(mainColor, GLASS_ALPHA, 0xFFFFFF, 0.07, true, false, false, false);
+		// Keep the legacy geometry carrier for its animation alpha API, but draw the
+		// actual settings body with the same 15-degree PhiPanel silhouette as Freeplay.
+		panelBG = new Slab(mainColor, 0, 0xFFFFFF, 0, false, false, false, false);
 		add(panelBG);
+		panelShape = new ResizablePhiPanel(mainColor);
+		panelShape.alpha = 0;
+		add(panelShape);
 
 		panelTitle = new FlxText(0, 0, 0, '', Std.int(headH * 0.42));
 		panelTitle.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(headH * 0.42), FlxColor.WHITE, LEFT);
@@ -972,7 +1020,7 @@ class OptionsState extends MusicBeatState
 		panelCount.antialiasing = ClientPrefs.data.antialiasing;
 		add(panelCount);
 
-		headLine = new Rect(0, 0, 1, 1, 0, 0, 0x96B5FF, 0.18);
+		headLine = new Rect(0, 0, 1, 1, 0, 0, 0xFFFFFF, 0.20);
 		add(headLine);
 	}
 
@@ -1015,12 +1063,13 @@ class OptionsState extends MusicBeatState
 		add(downBG);
 
 		// 返回按钮固定在左下角
-		backButton = new GeneralBack(FlxG.height * 0.012, FlxG.height - barH + FlxG.height * 0.012,
-			FlxG.width * 0.17, barH - FlxG.height * 0.024, Language.get('back', 'main'), EngineSet.mainColor, backMenu);
+		backButton = new GeneralBack(FlxG.width * 0.025, FlxG.height - barH + FlxG.height * 0.012,
+			FlxG.width * (SB_W - 0.05), barH - FlxG.height * 0.024, Language.get('back', 'main'), EngineSet.mainColor, backMenu);
 		add(backButton);
 
-		tipText = new FlxText(0, 0, 0, '', Std.int(barH * 0.3));
-		tipText.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(barH * 0.3), 0xD8DCEA, LEFT);
+		var tipFontSize:Int = Std.int(FlxG.height * 0.0225);
+		tipText = new FlxText(0, 0, 0, '', tipFontSize);
+		tipText.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), tipFontSize, 0xD8DCEA, LEFT);
 		tipText.borderStyle = NONE;
 		tipText.antialiasing = ClientPrefs.data.antialiasing;
 		tipText.x = FlxG.width * TIP_X;
@@ -1032,8 +1081,140 @@ class OptionsState extends MusicBeatState
 		add(tipText);
 		layoutTip();
 
-		resetButton = new ResetButton(FlxG.width - FlxG.width * 0.16 - headH * 0.12, 0, FlxG.width * 0.16, headH * 0.62);
+		var topY:Float = FlxG.height * 0.05;
+		var topH:Float = FlxG.height * 0.092;
+		var resetH:Float = topH * 0.58;
+		resetButton = new ResetButton(FlxG.width * 0.745, topY + (topH - resetH) * 0.5,
+			FlxG.width * 0.080, resetH);
 		add(resetButton);
+	}
+
+	/**
+	 * Freeplay 式设置外框：顶部工具栏、左侧分类列表、右侧详情区与底部说明区。
+	 * 这里刻意只把工具动作放在顶栏；分类名称只出现在左侧一次。
+	 */
+	function buildFreeplayChrome():Void
+	{
+		final W:Float = FlxG.width;
+		final H:Float = FlxG.height;
+		final topY:Float = H * 0.05;
+		final topH:Int = Std.int(H * 0.092);
+
+		// 上栏保留返回牌与主工具条；右侧多余的状态牌和品牌图标已移除。
+		fpBack = new PhiPanel(W * 0.019, topY, Std.int(W * 0.152), topH, 0xFF111821);
+		fpBack.alpha = 0.94;
+		add(fpBack);
+		fpBackText = new PhiItalicText(W * 0.037, topY + H * 0.026, W * 0.125, '', Std.int(H * 0.021));
+		fpBackText.bold = true;
+		fpBackText.borderStyle = NONE;
+		fpBackText.antialiasing = ClientPrefs.data.antialiasing;
+		add(fpBackText);
+		updateFreeplayBackText();
+
+		fpBar = new PhiPanel(W * 0.175, topY, Std.int(W * 0.562), topH, 0xFF101722);
+		fpBar.alpha = 0.90;
+		add(fpBar);
+		fpTitle = new FlxText(W * 0.198, topY + H * 0.015, W * 0.245, '', Std.int(H * 0.023));
+		fpTitle.borderStyle = NONE;
+		fpTitle.antialiasing = ClientPrefs.data.antialiasing;
+		add(fpTitle);
+		fpSubtitle = new FlxText(W * 0.198, topY + H * 0.056, W * 0.245, '', Std.int(H * 0.012));
+		fpSubtitle.borderStyle = NONE;
+		fpSubtitle.antialiasing = ClientPrefs.data.antialiasing;
+		add(fpSubtitle);
+		updateFreeplayHeaderText();
+
+		// 顶栏是工具区，不复制左栏分类；保留按键反馈和键位配置两个快捷操作。
+		addFreeplayTool(W * 0.435, topY + H * 0.008, W * 0.080, H * 0.076, 'Input', 'feedback');
+		addFreeplayTool(W * 0.520, topY + H * 0.008, W * 0.080, H * 0.076, 'Input', 'keybinds');
+
+		// Freeplay footer 的虚线基线保留为详情说明区分隔；移除底部键位提示。
+		backButton.visible = false;
+		backButton.active = false;
+		fpFooterLine = new Rect(0, H * 0.936, W, 2, 0, 0xD2DCE1, 0.24);
+		add(fpFooterLine);
+
+		// Reset is a top-bar action in the Freeplay layout. Bring it above the
+		// toolbar segment and place it in the clear space after that toolbar.
+		remove(resetButton, false);
+		add(resetButton);
+		fpVariableText = new FlxText(W * 0.838, topY + topH * 0.28, W * 0.147, '', Std.int(H * 0.017));
+		fpVariableText.setFormat(FontFallback.uiFont('变量名称'), Std.int(H * 0.017), FlxColor.WHITE, RIGHT,
+			FlxTextBorderStyle.OUTLINE, 0xFF111821);
+		fpVariableText.borderSize = 1.5;
+		fpVariableText.borderStyle = OUTLINE;
+		fpVariableText.antialiasing = ClientPrefs.data.antialiasing;
+		fpVariableText.visible = false;
+		add(fpVariableText);
+	}
+
+	function updateFreeplayBackText():Void
+	{
+		if (fpBackText == null) return;
+		fpBackText.text = 'D.C.E.  ‹  ' + PhigrosFreeplayView.textFor('backToMenu', '返回主菜单', 'Back to menu');
+		fpBackText.setFormat(FontFallback.uiFont(fpBackText.text), Std.int(FlxG.height * 0.021), FlxColor.WHITE, LEFT);
+		fpBackText.bold = true;
+		fpBackText.borderStyle = NONE;
+		fpBackText.antialiasing = ClientPrefs.data.antialiasing;
+	}
+
+	function freeplayLocalized(english:String, chinese:String, portuguese:String):String
+	{
+		return switch (ClientPrefs.data.language)
+		{
+			case 'Chinese': chinese;
+			case 'Portuguese (Brazil)': portuguese;
+			default: english;
+		}
+	}
+
+	function updateFreeplayHeaderText():Void
+	{
+		if (fpTitle != null)
+		{
+			fpTitle.text = freeplayLocalized('D.C.E. Settings', 'D.C.E. 设置', 'Configurações do D.C.E.');
+			fpTitle.setFormat(FontFallback.uiFont(fpTitle.text), Std.int(FlxG.height * 0.023), FlxColor.WHITE, LEFT);
+			fpTitle.borderStyle = NONE;
+		}
+		if (fpSubtitle != null)
+		{
+			fpSubtitle.text = freeplayLocalized('GAME OPTIONS', '游戏设置', 'OPÇÕES DO JOGO');
+			fpSubtitle.setFormat(FontFallback.uiFont(fpSubtitle.text), Std.int(FlxG.height * 0.012), 0xFFC1CDD2, LEFT);
+			fpSubtitle.borderStyle = NONE;
+		}
+		for (entry in fpToolLabels)
+		{
+			var text = entry.action == 'feedback'
+				? freeplayLocalized('Key Feedback', '键位反馈', 'Feedback das teclas')
+				: freeplayLocalized('Key Bindings', '按键配置', 'Teclas');
+			entry.label.text = text;
+			entry.label.setFormat(FontFallback.uiFont(text), Std.int(FlxG.height * 0.018), FlxColor.WHITE, CENTER);
+			entry.label.borderStyle = NONE;
+		}
+	}
+
+	function addFreeplayTool(x:Float, y:Float, w:Float, h:Float, iconName:String, action:String):Void
+	{
+		var panel = new PhiPanel(x, y, Std.int(w), Std.int(h), 0xFF111821);
+		panel.alpha = 0.0000001;
+		add(panel);
+		var icon = new FlxSprite().loadGraphic(Paths.image('menuExtend/OptionsState/icons/' + iconName));
+		icon.setGraphicSize(Std.int(h * 0.46));
+		icon.updateHitbox();
+		icon.antialiasing = ClientPrefs.data.antialiasing;
+		icon.color = 0xFFD8E0E5;
+		icon.setPosition(x + w * 0.31 - icon.width / 2, y + h * 0.14);
+		add(icon);
+		var caption = action == 'feedback'
+			? freeplayLocalized('Key Feedback', '键位反馈', 'Feedback das teclas')
+			: freeplayLocalized('Key Bindings', '按键配置', 'Teclas');
+		var label = new FlxText(x + 2, y + h * 0.57, w - 4, caption, Std.int(h * 0.20));
+		label.setFormat(FontFallback.uiFont(caption), Std.int(h * 0.20), FlxColor.WHITE, CENTER);
+		label.borderStyle = NONE;
+		label.antialiasing = ClientPrefs.data.antialiasing;
+		add(label);
+		fpToolLabels.push({label: label, action: action});
+		fpTools.push({panel: panel, action: action});
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -1051,11 +1232,10 @@ class OptionsState extends MusicBeatState
 		panelH = Math.floor(h);
 
 		panelBG.setRect(panelX, panelY, panelW, panelH);
+		panelShape.setRect(panelX, panelY, panelW, panelH);
 
 		// ★ 玻璃底必须在**这里**点亮 —— setPanel() 是唯一一处真正写面板几何的地方，
-		//   所有展开路径最终都要过它。以前 setPanelAlpha(1) 只写在
-		//   openVertical / openHorizontal 里，于是这两类路径会漏掉：
-		//     · toVertical() / toHorizontal() 模式切换（create() 初始化模式时就会跑），
+		//   所有展开路径最终都要过它。以前 setPanelAlpha(1) 只写在结构动画入口，
 		//       面板被它们的补间直接撑开，玻璃底却一直停在 create() 里设的 0；
 		//     · 于是 ① 面板区只剩背景和控件，看不出"玻璃"；
 		//       ② updateFrost() 的 `glassAlpha > 0.02` 判定不过 → 磨砂层整层不铺。
@@ -1099,8 +1279,10 @@ class OptionsState extends MusicBeatState
 			headLine.updateHitbox();
 			if (resetButton != null)
 			{
-				resetButton.x = panelX + panelW - resetButton.width - pad;
-				resetButton.y = panelY + headH * 0.2;
+				var topY:Float = FlxG.height * 0.05;
+				var topH:Float = FlxG.height * 0.092;
+				resetButton.x = FlxG.width * 0.745;
+				resetButton.y = topY + (topH - resetButton.height) * 0.5;
 			}
 			// ★ 计数（「11 项」）的定位：必须让「右缘」贴着重置按钮的左边，
 			//   而不是把「左缘」放到面板右缘附近。旧写法 panelCount.x = 面板右缘 - 2%宽
@@ -1108,10 +1290,8 @@ class OptionsState extends MusicBeatState
 			//   数字）。原型 NewOptionState.htm 的 .phead 是 [图标][标题/副标题 flex:1]
 			//   [.pcount 徽章][关闭按钮]，徽章永远排在按钮左边，所以这里按同一规则反推左缘。
 			//   autoSize 的 FlxText（构造时 fieldWidth<=0）width 即文字实际宽度。
-			panelCount.y = panelTitle.y + panelTitle.height * 0.35;
-			var countRight:Float = panelX + panelW - pad;
-			if (resetButton != null) countRight = resetButton.x - headH * 0.18;
-			panelCount.x = countRight - panelCount.width;
+			panelCount.visible = false;
+			headLine.visible = false;
 			if (specBG != null)
 			{
 				specBG.x = panelX;
@@ -1130,8 +1310,60 @@ class OptionsState extends MusicBeatState
 		layoutContent();
 	}
 
-	/** 分类内容区的宽度（= 建分类时用的宽度；模式切换不重建分类，所以这个值全程不变） */
-	public inline function contentWidth():Float return FlxG.width * (1 - P_LEFT_OPEN - P_RIGHT);
+	/**
+	 * 右侧内容的左边界沿用 Freeplay 面板的斜边。
+	 *
+	 * 面板本身是 15° 平行四边形；若内容仍从 panelX 的矩形边界开始，顶部的卡片会
+	 * 横跨斜切掉的三角区，压到工具栏/左栏上（输入设置页截图中的第一张卡片就是如此）。
+	 * 这里以内容可视区上缘的斜边位置作为统一内边距，整列卡片落在面板实心区域内。
+	 * 使用最终展开几何作为初始化回退值，确保分类第一次创建时就和打开后的坐标一致。
+	 */
+	function contentLayoutX():Float
+	{
+		var W:Float = FlxG.width;
+		var H:Float = FlxG.height;
+		var x:Float = panelW > MIN_W ? panelX : W * P_LEFT_OPEN;
+		var y:Float = panelW > MIN_W ? panelY : 0;
+		var w:Float = panelW > MIN_W ? panelW : W * (1 - P_LEFT_OPEN - P_RIGHT);
+		var h:Float = panelW > MIN_W ? panelH : H;
+		var top:Float = Math.max(y + headH, H * (0.05 + 0.092)) + contentPad();
+		var inset:Float = Math.min(h * PhiPanel.SLOPE, w * 0.5);
+		var t:Float = (h <= 0) ? 1 : FlxMath.bound((top - y) / h, 0, 1);
+		var leftAtTop:Float = x + inset * (1 - t);
+		return leftAtTop + contentPad();
+	}
+
+	/** 列表右边界沿用内容可视区上缘的斜切面板边界。 */
+	function contentLayoutRight():Float
+	{
+		var W:Float = FlxG.width;
+		var H:Float = FlxG.height;
+		var x:Float = panelW > MIN_W ? panelX : W * P_LEFT_OPEN;
+		var y:Float = panelW > MIN_W ? panelY : 0;
+		var w:Float = panelW > MIN_W ? panelW : W * (1 - P_LEFT_OPEN - P_RIGHT);
+		var h:Float = panelW > MIN_W ? panelH : H;
+		var top:Float = Math.max(y + headH, H * (0.05 + 0.092)) + contentPad();
+		var inset:Float = Math.min(h * PhiPanel.SLOPE, w * 0.5);
+		var t:Float = (h <= 0) ? 1 : FlxMath.bound((top - y) / h, 0, 1);
+		return x + w - inset * t - contentPad();
+	}
+
+	/** 分类卡片的可用宽度；分类切换沿用同一列几何。 */
+	public inline function contentWidth():Float return Math.max(1, contentLayoutRight() - contentLayoutX());
+
+	/** 每行沿面板左斜边移动，配合固定列宽贴合面板另一侧斜边。 */
+	public function contentRowX(rowY:Float):Float
+	{
+		var W:Float = FlxG.width;
+		var H:Float = FlxG.height;
+		var x:Float = panelW > MIN_W ? panelX : W * P_LEFT_OPEN;
+		var y:Float = panelW > MIN_W ? panelY : 0;
+		var w:Float = panelW > MIN_W ? panelW : W * (1 - P_LEFT_OPEN - P_RIGHT);
+		var h:Float = panelW > MIN_W ? panelH : H;
+		var inset:Float = Math.min(h * PhiPanel.SLOPE, w * 0.5);
+		var t:Float = (h <= 0) ? 1 : FlxMath.bound((rowY - y) / h, 0, 1);
+		return x + inset * (1 - t) + contentPad();
+	}
 
 	/**
 	 * 自绘内容（语言面板）可用的宽 / 高 —— 就是「内容可视区」。
@@ -1165,10 +1397,6 @@ class OptionsState extends MusicBeatState
 	 */
 	function layoutContent()
 	{
-		var hasPanel:Bool = panelW > MIN_W;
-		var baseX:Float = hasPanel ? panelX : FlxG.width * P_LEFT_OPEN;
-		var availW:Float = hasPanel ? panelW : contentWidth();
-
 		// ★ 起点统一用「内容可视区上缘」contentViewTop()。
 		//   以前这里写的是 baseY + headH（正好贴着标题栏分割线），于是每一页的
 		//   第一行都被 applyContentClip 裁掉 padding 那 6px（圆角顶被削平），
@@ -1179,7 +1407,7 @@ class OptionsState extends MusicBeatState
 		//   注意每个分类的值不同，所以下面循环里要各算各的 —— 不能只算一个 contentBaseY。
 		var curTitleH:Float = (currentCata != null) ? currentCata.titleH : 0;
 		contentBaseY = topY - curTitleH;
-		var cx:Float = baseX + (availW - contentWidth()) * 0.5;
+		var cx:Float = contentLayoutX();
 		contentBaseX = cx;
 
 		for (c in cataGroup)
@@ -1204,6 +1432,7 @@ class OptionsState extends MusicBeatState
 	 */
 	function showContent(cata:OptionCata, ?reveal:Float = 0.22)
 	{
+		clearTip();
 		for (c in cataGroup)
 			if (c != cata)
 			{
@@ -1237,6 +1466,8 @@ class OptionsState extends MusicBeatState
 		// 换了分类 = 裁剪区要重算（applyContentClip 的整数缓存失效）
 		clipKeyY = Math.NaN;
 		clipKeyH = Math.NaN;
+		clipKeyX = Math.NaN;
+		clipKeyW = Math.NaN;
 		currentCata = cata;
 		cata.visible = true;
 		cata.active = true;
@@ -1249,8 +1480,10 @@ class OptionsState extends MusicBeatState
 		currentCata.y = contentBaseY + contentScrollPos;
 		lastScrollApplied = contentScrollPos;
 		refreshContentLayout();
-		panelTitle.text = Language.get(cata.cataName, 'options');
-		panelSub.text = cata.cataName;
+		// The selected category is already identified in the left Freeplay-style
+		// list. Keep the detail header free of a second copy of that label.
+		panelTitle.visible = false;
+		panelSub.visible = false;
 		// 计数只数「可调的项」：旧版大标题不是设置项（它现在也被藏起来了）
 		var itemCount:Int = 0;
 		for (op in cata.optionArray) if (!HIDE_LEGACY_CATA_TITLE || op.type != TITLE) itemCount++;
@@ -1313,14 +1546,11 @@ class OptionsState extends MusicBeatState
 			});
 		}
 
-		// 标题栏 / 计数 / 重置按钮：普通精灵或自带安全淡出的对象，逐个处理
+		// 标题栏 / 计数随详情切换淡出；Reset 属于常驻顶栏，不跟随详情隐藏。
 		FlxTween.tween(panelTitle, {alpha: a}, dur, {ease: FlxEase.expoOut});
 		FlxTween.tween(panelSub, {alpha: a}, dur, {ease: FlxEase.expoOut});
 		FlxTween.tween(panelCount, {alpha: a}, dur, {ease: FlxEase.expoOut});
 		FlxTween.tween(headLine, {alpha: a * 0.18}, dur, {ease: FlxEase.expoOut});
-		// ★ 重置按钮是 FlxSpriteGroup，同样不能整体补间 alpha（会把它那块底板
-		//   从 0.045 放大成 1 → 一个纯白方块）。改成走它自己的安全淡出。
-		if (resetButton != null) resetButton.setFade(a);
 	}
 
 	/**
@@ -1370,6 +1600,8 @@ class OptionsState extends MusicBeatState
 	/** applyContentClip 的上一次结果（只在整数像素变化时才重新赋值，见下） */
 	var clipKeyY:Float = Math.NaN;
 	var clipKeyH:Float = Math.NaN;
+	var clipKeyX:Float = Math.NaN;
+	var clipKeyW:Float = Math.NaN;
 
 	/**
 	 * 把整块分类内容裁到 [top, bot]（屏幕坐标）。
@@ -1401,16 +1633,25 @@ class OptionsState extends MusicBeatState
 		var lh:Float = bot - top;
 		if (w <= 0 || lh <= 0) return;
 
+		// Rows follow the panel's slanted left edge as they move down. Extend the
+		// category-local clip to that lower edge as well; otherwise the fixed x=0
+		// clip cuts off each row's left side during scrolling.
+		var clipX:Float = Math.min(0, contentRowX(bot) - contentAreaX());
+		var clipW:Float = w - clipX;
+
 		if (cata.clipRect != null && !Math.isNaN(clipKeyY) && Math.floor(clipKeyY) == Math.floor(ly)
-			&& Math.floor(clipKeyH) == Math.floor(lh)) return;
+			&& Math.floor(clipKeyH) == Math.floor(lh) && Math.floor(clipKeyX) == Math.floor(clipX)
+			&& Math.floor(clipKeyW) == Math.floor(clipW)) return;
 
 		clipKeyY = ly;
 		clipKeyH = lh;
+		clipKeyX = clipX;
+		clipKeyW = clipW;
 
-		if (cata.clipRect == null) cata.clipRect = new FlxRect(0, ly, w, lh);
+		if (cata.clipRect == null) cata.clipRect = new FlxRect(clipX, ly, clipW, lh);
 		else
 		{
-			cata.clipRect.set(0, ly, w, lh);
+			cata.clipRect.set(clipX, ly, clipW, lh);
 			// ★ 就地改属性不会生效，必须重新赋值（flixel 在 clipRect 的文档里写明了）
 			cata.clipRect = cata.clipRect;
 		}
@@ -1428,6 +1669,8 @@ class OptionsState extends MusicBeatState
 		if (currentCata == null) return;
 		clipKeyY = Math.NaN;
 		clipKeyH = Math.NaN;
+		clipKeyX = Math.NaN;
+		clipKeyW = Math.NaN;
 		applyContentClip(contentViewTop(), contentViewBottom());
 	}
 
@@ -1457,7 +1700,7 @@ class OptionsState extends MusicBeatState
 	function measureContent(?cata:OptionCata)
 	{
 		var c:OptionCata = (cata != null) ? cata : currentCata;
-		var total:Float = (c != null) ? c.heightSet : 0;
+		var total:Float = (c != null) ? c.heightSet + c.heightSetOffset : 0;
 		var cataT:Float = (c != null) ? c.titleH : 0;
 		contentMaxScroll = Math.min(0, contentViewBottom() - (contentBaseY + cataT + total));
 		if (cataMove != null)
@@ -1477,6 +1720,35 @@ class OptionsState extends MusicBeatState
 	///////////////////////////////////////////////////////////////////////////////
 
 	function stale(token:Int):Bool return token != seqToken;
+
+	/** 关闭所有分类里的下拉框，避免面板收起或切分类后残留浮层。 */
+	public function closeAllStringSelects():Void
+	{
+		for (c in cataGroup)
+			for (op in c.optionArray)
+				if (op.stringRect != null) op.stringRect.forceClose();
+	}
+
+	/** 下拉菜单互斥：展开一个时收起同一分类里的其它菜单，防止浮层叠在行内容上。 */
+	public function closeOtherStringSelects(keep:Option):Void
+	{
+		if (currentCata == null) return;
+		for (op in currentCata.optionArray)
+		{
+			if (op == keep || op.stringRect == null || op.select == null) continue;
+			if (op.stringRect.isOpend || op.select.isOpend || op.select.visible)
+				op.stringRect.forceClose();
+		}
+	}
+
+	/** 鼠标停在可滚动的选项说明上时，把滚轮留给说明文本。 */
+	function descUnderMouse():Bool
+	{
+		if (currentCata == null) return false;
+		for (op in currentCata.optionArray)
+			if (op.descMaxScroll > 0 && op.baseDesc != null && op.visible && FlxG.mouse.overlaps(op.baseDesc)) return true;
+		return false;
+	}
 
 	/** 竖向：① 右缘向右延伸 → ② 一分为二 → ③ 上下缘拉满 */
 	function openVertical(cata:OptionCata, keepSb:Bool, token:Int)
@@ -1505,48 +1777,26 @@ class OptionsState extends MusicBeatState
 	}
 
 	/** 横向：① 下缘向下延伸 → ② 一分为二 → ③ 左右缘铺开（下缘贴屏幕底边） */
-	function openHorizontal(cata:OptionCata, keepBar:Bool, token:Int)
-	{
-		var W:Float = FlxG.width;
-		var H:Float = FlxG.height;
-		var barNow:Float = keepBar ? H * (BAR_H + BAR_GAP) : H * BAR_H;
-		var side:Float = W * BAR_SIDE;
-
-		setPanel(side, barNow, W - side * 2, MIN_W);
-		setPanelAlpha(1);
-		if (!keepBar) setBarHeight(H * BAR_H, false);
-
-		tweenPanel(side, barNow, W - side * 2, H - barNow, A1, FlxEase.expoInOut, function() {
-			if (stale(token)) return;
-			tweenPanel(side, H * (BAR_H + BAR_GAP * 2), W - side * 2, H - H * (BAR_H + BAR_GAP * 2), A2, FlxEase.expoOut, function() {
-				if (stale(token)) return;
-				tweenPanel(side, H * (BAR_H + BAR_GAP * 2), W - side * 2, H - H * (BAR_H + BAR_GAP * 2), A3, FlxEase.expoInOut, function() {
-					if (stale(token)) return;
-					inputLocked = false;
-					showContent(cata, REVEAL);
-				});
-			});
-			setBarHeight(H * (BAR_H + BAR_GAP), true);
-		});
-	}
-
 	function setPanelAlpha(a:Float)
 	{
 		// ★ a 是「面板整体可见度」（0 = 收起，1 = 完全显示），
 		//   玻璃底的不透明度是 GLASS_ALPHA，两者相乘。
-		//   以前这里写的是 panelBG.alpha = a，而 openVertical/openHorizontal 传的是 1，
+		//   以前这里写的是 panelBG.alpha = a，而 openVertical 传的是 1，
 		//   于是磨砂面板被写成了**完全不透明**的色块，背景一点也透不过来（图3 的问题）。
-		panelBG.glassAlpha = GLASS_ALPHA * a;
+		// Main panel is a single sheared sprite. Frost stays off its rectangular
+		// carrier so no square haze leaks beyond the parallelogram edges.
+		panelBG.glassAlpha = 0;
+		panelShape.alpha = GLASS_ALPHA * a;
 		panelTitle.alpha = a;
 		panelSub.alpha = a;
 		panelCount.alpha = a;
 		headLine.alpha = a * 0.18;
-		resetButton.alpha = a;
 	}
 
 	/** 反向：③ 收高 → ② 合回 → ① 缩回（共 0.25s） */
 	function closePanel(keepOpenBar:Bool, token:Int, done:Void->Void)
 	{
+		clearTip();
 		// 关面板同样要先把展开中的下拉列表收掉：它会跟着分类一起被"隐藏-再点亮"，
 		// 留在展开态的话，下次打开这个分类会直接看到一块深色列表底板
 		closeAllStringSelects();
@@ -1555,10 +1805,7 @@ class OptionsState extends MusicBeatState
 
 		tweenPanel(x0, originRowY, w0, originRowH, R1, FlxEase.expoInOut, function() {
 			if (stale(token)) { done(); return; }
-			var backX:Float = keepOpenBar
-				? (mode == 'v' ? FlxG.width * SB_W_OPEN : FlxG.width * BAR_SIDE)
-				: (mode == 'v' ? FlxG.width * P_LEFT_START : FlxG.width * BAR_SIDE);
-			var backW:Float = keepOpenBar && mode == 'v' ? 0 : 0;
+			var backX:Float = keepOpenBar ? FlxG.width * SB_W_OPEN : FlxG.width * P_LEFT_START;
 			tweenPanel(backX, originRowY, panelW, originRowH, R2, FlxEase.expoOut, function() {
 				if (stale(token)) { done(); return; }
 				tweenPanel(backX, originRowY, MIN_W, originRowH, R3, FlxEase.expoInOut, function() {
@@ -1571,8 +1818,9 @@ class OptionsState extends MusicBeatState
 					currentCata = null;
 					clipKeyY = Math.NaN;
 					clipKeyH = Math.NaN;
-					if (!keepOpenBar && mode == 'v') setSidebarWidth(FlxG.width * SB_W, true);
-					if (!keepOpenBar && mode == 'h') setBarHeight(FlxG.height * BAR_H, true);
+					clipKeyX = Math.NaN;
+					clipKeyW = Math.NaN;
+					if (!keepOpenBar) setSidebarWidth(FlxG.width * SB_W, true);
 					done();
 				});
 			});
@@ -1588,191 +1836,6 @@ class OptionsState extends MusicBeatState
 		else { barV.baseWidth = w; barV.setBarWidth(w); }
 	}
 
-	function setBarHeight(h:Float, animate:Bool)
-	{
-		if (animate) FlxTween.num(barH.baseHeight, h, A2, {ease: FlxEase.expoOut}, function(v) {
-			barH.baseHeight = v;
-			barH.setBarHeight(v);
-		});
-		else { barH.baseHeight = h; barH.setBarHeight(h); }
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	// 模式切换：竖向 ⇄ 横向
-	// 整条链 = MA + MB + showContent 的收尾淡入 = 0.19 + 0.19 + 0.10 = 0.48s ≤ 0.5s
-	///////////////////////////////////////////////////////////////////////////////
-
-	public function toggleMode()
-	{
-		if (inputLocked) return;
-		inputLocked = true;
-
-		// ★ 切模式前先把所有展开的下拉列表**立刻**收起来。
-		//   正常收起是"补间淡出 → onComplete 里才真正隐藏"，而模式切换会把面板
-		//   整体重排、内容重算一次，那条补间跑不完 —— 下拉列表就留在展开态，
-		//   变成一块深色底板 + 一列选项浮在新面板上（用户报的"切模式时下拉框不隐藏"）。
-		closeAllStringSelects();
-
-		if (mode == 'v') toHorizontal(); else toVertical();
-	}
-
-	/**
-	 * 把所有下拉框**硬关**一次（切模式 / 换分类 / 内容重新显示前必须调）。
-	 *
-	 * ★★ 为什么不看 `stringRect.isOpend` ★★
-	 *   `StringRect.change()` 收起时 `isOpend` 是**立刻**置 false 的，但
-	 *   `select.visible` 要等那条 0.45s 淡出补间 **onComplete** 才变 false。
-	 *   在这 0.45s 的窗口里，判据 `isOpend` 已经是 false → 这里会**漏掉
-	 *   这个正在收起的下拉列表**；紧跟着模式切换的整体重排 / 补间取消
-	 *   一打断，深色底板 + 一列选项就停在展开态浮在新面板上 ——
-	 *   也就是用户报的「切竖/横侧边栏时 Tap to choose 与下拉列表没正确隐藏」。
-	 *   → 改成无条件对每个下拉框调一次 `forceClose()`。它是幂等的
-	 *     （内部只在"确实开着"时才还版面），130 个设置项循环一次开销可忽略。
-	 */
-	public function closeAllStringSelects():Void
-	{
-		for (c in cataGroup)
-			for (op in c.optionArray)
-				if (op.stringRect != null) op.stringRect.forceClose();
-	}
-
-	/**
-	 * 鼠标是不是正停在「能滑动的描述文本」上（见 Option.descMaxScroll）。
-	 * 内容区的滚轮要据此让开：那一下是滚描述，不是翻页。
-	 */
-	function descUnderMouse():Bool
-	{
-		if (currentCata == null) return false;
-		for (op in currentCata.optionArray)
-			if (op.descMaxScroll > 0 && op.baseDesc != null && op.visible && FlxG.mouse.overlaps(op.baseDesc)) return true;
-		return false;
-	}
-
-	/**
-	 * 竖向 → 横向：① 竖向栏滑出 + 面板横着摊开 → ② 横栏滑入 + 面板上缘下移、下缘贴底。
-	 *
-	 * ★ 切模式必须先把终点算清楚，再让补间从「当前几何」插值过去。
-	 *   旧实现把「当前 panelW」写进了宽度公式里，而 setPanel() 每帧又在改 panelW ——
-	 *   公式读到的是被自己改过的值，几帧之内就发散成负数：面板整块消失
-	 *   （磨砂层因为 panelW < MIN_W 也不再铺），标题栏右侧的「数据重置」「N 项」
-	 *   被推到屏幕外（就是图2 的样子）。toVertical 则漏了把宽度写回竖向的值，
-	 *   切回来后面板比屏幕还宽、右侧元素全部出屏（图4）。
-	 */
-	function toHorizontal()
-	{
-		var wasOpen:Bool = currentCata != null;
-		if (wasOpen) fadeContent(0, 0.12);
-
-		var x0:Float = panelX;
-		var y0:Float = panelY;
-		var w0:Float = panelW;
-		var h0:Float = panelH;
-
-		// 终点（面板右缘在整段动画里保持不动：8% + 84% = 20% + 72% = 92%）
-		// ★ 面板**没打开**时不能被模式切换撑开。以前这里无条件撑到全宽，只是玻璃底
-		//   alpha 停在 0 而一直看不出来；把玻璃底点亮之后，它就变成一块盖住整个
-		//   内容区的暗板（横向模式下面板区亮度从 104 掉到 33，且之后点不回竖向设置）。
-		//   未打开时四边都保持当前收起几何。
-		var tx:Float = wasOpen ? FlxG.width * BAR_SIDE : x0;
-		var ty:Float = wasOpen ? FlxG.height * (BAR_H + BAR_GAP * 2) : y0;
-		var tw:Float = wasOpen ? FlxG.width * (1 - BAR_SIDE * 2) : MIN_W;
-		var th:Float = wasOpen ? (FlxG.height - ty) : h0;
-
-		// 阶段A（190ms）：竖向栏向左滑出屏幕（用 setOff，不再动 group.x）
-		var sx0:Float = barV.offX;
-		var sx1:Float = -barV.getBarW() * 1.1;
-		FlxTween.num(0, 1, MA, {ease: FlxEase.expoInOut}, function(t) { barV.setOff(sx0 + (sx1 - sx0) * t, 0); });
-
-	FlxTween.num(0, 1, MA, {
-		ease: FlxEase.expoInOut,
-		onComplete: function(_) {
-			mode = 'h';
-			updateStaticText();
-				// ★ 竖栏已经整体移出屏幕，顺手把一级列表**硬收起**（不走补间）。
-				//   列表项用的是绝对坐标，只要还停在"展开"状态，任何一个之后的
-				//   布局重算（layoutMembers 写绝对值）都可能把它们甩回屏幕里，
-				//   而这时栏底磨砂早就移走了 —— 屏幕上会剩下一排行分类项飘在背景上。
-				//   收起来（alpha=0 + 滑到栏外）就等于双保险；切回竖栏时
-				//   toVertical 末尾会再无条件落一次"展开"。
-				barV.setListOpen(false, false);
-				// 横栏高度按「面板是否打开」复位：否则面板没打开时第一次点分类，
-				// openHorizontal 会先把它压回 bar 再撑开，视觉上"收一下又恢复"
-				setBarHeight(FlxG.height * (wasOpen ? BAR_H + BAR_GAP : BAR_H), false);
-
-				// 阶段B（190ms）：横向栏从屏幕上方滑入；面板上缘下移、下缘贴屏幕底边
-				var sy0:Float = -barH.getBarH() * 1.1;
-				barH.setOff(0, sy0);
-				FlxTween.num(0, 1, MB, {
-					ease: FlxEase.expoOut,
-					onComplete: function(_) {
-						if (currentCata != null)
-						{
-							showContent(currentCata, REVEAL);
-						}
-						inputLocked = false;
-					}
-				}, function(t) {
-					barH.setOff(0, sy0 * (1 - t));
-					setPanel(tx, y0 + (ty - y0) * t, tw, h0 + (th - h0) * t);
-				});
-			}
-		}, function(t) {
-			setPanel(x0 + (tx - x0) * t, y0, w0 + (tw - w0) * t, h0);
-		});
-	}
-
-	/** 横向 → 竖向：① 横栏收回上方 + 面板上下撑满 → ② 竖栏从左移回 + 面板左缘/宽度落回竖向值 */
-	function toVertical()
-	{
-		var wasOpen:Bool = currentCata != null;
-		if (wasOpen) fadeContent(0, 0.12);
-
-		var x0:Float = panelX;
-		var y0:Float = panelY;
-		var w0:Float = panelW;
-		var h0:Float = panelH;
-
-		// ★ 同 toHorizontal()：面板没打开时保持收起几何，不要被模式切换撑开
-		var tx:Float = wasOpen ? FlxG.width * P_LEFT_OPEN : x0;
-		var ty:Float = wasOpen ? 0 : y0;
-		var tw:Float = wasOpen ? FlxG.width * (1 - P_LEFT_OPEN - P_RIGHT) : MIN_W;
-		var th:Float = wasOpen ? FlxG.height : h0;
-
-		// 阶段A'（190ms）：横向栏收回屏幕上方
-		var sy0:Float = barH.offY;
-		var sy1:Float = -barH.getBarH() * 1.1;
-		FlxTween.num(0, 1, MA, {ease: FlxEase.expoInOut}, function(t) { barH.setOff(0, sy0 + (sy1 - sy0) * t); });
-
-	FlxTween.num(0, 1, MA, {
-		ease: FlxEase.expoInOut,
-		onComplete: function(_) {
-			mode = 'v';
-			updateStaticText();
-				// 宽度同样按「面板是否打开」复位，否则会残留展开态的 18.5%
-				setSidebarWidth(FlxG.width * (wasOpen ? SB_W_OPEN : SB_W), false);
-
-				// 阶段B'（190ms）：竖向栏从左移回；面板左缘/宽度落到竖向目标
-				var bx0:Float = barV.offX;
-				FlxTween.num(0, 1, MB, {
-					ease: FlxEase.expoOut,
-					onComplete: function(_) {
-						// ★ 竖栏滑回后把一级列表"复位成展开"（不走补间，直接落位）。
-						//   列表项的坐标是绝对坐标（baseX），一旦在横栏期间被别的补间
-						//   写过、或者整条栏平移过，这里无条件落一次就能保证
-						//   「回来时侧边栏一定是完整可见的」，不会再出现空侧栏/漂在屏幕外。
-						barV.setListOpen(true, false);
-						if (currentCata != null) showContent(currentCata, REVEAL);
-						inputLocked = false;
-					}
-				}, function(t) {
-					barV.setOff(bx0 * (1 - t), 0);
-					setPanel(x0 + (tx - x0) * t, ty, w0 + (tw - w0) * t, th);
-				});
-			}
-		}, function(t) {
-			setPanel(x0, y0 + (ty - y0) * t, w0, h0 + (th - h0) * t);
-		});
-	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	// 交互
@@ -1784,9 +1847,7 @@ class OptionsState extends MusicBeatState
 		// ★ 语言区块盖在上面的点击归语言区块所有。
 		//   成员在 update 里先于 NaviGroup.update 跑（super.update 在最前），
 		//   而语言列表会盖住它下面的分类项 —— 不让开就会"点语言却切了分类"。
-		if (langBlockSwallow || barV.langSwallowsMouse() || barH.langSwallowsMouse()) return;
-		if (mode == 'h' && !barH.isOpened) return;
-		if (mode == 'v' && !barV.isOpened) return;
+		if (langBlockSwallow || barV.langSwallowsMouse() || !barV.isOpened) return;
 
 		var cata:OptionCata = null;
 		var idx:Int = m.optionSort;
@@ -1806,14 +1867,12 @@ class OptionsState extends MusicBeatState
 		{
 			closePanel(keep, token, function() {
 				if (stale(token)) return;
-				if (mode == 'v') openVertical(cata, keep, token);
-				else openHorizontal(cata, keep, token);
+				openVertical(cata, keep, token);
 			});
 		}
 		else
 		{
-			if (mode == 'v') openVertical(cata, false, token);
-			else openHorizontal(cata, false, token);
+			openVertical(cata, false, token);
 		}
 	}
 
@@ -1988,12 +2047,13 @@ class OptionsState extends MusicBeatState
 
 	public function requestLanguage(langName:String)
 	{
+		if (!getLanguageList().contains(langName)) return;
 		if (ClientPrefs.data.language == langName) return;
 		if (inputLocked) return;
 		inputLocked = true;
 		// 眨眼：面板内容先淡出，换完再淡入（HTML 原型的 #panelInner.blink）。
 		//
-		// ★ 不要对 barV / barH 整体做 alpha 补间：FlxSpriteGroup 的 alpha 是
+		// ★ 不要对 barV 整体做 alpha 补间：FlxSpriteGroup 的 alpha 是
 		//   "按比例乘到每个子元素上"，淡出再淡入会把子元素各自的基准 alpha
 		//   （例如语言按钮底的 0.07）冲成 1，颜色会永久变掉。
 		//   而且 Flixel 里也没有 backdrop-blur 可以让底板"保持不动"。
@@ -2010,8 +2070,8 @@ class OptionsState extends MusicBeatState
 	{
 		// ★ 必须在 super.update() 之前算：NaviMember / NaviGroup 都在 super.update 里跑，
 		//   它们要用这一帧的"语言区块是否吃掉鼠标"来决定让不让开 hover。
-		if (barV != null && barH != null)
-			langBlockSwallow = barV.langSwallowsMouse() || barH.langSwallowsMouse();
+		if (barV != null)
+			langBlockSwallow = barV.langSwallowsMouse();
 
 		// ★ 滚轮落在「能滑动的描述文本」上时，内容区整体让开（cataMove）：
 		//   那一下是滚描述，不是翻页。见 Option.update 的 scrollDesc。
@@ -2045,6 +2105,24 @@ class OptionsState extends MusicBeatState
 
 		super.update(elapsed);
 
+		if (mouseEvent.justReleased && !inputLocked)
+		{
+			if (fpBack != null && fpBack.contains(FlxG.mouse.x, FlxG.mouse.y)) backMenu();
+			else
+			{
+				for (tool in fpTools)
+				{
+					if (!tool.panel.contains(FlxG.mouse.x, FlxG.mouse.y)) continue;
+					switch (tool.action)
+					{
+						case 'feedback': moveState(9);
+						case 'keybinds': moveState(3);
+					}
+					break;
+				}
+			}
+		}
+
 		cataMove.inputAllow = true;
 
 		if (controls.BACK)
@@ -2070,6 +2148,7 @@ class OptionsState extends MusicBeatState
 		updateHint();
 		updateFrost();
 		updateIndicator();
+		layoutTip();
 	}
 
 
@@ -2117,7 +2196,6 @@ class OptionsState extends MusicBeatState
 		if (cur == indicatorName) return;
 		indicatorName = cur;
 		for (m in barV.parent) m.cataChoose = (cur != null && m.memberName == cur);
-		for (m in barH.parent) m.cataChoose = (cur != null && m.memberName == cur);
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -2127,8 +2205,8 @@ class OptionsState extends MusicBeatState
 	public function addCata(type:String, follow:NaviGroup, mem:NaviMember, extraPath:String = '')
 	{
 		var obj:OptionCata = null;
-		var cx:Float = FlxG.width * P_LEFT_OPEN;
-		var cw:Float = FlxG.width * (1 - P_LEFT_OPEN - P_RIGHT);
+		var cx:Float = contentLayoutX();
+		var cw:Float = contentWidth();
 		var cy:Float = headH;
 		var chh:Float = 200;
 
@@ -2169,7 +2247,16 @@ class OptionsState extends MusicBeatState
 	}
 
 	public function addMove(tar:MouseMove) add(tar);
-	public function cataMoveChange() {}
+	public function cataMoveChange()
+	{
+		if (currentCata == null) return;
+		// 下拉展开会即时增加分类总高；同步滚动边界、当前落点与可视裁剪，
+		// 否则新增的列表行虽推动了后续选项，却仍受旧滚动范围/裁剪限制。
+		measureContent(currentCata);
+		currentCata.y = contentBaseY + contentScrollPos;
+		lastScrollApplied = contentScrollPos;
+		refreshContentLayout();
+	}
 	public function startSearch(text:String, time = 0.5) {}
 	public function changeCata(cataSort:Int, memSort:Int) {}
 	public function changeNavi(navi:NaviGroup, isOpened:Bool, naviTime:Float = 0.45) {}
@@ -2189,6 +2276,12 @@ class OptionsState extends MusicBeatState
 		if (tipText == null) return;
 		var clean:String = (str == null) ? '' : str;
 		if (tipText.text == clean) return;
+		// Keep the explanation as one flowing string; FlxText wraps it to fieldWidth.
+		clean = StringTools.replace(clean, "\r\n", " ");
+		clean = StringTools.replace(clean, "\n", " ");
+		clean = StringTools.replace(clean, "\r", " ");
+		// A previous long tip may have left a fixed-height field behind.
+		tipText.fieldHeight = 0;
 		tipText.text = clean;
 		if (clean != '') tipText.font = FontFallback.uiFont(clean); // 文本定下来之后再挑字体
 		tipScrollV = 0;
@@ -2197,16 +2290,66 @@ class OptionsState extends MusicBeatState
 		tipFitDelay = 1;
 	}
 
+	/** The hovered setting owns the footer explanation until the pointer leaves it. */
+	public function showTip(owner:Option, str:String):Void
+	{
+		tipOwner = owner;
+		showVariable(owner);
+		changeTip(str);
+	}
+
+	function showVariable(owner:Option):Void
+	{
+		if (fpVariableText == null) return;
+		if (owner == null || owner.variable == null || owner.variable == '')
+		{
+			fpVariableText.text = '';
+			fpVariableText.visible = false;
+			return;
+		}
+		fpVariableText.text = Language.get('Target', 'options') + ': ' + owner.variable;
+		fpVariableText.setFormat(FontFallback.uiFont(fpVariableText.text), Std.int(FlxG.height * 0.017),
+			FlxColor.WHITE, RIGHT, FlxTextBorderStyle.OUTLINE, 0xFF111821);
+		fpVariableText.borderSize = 1.5;
+		fpVariableText.borderStyle = OUTLINE;
+		fpVariableText.visible = true;
+	}
+
+	public function clearTip(?owner:Option):Void
+	{
+		if (owner != null && tipOwner != owner) return;
+		tipOwner = null;
+		showVariable(null);
+		changeTip('');
+	}
+
 	/** 说明文本在底部栏里垂直居中（行数变了高度就变，所以每次量完都要重算） */
 	function layoutTip():Void
 	{
 		if (tipText == null) return;
 		var top:Float = bottomBarTop();
+		var tx:Float = FlxG.width * TIP_X;
+		var px:Float = panelW > MIN_W ? panelX : FlxG.width * P_LEFT_OPEN;
+		var py:Float = panelW > MIN_W ? panelY : 0;
+		var pw:Float = panelW > MIN_W ? panelW : FlxG.width * (1 - P_LEFT_OPEN - P_RIGHT);
+		var ph:Float = panelW > MIN_W ? panelH : FlxG.height;
+		var inset:Float = Math.min(ph * 0.2679491924, pw * 0.5);
+		var t:Float = ph <= 0 ? 1 : FlxMath.bound((top + (FlxG.height - top) * 0.5 - py) / ph, 0, 1);
+		var right:Float = px + pw - inset * t;
+		var targetW:Float = Math.max(40, right - tx - FlxG.width * 0.025);
+		if (Math.abs(tipText.fieldWidth - targetW) > 0.5)
+		{
+			tipText.x = tx;
+			tipText.fieldWidth = targetW;
+			tipText.fieldHeight = 0;
+			tipNeedFit = tipText.text != null && tipText.text.length > 0;
+			tipFitDelay = 1;
+		}
 		tipText.y = top + (FlxG.height - top) / 2 - tipText.height / 2;
 	}
 
 	/**
-	 * 量一次说明文本：超过 TIP_LINES 行就把文本框收成 TIP_LINES 行高，多出来的用滚轮滑。
+	 * 量一次说明文本：用满底部说明区的可用高度，多出来的用滚轮滑。
 	 * 与 `Option.fitDescWindow` 同构（同一个 FlxText 坑）。
 	 */
 	function fitTipWindow():Void
@@ -2241,10 +2384,12 @@ class OptionsState extends MusicBeatState
 		var est:Float = fullH / lineH;
 		var lines:Int = (est > 1) ? Std.int(est + 0.5) : 1;
 
-		if (lines > TIP_LINES)
+		var barRoom:Float = Math.max(1, FlxG.height - bottomBarTop() - 8);
+		var visibleLines:Int = Std.int(Math.max(1, Math.floor(barRoom / lineH)));
+		if (lines > visibleLines)
 		{
-			tipText.fieldHeight = Math.min(lineH * TIP_LINES, fullH) + 2;
-			tipMaxScroll = lines - TIP_LINES;
+			tipText.fieldHeight = Math.min(fullH, barRoom);
+			tipMaxScroll = lines - visibleLines;
 			if (tipScrollV > tipMaxScroll) tipScrollV = tipMaxScroll;
 			if (tipScrollV < 0) tipScrollV = 0;
 			tf.scrollV = tipScrollV + 1;
@@ -2295,24 +2440,28 @@ class OptionsState extends MusicBeatState
 			case 5:
 				persistentUpdate = false;
 				openSubState(new MobileExtraControl());
+			#if mobile
 			case 6: MusicBeatState.switchState(new CopyState(true));
+			#end
 			case 7:
 				persistentUpdate = false;
 				openSubState(new NotesSubStateLegacy());
 			case 8:
 				persistentUpdate = false;
 				openSubState(new SelectGameSubState());
+			case 9:
+				persistentUpdate = false;
+				openSubState(new options.base.KeyboardViewerSubState());
 		}
 	}
 
 	public function changeLanguage()
 	{
+		clearTip();
 		barV.changeLanguage();
-		barH.changeLanguage();
 		barV.refreshLangVisual(false);
-		barH.refreshLangVisual(false);
 		// ★ 内容区的文案也要跟着换：Option.changeLanguage() 会重写每一条的
-		//   「变量名称: xxx」+ 描述文字，并重建字号/字体（中英文字宽不同）。
+		//   变量名现在显示在顶栏，列表项只重建设置名称/说明文本。
 		//   以前漏了这一步，所以点语言按钮后侧边栏和标题栏立刻变了，二级菜单里的
 		//   设置项还是旧语言 —— 用户反馈的「切换语言没有立即生效」。
 		for (c in cataGroup) c.changeLanguage();
@@ -2322,18 +2471,17 @@ class OptionsState extends MusicBeatState
 		}
 		resetButton.changeLanguage();
 		backButton.changeLanguage();
+		updateFreeplayBackText();
+		updateFreeplayHeaderText();
 		updateStaticText();
 	}
 
 	function updateStaticText()
 	{
-		var isV:Bool = (mode == 'v');
 		var isCN:Bool = (ClientPrefs.data.language == 'Chinese');
-		hintMark.text = isV ? '<' : '^';
-		hintText.text = isV
-			? (isCN ? '从左侧选择调整项后这里才会显示设置' : 'Select an item on the left to show its settings here')
-			: (isCN ? '从上方选择调整项后这里才会显示设置' : 'Select an item above to show its settings here');
-		hintSub.text = isV ? 'SELECT AN ITEM ON THE LEFT' : 'SELECT AN ITEM ABOVE';
+		hintMark.text = '<';
+		hintText.text = isCN ? '从左侧选择调整项后这里才会显示设置' : 'Select an item on the left to show its settings here';
+		hintSub.text = 'SELECT AN ITEM ON THE LEFT';
 
 		// ★ 文本定下来之后**再**挑字体 —— 判断依据是"这段文本"本身（见 FontFallback）。
 		//   中文提示语在 English 界面下会撞上纯拉丁的 chillax，不做回退就是一片空白。
@@ -2347,9 +2495,8 @@ class OptionsState extends MusicBeatState
 
 	function layoutHint()
 	{
-		var isV:Bool = (mode == 'v');
-		var cx:Float = isV ? (FlxG.width * SB_W + FlxG.width) / 2 : FlxG.width / 2;
-		var cy:Float = isV ? FlxG.height / 2 : (FlxG.height * (BAR_H + BAR_GAP * 2) + FlxG.height) / 2;
+		var cx:Float = (FlxG.width * SB_W + FlxG.width) / 2;
+		var cy:Float = FlxG.height / 2;
 		hintMark.x = cx - hintMark.width / 2;
 		hintMark.y = cy - FlxG.height * 0.11;
 		hintText.x = cx - hintText.width / 2;
@@ -2363,7 +2510,6 @@ class OptionsState extends MusicBeatState
 		super.closeSubState();
 		persistentUpdate = true;
 	}
-
 	///////////////////////////////////////////////////////////////////////////////
 
 	var backCheck:Bool = false;
@@ -2379,10 +2525,16 @@ class OptionsState extends MusicBeatState
 			if (Main.watermark != null)
 			{
 				Main.watermark.scaleX = Main.watermark.scaleY = ClientPrefs.data.watermarkScale;
-				Main.watermark.y += (1 - ClientPrefs.data.watermarkScale) * Main.watermark.bitmapData.height;
+				Main.watermark.y = Lib.current.stage.stageHeight - 5 - Main.watermark.scaleY * Main.watermark.bitmapData.height;
 				Main.watermark.visible = ClientPrefs.data.showWatermark;
 			}
-			switch (stateType)
+			// ★ 先把目标取出来、立刻把 static 归零，再执行跳转。
+			//   原来是先 switch 再 `stateType = 0`：一旦 switch 过程中抛异常/提前返回，
+			//   或者在 case 里插入了别的跳转，残留值就会带到下一次打开设置，
+			//   导致「从主菜单进设置、退出却进了游戏」这类偶发问题。
+			var backTo:Int = stateType;
+			stateType = 0;
+			switch (backTo)
 			{
 				case 0: MusicBeatState.switchState(new MainMenuState());
 				case 1: MusicBeatState.switchState(new FreeplayState());
@@ -2390,7 +2542,6 @@ class OptionsState extends MusicBeatState
 					MusicBeatState.switchState(new PlayState());
 					FlxG.mouse.visible = false;
 			}
-			stateType = 0;
 		}
 	}
 }

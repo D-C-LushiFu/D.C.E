@@ -102,7 +102,27 @@ class Charter extends UIState {
 	public var uiCamera:FlxCamera;
 	public var selectionBox:UISliceSprite;
 	public var autoSaveNotif:CharterAutoSaveUI;
+	#if TOUCH_CONTROLS
+	public var playButton:UIButton;
+	public var testButton:UIButton;
+	public var deleteButton:UIButton;
+	public var undoButton:UIButton;
+	public var redoButton:UIButton;
+	public var subtractSustainButton:UIButton;
+	public var addSustainButton:UIButton;
+	public var exitButton:UIButton;
+	public var mobileToolsToggleButton:UIButton;
+	public var mobileUpButton:UIButton;
+	public var mobileDownButton:UIButton;
+	public var mobileLeftButton:UIButton;
+	public var mobileRightButton:UIButton;
+	public var mobileToolButtons:Array<UIButton> = [];
+	public var mobileToolPages:Array<Array<UIButton>> = [];
+	public var mobileToolPage:Int = 0;
+	public var mobileQueuedAction:Void->Void = null;
+	#end
 	public static var autoSaveTimer:Float = 0;
+	var clearStaticsOnDestroy:Bool = false;
 
 	public static var selection:Selection;
 
@@ -443,25 +463,26 @@ class Charter extends UIState {
 		gridBackdrops = new CharterBackdropGroup(strumLines);
 		gridBackdrops.notesGroup = this.notesGroup;
 
-		leftEventRowText = new UIText(0, -40, 0, translate("info.localEvents"), 12);
+		leftEventRowText = new UIText(0, -40, 0, translate("info." + (Options.charterSwapEventSides ? "globalEvents" : "localEvents")), 12);
 		leftEventRowText.alignment = "center"; leftEventRowText.alpha = 0.75;
 
 		leftEventsBackdrop = new EventBackdrop(false);
 		leftEventsBackdrop.x = -leftEventsBackdrop.width;
 
 		leftEventRowText.cameras = leftEventsBackdrop.cameras = leftEventsGroup.cameras = [charterCamera];
-		leftEventsGroup.eventsBackdrop = leftEventsBackdrop;
-		leftEventsGroup.eventsRowText = leftEventRowText;
 
-		rightEventRowText = new UIText(0, -40, 0, translate("info.globalEvents"), 12);
+		rightEventRowText = new UIText(0, -40, 0, translate("info." + (Options.charterSwapEventSides ? "localEvents" : "globalEvents")), 12);
 		rightEventRowText.alignment = "center"; rightEventRowText.alpha = 0.75;
 
 		rightEventsBackdrop = new EventBackdrop(true);
 		rightEventsBackdrop.x = 0;
 
 		rightEventRowText.cameras = rightEventsBackdrop.cameras = rightEventsGroup.cameras = [charterCamera];
-		rightEventsGroup.eventsBackdrop = rightEventsBackdrop;
-		rightEventsGroup.eventsRowText = rightEventRowText;
+
+		leftEventsGroup.eventsBackdrop = Options.charterSwapEventSides ? rightEventsBackdrop : leftEventsBackdrop;
+		leftEventsGroup.eventsRowText = Options.charterSwapEventSides ? rightEventRowText : leftEventRowText;
+		rightEventsGroup.eventsBackdrop = Options.charterSwapEventSides ? leftEventsBackdrop : rightEventsBackdrop;
+		rightEventsGroup.eventsRowText = Options.charterSwapEventSides ? leftEventRowText : rightEventRowText;
 
 		// thank you neo for pointing out im stupid -lunar
 		// this is future lunar i completely forgot what neo pointed out but hes awesome go follow him on twitter
@@ -537,15 +558,102 @@ class Charter extends UIState {
 		strumlineInfoBG.cameras = [charterCamera];
 		strumLines.cameras = [charterCamera];
 
-		localAddEventSpr = new CharterEventAdd(false);
+		localAddEventSpr = new CharterEventAdd(Options.charterSwapEventSides);
 		localAddEventSpr.x -= localAddEventSpr.bWidth;
 		localAddEventSpr.cameras = [charterCamera];
 		localAddEventSpr.alpha = 0;
 
-		globalAddEventSpr = new CharterEventAdd(true);
+		globalAddEventSpr = new CharterEventAdd(!Options.charterSwapEventSides);
 		globalAddEventSpr.x = 0;
 		globalAddEventSpr.cameras = [charterCamera];
 		globalAddEventSpr.alpha = 0;
+
+		#if TOUCH_CONTROLS
+		playButton = new UIButton(FlxG.width - 105, FlxG.height - 85, ">", () -> {
+			_playback_play(null);
+			playButton.field.text = FlxG.sound.music.playing ? "||" : ">";
+		}, 75, 75);
+		playButton.cameras = [uiCamera];
+		playButton.field.scale.set(1.5, 1.5);
+		playButton.alpha = Options.touchPadAlpha;
+
+		testButton = new UIButton(FlxG.width - 150, playButton.y - 60, "Playtest",
+			() -> queueMobileAction(() -> _chart_playtest(null)), 120, 50);
+		testButton.cameras = [uiCamera];
+		testButton.alpha = Options.touchPadAlpha;
+
+		exitButton = new UIButton(10, FlxG.height - 50, "<", () -> queueMobileAction(() -> _file_exit(null)), 40, 40);
+		exitButton.cameras = [uiCamera];
+		exitButton.alpha = Options.touchPadAlpha;
+
+		// Kept below the top bar and separated from the page buttons.
+		mobileToolsToggleButton = new UIButton(10, 140, "NAV [1/5]", toggleMobileToolsPage, 160, 40);
+		mobileToolsToggleButton.cameras = [uiCamera];
+		mobileToolsToggleButton.alpha = Options.touchPadAlpha;
+
+		var navHome = createMobileToolButton("HOME", 0, 0, () -> _song_start(null));
+		var navSectionStart = createMobileToolButton("SEC", 1, 0, () -> _playback_section_start(null));
+		var navEnd = createMobileToolButton("END", 2, 0, () -> _song_end(null));
+		mobileLeftButton = createMobileToolButton("SEC-", 0, 1, () -> _playback_back(null));
+		mobileRightButton = createMobileToolButton("SEC+", 2, 1, () -> _playback_forward(null));
+		mobileUpButton = createMobileToolButton("STEP-", 0, 2, () -> _playback_back_step(null));
+		mobileDownButton = createMobileToolButton("STEP+", 2, 2, () -> _playback_forward_step(null));
+		var navigationPage = [navHome, navSectionStart, navEnd, mobileLeftButton, mobileRightButton, mobileUpButton, mobileDownButton];
+
+		undoButton = createMobileToolButton("UNDO", 0, 0, () -> _edit_undo(null));
+		redoButton = createMobileToolButton("REDO", 1, 0, () -> _edit_redo(null));
+		deleteButton = createMobileToolButton("DEL", 2, 0, () -> _edit_delete(null));
+		var copyButton = createMobileToolButton("COPY", 0, 1, () -> _edit_copy(null));
+		var cutButton = createMobileToolButton("CUT", 1, 1, () -> _edit_cut(null));
+		var pasteButton = createMobileToolButton("PASTE", 2, 1, () -> _edit_paste(null));
+		var deleteStackedButton = createMobileToolButton("STACK", 0, 2, () -> _edit_deletestacked(null));
+		var selectAllButton = createMobileToolButton("ALL", 1, 2, () -> _note_selectall(null));
+		var selectMeasureButton = createMobileToolButton("MEAS", 2, 2, () -> _note_selectmeasure(null));
+		var deselectButton = createMobileToolButton("NONE", 0, 3, function() {
+			selection = [];
+		});
+		var editPage = [undoButton, redoButton, deleteButton, copyButton, cutButton, pasteButton,
+			deleteStackedButton, selectAllButton, selectMeasureButton, deselectButton];
+
+		subtractSustainButton = createMobileToolButton("SUS-", 0, 0, () -> _note_subtractsustain(null));
+		addSustainButton = createMobileToolButton("SUS+", 2, 0, () -> _note_addsustain(null));
+		var snapDownButton = createMobileToolButton("SNAP-", 0, 1, () -> _snap_decreasesnap(null));
+		var snapResetButton = createMobileToolButton("SNAP0", 1, 1, () -> _snap_resetsnap(null));
+		var snapUpButton = createMobileToolButton("SNAP+", 2, 1, () -> _snap_increasesnap(null));
+		var typeDownButton = createMobileToolButton("TYPE-", 0, 2, () -> changeMobileNoteType(-1));
+		var typeResetButton = createMobileToolButton("TYPE0", 1, 2, () -> changeNoteType(0));
+		var typeUpButton = createMobileToolButton("TYPE+", 2, 2, () -> changeMobileNoteType(1));
+		var selectLineButton = createMobileToolButton("LINE", 0, 3, selectMobileStrumline);
+		var notePage = [subtractSustainButton, addSustainButton, snapDownButton, snapResetButton, snapUpButton,
+			typeDownButton, typeResetButton, typeUpButton, selectLineButton];
+
+		var zoomOutButton = createMobileToolButton("ZOOM-", 0, 0, () -> _view_zoomout(null));
+		var zoomResetButton = createMobileToolButton("ZOOM0", 1, 0, () -> _view_zoomreset(null));
+		var zoomInButton = createMobileToolButton("ZOOM+", 2, 0, () -> _view_zoomin(null));
+		var panLeftButton = createMobileToolButton("PAN-", 0, 1, () -> _view_scrollleft(null));
+		var panResetButton = createMobileToolButton("PAN0", 1, 1, () -> _view_scrollreset(null));
+		var panRightButton = createMobileToolButton("PAN+", 2, 1, () -> _view_scrollright(null));
+		var speedDownButton = createMobileToolButton("SPD-", 0, 2, () -> _playback_speed_lower(null));
+		var speedResetButton = createMobileToolButton("SPD0", 1, 2, () -> _playback_speed_reset(null));
+		var speedUpButton = createMobileToolButton("SPD+", 2, 2, () -> _playback_speed_raise(null));
+		var viewPage = [zoomOutButton, zoomResetButton, zoomInButton, panLeftButton, panResetButton, panRightButton,
+			speedDownButton, speedResetButton, speedUpButton];
+
+		var saveButton = createMobileToolButton("SAVE", 0, 0, () -> _file_save_all(null));
+		var testAllButton = createMobileToolButton("TEST", 1, 0, () -> queueMobileAction(() -> _chart_playtest(null)));
+		var testHereButton = createMobileToolButton("TEST@", 2, 0, () -> queueMobileAction(() -> _chart_playtest_here(null)));
+		var opponentButton = createMobileToolButton("OPP", 0, 1, () -> queueMobileAction(() -> _chart_playtest_opponent(null)));
+		var opponentHereButton = createMobileToolButton("OPP@", 1, 1, () -> queueMobileAction(() -> _chart_playtest_opponent_here(null)));
+		var metronomeButton = createMobileToolButton("MET", 2, 1, toggleMobileMetronome);
+		var playerCameraButton = createMobileToolButton("PCAM", 0, 2, () -> _player_camera_add(null));
+		var opponentCameraButton = createMobileToolButton("OCAM", 1, 2, () -> _opponent_camera_add(null));
+		var saveAsButton = createMobileToolButton("SAVE@", 2, 2, () -> queueMobileAction(() -> _file_saveas(null)));
+		var testPage = [saveButton, testAllButton, testHereButton, opponentButton, opponentHereButton,
+			metronomeButton, playerCameraButton, opponentCameraButton, saveAsButton];
+
+		mobileToolPages = [navigationPage, editPage, notePage, viewPage, testPage];
+		setMobileToolsPage(0);
+		#end
 
 		// adds grid and notes so that they're ALWAYS behind the UI
 		add(gridBackdrops);
@@ -575,6 +683,11 @@ class Charter extends UIState {
 		// add the ui group
 		add(uiGroup);
 
+		#if TOUCH_CONTROLS
+		for (control in [playButton, testButton, exitButton, mobileToolsToggleButton]) add(control);
+		for (control in mobileToolButtons) add(control);
+		#end
+
 		loadSong();
 
 		if (Framerate.isLoaded) {
@@ -599,8 +712,81 @@ class Charter extends UIState {
 		DiscordUtil.call("onEditorLoaded", ["Chart Editor", __song + " (" + __diff + ")" + (__variant != null && __variant != "" ? " (" + __variant + ")" : "")]);
 	}
 
+	#if TOUCH_CONTROLS
+	function createMobileToolButton(label:String, column:Int, row:Int, callback:Void->Void):UIButton
+	{
+		var button = new UIButton(10 + (column * 55), 190 + (row * 45), label, callback, 50, 40);
+		button.cameras = [uiCamera];
+		button.alpha = Options.touchPadAlpha;
+		mobileToolButtons.push(button);
+		return button;
+	}
+
+	function toggleMobileToolsPage():Void
+	{
+		if (mobileToolPages.length > 0) setMobileToolsPage(mobileToolPage + 1);
+	}
+
+	function setMobileToolsPage(page:Int):Void
+	{
+		if (mobileToolPages.length == 0) return;
+		mobileToolPage = FlxMath.wrap(page, 0, mobileToolPages.length - 1);
+
+		for (button in mobileToolButtons)
+			if (button != null) button.visible = button.selectable = false;
+		for (button in mobileToolPages[mobileToolPage])
+			if (button != null) button.visible = button.selectable = true;
+
+		var pageName = switch (mobileToolPage) {
+			case 0: "NAV";
+			case 1: "EDIT";
+			case 2: "NOTE";
+			case 3: "VIEW";
+			case 4: "TEST";
+			default: "TOOLS";
+		};
+		if (mobileToolsToggleButton != null)
+			mobileToolsToggleButton.field.text = '$pageName [${mobileToolPage + 1}/${mobileToolPages.length}]';
+	}
+
+	function queueMobileAction(action:Void->Void):Void
+	{
+		if (action == null || mobileQueuedAction != null) return;
+		mobileQueuedAction = action;
+		FlxG.signals.postUpdate.addOnce(function() {
+			var queued = mobileQueuedAction;
+			mobileQueuedAction = null;
+			if (queued != null && FlxG.state == this) queued();
+		});
+	}
+
+	function changeMobileNoteType(change:Int):Void
+	{
+		changeNoteType(FlxMath.wrap(noteType + change, 0, noteTypes.length));
+	}
+
+	function selectMobileStrumline():Void
+	{
+		var strumlineID = -1;
+		for (selected in selection)
+			if (selected is CharterNote) {
+				strumlineID = cast(selected, CharterNote).strumLineID;
+				break;
+			}
+		if (strumlineID < 0) return;
+		selection = [for (note in notesGroup.members)
+			if (note != null && note.strumLineID == strumlineID) note];
+	}
+
+	function toggleMobileMetronome():Void
+	{
+		Options.charterMetronomeEnabled = !Options.charterMetronomeEnabled;
+	}
+	#end
+
 	override function destroy() {
-		__updatePlaytestInfo();
+		if (clearStaticsOnDestroy) __clearStatics();
+		else __updatePlaytestInfo();
 
 		if(Framerate.isLoaded) {
 			Framerate.fpsCounter.alpha = 1;
@@ -920,11 +1106,12 @@ class Charter extends UIState {
 						n.cursor = HAND;
 					}, function (e:CharterEvent) {
 						e.snappedToGrid = false;
-						e.setPosition(e.eventsBackdrop.x + (e.global ? 0 : e.eventsBackdrop.width - e.bWidth) + (mousePos.x - dragStartPos.x), e.step * 40 + (mousePos.y - dragStartPos.y) - 17);
+						var isGlobal = e.global != Options.charterSwapEventSides;
+						e.setPosition(e.eventsBackdrop.x + (isGlobal ? 0 : e.eventsBackdrop.width - e.bWidth) + (mousePos.x - dragStartPos.x), e.step * 40 + (mousePos.y - dragStartPos.y) - 17);
 						e.y = CoolUtil.bound(e.y, -17, (__endStep*40)-17);
 						e.cursor = HAND;
 
-						e.displayGlobal = e.x + (e.bWidth/2) > ((strumLines.totalKeyCount*40)/2);
+						e.displayGlobal = e.x + (e.bWidth/2) > ((strumLines.totalKeyCount*40)/2) != Options.charterSwapEventSides;
 					});
 					currentCursor = HAND;
 				} else {
@@ -1045,7 +1232,7 @@ class Charter extends UIState {
 											var e:CharterEvent = cast s;
 											var newEvent = new CharterEvent(e.step, [for (event in e.events) Reflect.copy(event)], e.global);
 											newEvent.refreshEventIcons();
-											(e.global ? rightEventsGroup : leftEventsGroup).add(newEvent);
+											((e.global != Options.charterSwapEventSides) ? rightEventsGroup : leftEventsGroup).add(newEvent);
 											newSelection.push(newEvent);
 										}
 									}
@@ -1123,11 +1310,12 @@ class Charter extends UIState {
 		// Event Spr
 		for (addEventSpr in [localAddEventSpr, globalAddEventSpr]) {
 			addEventSpr.incorporeal = true;
-			if ((!addEventSpr.global ? mousePos.x < 0 : mousePos.x > strumLines.totalKeyCount * 40) && gridActionType == NONE && inBoundsY) {
+			var onLeft:Bool = (!addEventSpr.global) != Options.charterSwapEventSides;
+			if ((onLeft ? mousePos.x < 0 : mousePos.x > strumLines.totalKeyCount * 40) && gridActionType == NONE && inBoundsY) {
 				var event = getHoveredEvent(mousePos.y, !addEventSpr.global ? leftEventsGroup : rightEventsGroup);
 				var hoveredWidth:Float = event != null ? 27 + 40 + event.bWidth : addEventSpr.bWidth;
 
-				if ((!addEventSpr.global ? mousePos.x > -hoveredWidth : mousePos.x < strumLines.totalKeyCount * 40 + hoveredWidth)) {
+				if ((onLeft ? mousePos.x > -hoveredWidth : mousePos.x < strumLines.totalKeyCount * 40 + hoveredWidth)) {
 					addEventSpr.incorporeal = false;
 
 					if (event != null) addEventSpr.updateEdit(event);
@@ -1645,8 +1833,25 @@ class Charter extends UIState {
 	#if REGION
 	function _file_exit(_) {
 		if (undos.unsaved) SaveWarning.triggerWarning();
-		else {undos = null; FlxG.switchState(new CharterSelection()); Charter.instance.__clearStatics();}
+		else {
+			// Keep the static selection/undo data valid for every remaining update
+			// in the transition frame. Clearing it here made CharterNoteGroup.forEach
+			// call selection.copy() after selection had already become null.
+			clearStaticsOnDestroy = true;
+			FlxG.switchState(new CharterSelection());
+		}
 	}
+
+	#if mobile
+	public override function onMobileBack():Bool {
+		#if TOUCH_CONTROLS
+		queueMobileAction(() -> _file_exit(null));
+		#else
+		_file_exit(null);
+		#end
+		return true;
+	}
+	#end
 
 	function _file_save_all(_) {saveEverything(); UIState.playEditorSound(Flags.DEFAULT_EDITOR_SAVE_SOUND);}
 	function _file_save(_) {saveChart(); UIState.playEditorSound(Flags.DEFAULT_EDITOR_SAVE_SOUND);}

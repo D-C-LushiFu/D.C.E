@@ -41,6 +41,10 @@ class MobileControlSelectSubState extends MusicBeatSubstate
 	var buttonBinded:Bool = false;
 	var bindButton:FlxButton;
 	var resetButton:UIButton;
+	/** Reset 按钮的"二次确认"状态：先点一下变成 Sure?，2 秒内再点一下才真的重置 */
+	var resetConfirmPending:Bool = false;
+	var resetConfirmTimer:Float = 0;
+	static inline var RESET_CONFIRM_WINDOW:Float = 2.0;
 	var daFunny:FlxText;
 	var buttonLeftColor:Array<FlxColor>;
 	var buttonDownColor:Array<FlxColor>;
@@ -144,47 +148,24 @@ class MobileControlSelectSubState extends MusicBeatSubstate
 		exit.color = FlxColor.LIME;
 		exit.setGraphicSize(Std.int(exit.width) * 3);
 		exit.updateHitbox();
+		// ★ 不允许"手指从别处滑进来、在这上面松手"就当点击。
+		//   移动端拖动虚拟按键时手指很容易扫过 / 松开在这排按钮上，一松手就"退出并保存"，
+		//   会把当时屏幕上的位置直接落盘。关掉 allowSwiping 后必须**从按钮上按下去**才算。
+		exit.allowSwiping = false;
 		exit.label.setFormat(Paths.font('vcr.ttf'), 28, FlxColor.WHITE, FlxTextAlign.CENTER);
 		exit.label.fieldWidth = exit.width;
 		exit.label.x = ((exit.width - exit.label.width) / 2) + exit.x;
 		exit.label.offset.y = -10; // WHY THE FUCK I CAN'T CHANGE THE LABEL Y
 		add(exit);
 
-		resetButton = new UIButton(exit.x, exit.height + exit.y + 20, "Reset", () ->
-		{
-			if (resetButton.visible)
-			{
-				var daChoice:String = controlsItems[Math.floor(curSelected)];
-				if (daChoice == 'Pad-Custom')
-				{
-					virtualPadd.buttonUp.x = FlxG.width - 258;
-					virtualPadd.buttonUp.y = FlxG.height - 408;
-					virtualPadd.buttonDown.x = FlxG.width - 258;
-					virtualPadd.buttonDown.y = FlxG.height - 201;
-					virtualPadd.buttonRight.x = FlxG.width - 132;
-					virtualPadd.buttonRight.y = FlxG.height - 309;
-					virtualPadd.buttonLeft.x = FlxG.width - 384;
-					virtualPadd.buttonLeft.y = FlxG.height - 309;
-				}
-				else
-				{
-				}
-
-				if (virtualPadd.extraKeys.length >= 4)
-				{
-					var BTN:Int = 130;
-					var ratio:Float = 1.01;
-					for (i in 0...virtualPadd.extraKeys.length)
-					{
-						virtualPadd.extraKeys[i].x = FlxG.width - (BTN * (1 + i) * ratio);
-						virtualPadd.extraKeys[i].y = FlxG.height - (BTN * 4 * ratio);
-					}
-				}
-			}
-		});
+		resetButton = new UIButton(exit.x, exit.height + exit.y + 20, "Reset", onResetClicked);
 		resetButton.color = FlxColor.RED;
 		resetButton.setGraphicSize(Std.int(resetButton.width) * 3);
 		resetButton.updateHitbox();
+		// ★ 同 exit：必须"从 Reset 按钮上按下去"才算点击。
+		//   这两个按钮上下紧挨着，以前手指在 Reset 上松开就会把 4 个方向键弹回默认位置 ——
+		//   用户报的"我没点 Reset、按键位置偶尔被重置"就是这条路径。
+		resetButton.allowSwiping = false;
 		resetButton.label.setFormat(Paths.font('vcr.ttf'), 28, FlxColor.WHITE, FlxTextAlign.CENTER);
 		resetButton.label.fieldWidth = resetButton.width;
 		resetButton.label.x = ((resetButton.width - resetButton.label.width) / 2) + resetButton.x;
@@ -291,6 +272,14 @@ class MobileControlSelectSubState extends MusicBeatSubstate
 		inputvari.screenCenter(X);
 		leftArrow.x = inputvari.x - 60;
 		rightArrow.x = inputvari.x + inputvari.width + 10;
+
+		// Reset 的二次确认窗口：超时自动收回，避免"上一次点了一半的确认"被后面的误触接上
+		if (resetConfirmPending)
+		{
+			resetConfirmTimer += elapsed;
+			if (resetConfirmTimer > RESET_CONFIRM_WINDOW)
+				cancelResetConfirm();
+		}
 
 		var mouse = FlxG.mouse;
 
@@ -420,8 +409,83 @@ class MobileControlSelectSubState extends MusicBeatSubstate
 		virtualPadd = null;
 	}
 
+	// ===================== Reset 按钮：二次确认 =====================
+	//
+	// 为什么改成两步：这个 Reset 只能**在屏幕上**清位置、真正落盘要等玩家再点
+	// "Exit & Save"，但两个按钮上下紧挨着，"误点 Reset → 顺手退出保存"是一条很短的
+	// 路径；而它以前是**一次点击就生效、没有任何确认**。
+	// 现在：第一次点按钮文字变成 "Sure?"，2 秒内再点一次才真正重置；
+	// 期间换类型 / 超时都会自动收回。配合 `allowSwiping = false`，
+	// "手指从别处滑进来在这上面松手"不再是点击。
+
+	function setResetLabel(txt:String):Void
+	{
+		if (resetButton == null || resetButton.label == null) return;
+		resetButton.label.text = txt;
+		resetButton.label.x = ((resetButton.width - resetButton.label.width) / 2) + resetButton.x;
+	}
+
+	function onResetClicked():Void
+	{
+		if (resetButton == null || !resetButton.visible) return;
+
+		if (!resetConfirmPending)
+		{
+			resetConfirmPending = true;
+			resetConfirmTimer = 0;
+			setResetLabel('Sure?');
+			FlxG.sound.play(Paths.sound('scrollMenu'));
+			return;
+		}
+
+		resetConfirmPending = false;
+		resetConfirmTimer = 0;
+		setResetLabel('Reset');
+		applyPadReset();
+		FlxG.sound.play(Paths.sound('cancelMenu'));
+	}
+
+	function cancelResetConfirm():Void
+	{
+		if (!resetConfirmPending) return;
+		resetConfirmPending = false;
+		resetConfirmTimer = 0;
+		setResetLabel('Reset');
+	}
+
+	/** 真正把方向键 / 特殊键挪回默认位置（旧 Reset 按钮的全部逻辑，原样保留） */
+	function applyPadReset():Void
+	{
+		if (virtualPadd == null) return;
+
+		var daChoice:String = controlsItems[Math.floor(curSelected)];
+		if (daChoice == 'Pad-Custom')
+		{
+			virtualPadd.buttonUp.x = FlxG.width - 258;
+			virtualPadd.buttonUp.y = FlxG.height - 408;
+			virtualPadd.buttonDown.x = FlxG.width - 258;
+			virtualPadd.buttonDown.y = FlxG.height - 201;
+			virtualPadd.buttonRight.x = FlxG.width - 132;
+			virtualPadd.buttonRight.y = FlxG.height - 309;
+			virtualPadd.buttonLeft.x = FlxG.width - 384;
+			virtualPadd.buttonLeft.y = FlxG.height - 309;
+		}
+
+		if (virtualPadd.extraKeys.length >= 4)
+		{
+			var BTN:Int = 130;
+			var ratio:Float = 1.01;
+			for (i in 0...virtualPadd.extraKeys.length)
+			{
+				virtualPadd.extraKeys[i].x = FlxG.width - (BTN * (1 + i) * ratio);
+				virtualPadd.extraKeys[i].y = FlxG.height - (BTN * 4 * ratio);
+			}
+		}
+	}
+
 	function changeSelection(change:Int = 0):Void
 	{
+		cancelResetConfirm(); // 换类型时把没确认完的 Reset 收回，免得误接一次点击
 		if (usesExternalPreferences && change != 0 && controlsItems[Math.floor(curSelected)] == 'Pad-Custom')
 			externalCustomPositions = getCustomPositions();
 

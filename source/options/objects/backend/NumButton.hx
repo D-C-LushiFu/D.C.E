@@ -248,26 +248,36 @@ class NumButton extends FlxSpriteGroup {
 
     function rectUpdate(percent:Float, ?outputData)
 	{
+		// ★ NaN / 无穷防御：max == min（除零）或存档里的值不是数字时 percent 会是 NaN，
+		//   直接喂给 scale.x 会画出一条长度离谱的条。
+		if (!Math.isFinite(percent)) percent = 0;
 		if (percent < 0) percent = 0;
 		if (percent > 1) percent = 1;
 
-		// ★★ 踩坑记录（下面两条都是实测踩出来的，别再走回头路）：
-		//   ① 只改 `_frame.frame.width` 不够：它管的是【源矩形】，而 Sprite 的
-		//      【目标宽】是建好时定死的整条宽（= frameWidth × scale.x，跟源无关），
-		//      于是"115px 的源"被横向【拉伸】回 345px，画面上依旧是一条满的 ——
-		//      这正是用户报的"显示的与实际上不符"（p=1/3 时整条全亮，只有杆在 1/3）。
-		//   ② 改用 clipRect 也不行：`clipRect.width` 只改、不重新赋值的话根本不生效
-		//      （setter 才干活，见 Bar.hx 那句 `// flixel is retarded`）；
-		//      而走了 setter 之后 `frame.clipTo()` 是在【原帧上累积】缩减的，
-		//      一旦被裁到 1px 就再也回不到满宽（实测滚到最大时整条反而全灭）。
-		//   → 正解：**源和目标按同一比例一起缩** —— 源只取纹理最左边 fillW，
-		//     同时用 scale.x 把目标宽也缩到 fillW，两者 1:1，既不拉伸也不累积。
+		// ★★ 踩坑记录（都是同机实测踩出来的，别再走回头路）：
+		//   ① 只改 `_frame.frame.width`（源矩形）→ 条会被横向【拉伸】回满宽，
+		//      画面上依旧是一条满的（用户报的"显示的与实际上不符"）。
+		//   ② 再叠一个 `scale.x = fillW / barFullW`（上一版做法）→ 表面上对了，
+		//      但绘制宽度变成"看历史"的：刚进页面正确，拖过滑块/点过 +/- 之后
+		//      变成 percent²（明显缩短），上下滚动列表又恢复正常 —— 见下面那段。
+		//   ③ `clipRect` 也不行：只改不重新赋值根本不生效（setter 才干活，见 Bar.hx
+		//      那句 `// flixel is retarded`）；走了 setter 之后 `frame.clipTo()` 是在
+		//      【原帧上累积】缩减的，一旦被裁到 1px 就再也回不到满宽。
+		//   → 正解：**只缩 scale.x、源矩形一个字都别动**。
 		// ★ 一律用 barFullW 算 —— 不能用 moveDis.width / moveBG.width 反推。
 		var fillW:Float = barFullW * percent;
 		if (fillW < 1)
 			fillW = 1;
-		moveDis._frame.frame.width = fillW;     // 源：只取纹理最左边 fillW
-		moveDis.scale.x = fillW / barFullW;     // 目标：跟着缩，否则会被拉伸回满宽
+		// ★ 只缩 scale.x，**不要**再就地改 `moveDis._frame.frame.width`（2026-09-25 实测）：
+		//   改源矩形会让填充的绘制宽度变成"看历史"的 ——
+		//     · 刚进设置页            → 宽 = 整条 × percent（正确）
+		//     · 拖过滑块 / 点过 +/- 后 → 宽 = 整条 × percent²（明显缩短，长度对不上杆）
+		//     · 上下滚动列表（触发重绘）→ 又恢复原样
+		//   这正是用户报的「调滑块之后滑动条显示异常、明显缩短、错误长度」。
+		//   原理：目标宽只等于 纹理宽 × scale.x，改源矩形不会改它；而"纹理宽按多少算"
+		//   取决于渲染批次重读帧的时机，于是同一份数据会画出两种长度。
+		//   只缩 scale.x 时：绘制宽 = barFullW × (fillW / barFullW) = percent × barFullW，恒定正确。
+		moveDis.scale.x = fillW / barFullW;
 		// 杆跨在填充右缘上（左右各半个杆宽）：percent=1 时杆的右缘正好贴住条的右缘
 		rod.x = follow.followX + follow.innerX + innerX + deleteButton.width * 1.2 + (barFullW - rod.width) * percent;
 

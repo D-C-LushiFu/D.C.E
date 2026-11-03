@@ -81,7 +81,7 @@ class TraceServer {
 			try {
 				var client = server.accept();
 				addClient(client);
-				sendFormattedMessage(client, "INFO", "Connected to NovaFlare trace server.", 0x8BD3FF);
+				sendFormattedMessage(client, "INFO", "Connected to D.C.E. trace server.", 0x8BD3FF);
 				Console.logLevel("NET", "Trace client connected", 0x8BD3FF);
 			} catch (e:Dynamic) {
 				if (isRunning) {

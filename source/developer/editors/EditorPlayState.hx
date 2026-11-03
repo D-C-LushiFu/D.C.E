@@ -21,6 +21,23 @@ import games.objects.NoteSplash;
 import games.objects.StrumNote;
 import games.backend.TimingSystem;
 
+private typedef PreviewNoteData = {
+	var strumTime:Float;
+	var noteData:Int;
+	var sustainLength:Float;
+	var mustPress:Bool;
+	var gfNote:Bool;
+	var noteType:String;
+	var generatedMania:Int;
+	var sustainSteps:Int;
+}
+
+private typedef PreviewSpawnEntry = {
+	var strumTime:Float;
+	var data:PreviewNoteData;
+	var note:Note;
+}
+
 class EditorPlayState extends MusicBeatSubstate
 {
 
@@ -34,12 +51,14 @@ class EditorPlayState extends MusicBeatSubstate
 	var startingSong:Bool = true;
 
 	var playbackRate:Float = 1;
+	/** 挂在全局 persist 音轨 FlxG.sound.music 上的完成回调（闭包捕获 this，销毁时必须摘掉） */
+	var musicOnComplete:Void->Void = null;
 	var vocals:FlxSound;
 	var opponentVocals:FlxSound;
 	var inst:FlxSound;
 
 	var notes:FlxTypedGroup<Note>;
-	var unspawnNotes:Array<Note> = [];
+	var unspawnNotes:Array<PreviewSpawnEntry> = [];
 	var killNotes:Array<Note> = [];
 	var killNotesBudget:Int = 20;
 	var ratingsData:Array<Rating> = Rating.loadDefault();
@@ -280,16 +299,22 @@ class EditorPlayState extends MusicBeatSubstate
 		var j:Int = unspawnNotes.length - 1;
 		while (j >= 0)
 		{
-			var n:Note = unspawnNotes[j];
-			var nKeys:Int = (n != null && n.generatedMania >= 0 ? n.generatedMania : currentMania) + 1;
-			if (n != null && n.noteData >= nKeys)
+			var entry:PreviewSpawnEntry = unspawnNotes[j];
+			var mania:Int = entry != null ? (entry.data != null ? entry.data.generatedMania : entry.note.generatedMania) : -1;
+			var lane:Int = entry != null ? (entry.data != null ? entry.data.noteData : entry.note.noteData) : -1;
+			var nKeys:Int = (mania >= 0 ? mania : currentMania) + 1;
+			if (entry != null && lane >= nKeys)
 			{
-				detachNoteRefs(n);
-				unspawnNotes.remove(n);
-				n.destroy();
+				unspawnNotes.splice(j, 1);
+				if (entry.note != null)
+				{
+					detachNoteRefs(entry.note);
+					entry.note.destroy();
+				}
 			}
 			j--;
 		}
+		heapifyPreviewSpawns();
 
 		// 重建 strum（当前段键数）
 		while (strumLineNotes.members.length > 0)
@@ -377,31 +402,36 @@ class EditorPlayState extends MusicBeatSubstate
 			applyEditorKeyChange(point.keys);
 		}
 
-		if (unspawnNotes[0] != null)
+		if (unspawnNotes.length > 0 && unspawnNotes[0] != null)
 		{
 			var time:Float = spawnTime * playbackRate;
 			if (songSpeed < 1)
 				time /= songSpeed;
-			if (unspawnNotes[0].multSpeed < 1)
-				time /= unspawnNotes[0].multSpeed;
 
 			while (unspawnNotes.length > 0 && unspawnNotes[0].strumTime - Conductor.songPosition < time)
 			{
-				var dunceNote:Note = unspawnNotes[0];
+				var entry:PreviewSpawnEntry = popPreviewSpawn();
+				if (entry == null) continue;
+				if (entry.data != null)
+				{
+					spawnPreviewNote(entry.data);
+					continue;
+				}
+				var dunceNote:Note = entry.note;
+				if (dunceNote == null) continue;
 				// ★ KeyChange(MoreKey)：越界判定按音符「自身所属段」的键数——
 				//   事件后的未来段音符（如 4K→6K 新增轨）提前进入 spawn 窗口时不能被当前旧键数误杀
 				var noteKeys:Int = (dunceNote.generatedMania >= 0 ? dunceNote.generatedMania : currentMania) + 1;
 				if (dunceNote.noteData >= noteKeys)
 				{
-					unspawnNotes.shift();
 					dunceNote.destroy();
 					continue;
 				}
-				notes.insert(0, dunceNote);
+				dunceNote.exists = true;
+				dunceNote.active = true;
+				dunceNote.visible = true;
 				dunceNote.spawned = true;
-
-				var index:Int = unspawnNotes.indexOf(dunceNote);
-				unspawnNotes.splice(index, 1);
+				notes.insert(0, dunceNote);
 			}
 		}
 
@@ -446,6 +476,130 @@ class EditorPlayState extends MusicBeatSubstate
 						\nBeat: $curBeat
 						\nStep: $curStep';
 		super.update(elapsed);
+	}
+
+	/** Construct a note only when its head enters the spawn window. Long-note links are
+	 *  prepared together, while sustain sprites remain queued until their own spawn time. */
+	function spawnPreviewNote(data:PreviewNoteData):Void
+	{
+		if (data == null) return;
+		var head:Note = new Note(data.strumTime, data.noteData, null, false, false, instance, data.generatedMania);
+		head.mustPress = data.mustPress;
+		head.sustainLength = data.sustainLength;
+		head.gfNote = data.gfNote;
+		head.noteType = data.noteType;
+		head.scrollFactor.set();
+		if (head.mustPress)
+			head.x += FlxG.width / 2;
+		else if (ClientPrefs.data.middleScroll)
+		{
+			head.x += 310;
+			if (data.noteData > 1) head.x += FlxG.width / 2 + 25;
+		}
+		head.spawned = true;
+		notes.insert(0, head);
+
+		var previous:Note = head;
+		for (susStep in 0...data.sustainSteps)
+		{
+			var sustain:Note = new Note(data.strumTime + Conductor.stepCrochet * susStep, data.noteData, previous, true, false, instance,
+				data.generatedMania);
+			sustain.hitMultUpdate(susStep, data.sustainSteps - 1);
+			sustain.mustPress = data.mustPress;
+			sustain.gfNote = data.gfNote;
+			sustain.noteType = data.noteType;
+			sustain.scrollFactor.set();
+			sustain.parent = head;
+			head.tail.push(sustain);
+			sustain.correctionOffset = head.height / 2;
+			if (!PlayState.isPixelStage)
+			{
+				if (previous.isSustainNote)
+				{
+					previous.scale.y *= Note.SUSTAIN_SIZE / previous.frameHeight;
+					previous.scale.y /= playbackRate;
+					previous.updateHitbox();
+				}
+				if (ClientPrefs.data.downScroll) sustain.correctionOffset = 0;
+			}
+			else if (previous.isSustainNote)
+			{
+				previous.scale.y /= playbackRate;
+				previous.updateHitbox();
+			}
+			if (sustain.mustPress)
+				sustain.x += FlxG.width / 2;
+			else if (ClientPrefs.data.middleScroll)
+			{
+				sustain.x += 310;
+				if (data.noteData > 1) sustain.x += FlxG.width / 2 + 25;
+			}
+			sustain.exists = false;
+			sustain.active = false;
+			sustain.visible = false;
+			insertPreviewSpawn({strumTime: sustain.strumTime, data: null, note: sustain});
+			previous = sustain;
+		}
+	}
+
+	/** Push a pending head/tail into the min-heap without shifting the remaining chart. */
+	function insertPreviewSpawn(entry:PreviewSpawnEntry):Void
+	{
+		var child:Int = unspawnNotes.length;
+		unspawnNotes.push(entry);
+		while (child > 0)
+		{
+			var parent:Int = (child - 1) >> 1;
+			if (unspawnNotes[parent].strumTime <= entry.strumTime) break;
+			unspawnNotes[child] = unspawnNotes[parent];
+			child = parent;
+		}
+		unspawnNotes[child] = entry;
+	}
+
+	function popPreviewSpawn():PreviewSpawnEntry
+	{
+		if (unspawnNotes.length == 0) return null;
+		var first:PreviewSpawnEntry = unspawnNotes[0];
+		var last:PreviewSpawnEntry = unspawnNotes.pop();
+		if (unspawnNotes.length > 0)
+		{
+			var index:Int = 0;
+			while (true)
+			{
+				var left:Int = index * 2 + 1;
+				if (left >= unspawnNotes.length) break;
+				var right:Int = left + 1;
+				var child:Int = right < unspawnNotes.length && unspawnNotes[right].strumTime < unspawnNotes[left].strumTime ? right : left;
+				if (unspawnNotes[child].strumTime >= last.strumTime) break;
+				unspawnNotes[index] = unspawnNotes[child];
+				index = child;
+			}
+			unspawnNotes[index] = last;
+		}
+		return first;
+	}
+
+	function heapifyPreviewSpawns():Void
+	{
+		var index:Int = (unspawnNotes.length >> 1) - 1;
+		while (index >= 0)
+		{
+			var current:Int = index;
+			var entry:PreviewSpawnEntry = unspawnNotes[current];
+			while (true)
+			{
+				var left:Int = current * 2 + 1;
+				if (left >= unspawnNotes.length) break;
+				var right:Int = left + 1;
+				var child:Int = right < unspawnNotes.length && unspawnNotes[right].strumTime < unspawnNotes[left].strumTime ? right : left;
+				if (unspawnNotes[child].strumTime >= entry.strumTime) break;
+				unspawnNotes[current] = unspawnNotes[child];
+				current = child;
+			}
+			unspawnNotes[current] = entry;
+			index--;
+		}
 	}
 
 	var lastStepHit:Int = -1;
@@ -500,7 +654,69 @@ class EditorPlayState extends MusicBeatSubstate
 	override function destroy()
 	{
 		FlxG.mouse.visible = true;
+		// ★ 清掉本类自己的静态 self 引用（构造函数里赋的值）：不清就会永久钉住整个试玩状态
+		//   —— 历史上整首谱一次性构造 Note 会推高大谱峰值；现在改为音符进入生成窗口时再构造。
+		if (instance == this) instance = null;
+		// ★ Note.init(instance) 在本状态上留了静态回引用，销毁时清掉（否则整个试玩状态被钉住）。
+		games.objects.Note.clearFollow(this);
+		// ★ 试玩状态销毁时摘掉挂在全局 persist 音轨上的完成回调（闭包捕获 this，
+		//   留着会把整个 EditorPlayState 及其音符/精灵图钉在内存里）。
+		if (FlxG.sound != null && FlxG.sound.music != null && musicOnComplete != null
+			&& FlxG.sound.music.onComplete == musicOnComplete)
+			FlxG.sound.music.onComplete = null;
+		musicOnComplete = null;
+		// ★ 试玩自己的三条音轨（Inst / 玩家 vocal / 对手 vocal）挂在**全局** FlxG.sound.list 上，
+		//   和 PlayState 是同一个毛病：ESC 试玩一次就永久留下 3 个 FlxSound（连同解码音频），
+		//   反复试玩线性增长。这里摘除并释放。
+		//   注意：全局 FlxG.sound.music 不能在这里销毁 —— 退出试玩是回到编谱器（父状态还活着），
+		//   编谱器还要用它放曲子。
+		releasePlaySound(vocals);
+		vocals = null;
+		releasePlaySound(opponentVocals);
+		opponentVocals = null;
+		releasePlaySound(inst);
+		inst = null;
+		// ★ 十二轮：试玩结束 → 若父状态仍是编谱器，切回编辑器的高分辨率设计空间
+		//   （试玩开始前 ChartingState 会调用 exitHiRes() 退回 1280×720，让试玩画面与真实游玩一致）
+		if (Std.isOfType(FlxG.state, ChartingState))
+			EditorInputStyle.enterHiRes();
 		super.destroy();
+		// ★ 试玩大谱的 Note 峰值已改为按生成窗口控制；退出时仍回收临场音符及 hxcpp 的空闲堆。
+		//   MusicBeatState.destroy 的 compactIfBloated 管不到这里（试玩是 Substate 不是 State），
+		//   所以试玩销毁时单独补一次：把空闲堆还给 OS + 清 Windows 工作集。
+		try developer.display.ResourceLedger.compactIfBloated(256) catch (e:Dynamic) {}
+	}
+
+	/**
+	 * 掏空（见 MusicBeatState.hollowOut）：整首谱项现在只保存轻量数据；已生成但尚未入场的 sustain 音符仍在队列，
+	 * 所以销毁时显式释放这些 Note 并清空队列。
+	 */
+	override function hollowOut():Void
+	{
+		for (entry in unspawnNotes)
+			if (entry != null && entry.note != null)
+				entry.note.destroy();
+		unspawnNotes.resize(0);
+		unspawnNotes = [];
+		MusicBeatState.freeBunch(cast killNotes);
+		killNotes = [];
+
+		notes = null;
+		strumLineNotes = null;
+		opponentStrums = null;
+		playerStrums = null;
+		grpNoteSplashes = null;
+		lastScore = [];
+		keyChangePoints = [];
+	}
+
+	/** 从全局声音列表摘除并释放一条音轨（与 PlayState.releasePlaySound 同一套处理）。 */
+	static function releasePlaySound(sound:FlxSound):Void
+	{
+		if (sound == null) return;
+		if (FlxG.sound != null && FlxG.sound.list != null)
+			FlxG.sound.list.remove(sound);
+		sound.destroy();
 	}
 
     function startSong():Void
@@ -510,7 +726,8 @@ class EditorPlayState extends MusicBeatSubstate
         FlxG.sound.playMusic(inst._sound, 1, false);
         FlxG.sound.music.time = startPos;
         #if FLX_PITCH FlxG.sound.music.pitch = playbackRate; #end
-        FlxG.sound.music.onComplete = finishSong;
+        musicOnComplete = finishSong;
+        FlxG.sound.music.onComplete = musicOnComplete;
         vocals.volume = 1;
         vocals.time = startPos;
         vocals.play();
@@ -588,6 +805,16 @@ class EditorPlayState extends MusicBeatSubstate
 
 		// NEW SHIT
 		noteData = songData.notes;
+		var sourceBF:Int = 0;
+		var sourceOpp:Int = 0;
+		for (section in noteData)
+			for (row in section.sectionNotes)
+			{
+				var keys = KeyChange.maniaAt(row[0] + ClientPrefs.data.noteOffset, keyChangePoints, currentMania) + 1;
+				var player = Song.chartEngineVersion == 'Pe-1.0.4' ? row[1] < keys : (row[1] < keys ? section.mustHitSection : !section.mustHitSection);
+				if (player) sourceBF++; else sourceOpp++;
+			}
+		trace('[PreviewOwnership] engine=' + Song.chartEngineVersion + ' BF=' + sourceBF + ' Opp=' + sourceOpp);
 		for (section in noteData)
 		{
 			for (songNotes in section.sectionNotes)
@@ -615,96 +842,38 @@ class EditorPlayState extends MusicBeatSubstate
 						gottaHitNote = !section.mustHitSection;
 				}
 
-				var oldNote:Note;
-				if (unspawnNotes.length > 0)
-					oldNote = unspawnNotes[Std.int(unspawnNotes.length - 1)];
-				else
-					oldNote = null;
-
-				var swagNote:Note = new Note(daStrumTime, daNoteData, oldNote, false, false, instance, noteMania);
-				swagNote.mustPress = gottaHitNote;
-				swagNote.sustainLength = songNotes[2];
+				var sustainLength:Float = songNotes[2];
 				// gfNote 语义也跟随引擎版本（与 PlayState 一致）
+				var gfNote:Bool;
 				if (isPe104)
-					swagNote.gfNote = (section.gfSection && gottaHitNote == section.mustHitSection);
+					gfNote = (section.gfSection && gottaHitNote == section.mustHitSection);
 				else
-					swagNote.gfNote = (section.gfSection && (songNotes[1] < perSideKeys));
-				swagNote.noteType = songNotes[3];
+					gfNote = (section.gfSection && (songNotes[1] < perSideKeys));
+				var noteType:String = songNotes[3];
 				if (!Std.isOfType(songNotes[3], String))
-					swagNote.noteType = ChartingState.noteTypeList[songNotes[3]]; // Backward compatibility + compatibility with Week 7 charts
+					noteType = ChartingState.noteTypeList[songNotes[3]]; // Backward compatibility + compatibility with Week 7 charts
 
-				swagNote.scrollFactor.set();
-
-				unspawnNotes.push(swagNote);
-
-				final susLength:Float = swagNote.sustainLength / Conductor.stepCrochet;
-				final floorSus:Int = Math.floor(susLength);
-
-				if (floorSus > 0)
+				var sustainSteps:Int = 0;
+				if (Conductor.stepCrochet > 0)
 				{
-					for (susNote in 0...floorSus + 1)
-					{
-						oldNote = unspawnNotes[Std.int(unspawnNotes.length - 1)];
-
-						var sustainNote:Note = new Note(daStrumTime + (Conductor.stepCrochet * susNote), daNoteData, oldNote, true, false, instance, noteMania);
-						sustainNote.hitMultUpdate(susNote, floorSus);
-						sustainNote.mustPress = gottaHitNote;
-						if (isPe104)
-							sustainNote.gfNote = (section.gfSection && gottaHitNote == section.mustHitSection);
-						else
-							sustainNote.gfNote = (section.gfSection && (songNotes[1] < perSideKeys));
-						sustainNote.noteType = swagNote.noteType;
-						sustainNote.scrollFactor.set();
-						sustainNote.parent = swagNote;
-						unspawnNotes.push(sustainNote);
-						swagNote.tail.push(sustainNote);
-
-						sustainNote.correctionOffset = swagNote.height / 2;
-						if (!PlayState.isPixelStage)
-						{
-							if (oldNote.isSustainNote)
-							{
-								oldNote.scale.y *= Note.SUSTAIN_SIZE / oldNote.frameHeight;
-								oldNote.scale.y /= playbackRate;
-								oldNote.updateHitbox();
-							}
-
-							if (ClientPrefs.data.downScroll)
-								sustainNote.correctionOffset = 0;
-						}
-						else if (oldNote.isSustainNote)
-						{
-							oldNote.scale.y /= playbackRate;
-							oldNote.updateHitbox();
-						}
-
-						if (sustainNote.mustPress)
-							sustainNote.x += FlxG.width / 2; // general offset
-						else if (ClientPrefs.data.middleScroll)
-						{
-							sustainNote.x += 310;
-							if (daNoteData > 1) // Up and Right
-								sustainNote.x += FlxG.width / 2 + 25;
-						}
-					}
+					var floorSus:Int = Math.floor(sustainLength / Conductor.stepCrochet);
+					if (floorSus > 0) sustainSteps = floorSus + 1;
 				}
-
-				if (swagNote.mustPress)
-				{
-					swagNote.x += FlxG.width / 2; // general offset
-				}
-				else if (ClientPrefs.data.middleScroll)
-				{
-					swagNote.x += 310;
-					if (daNoteData > 1) // Up and Right
-					{
-						swagNote.x += FlxG.width / 2 + 25;
-					}
-				}
+				var data:PreviewNoteData = {
+					strumTime: daStrumTime,
+					noteData: daNoteData,
+					sustainLength: sustainLength,
+					mustPress: gottaHitNote,
+					gfNote: gfNote,
+					noteType: noteType,
+					generatedMania: noteMania,
+					sustainSteps: sustainSteps
+				};
+				unspawnNotes.push({strumTime: daStrumTime + ClientPrefs.data.noteOffset, data: data, note: null});
 			}
 		}
 
-		unspawnNotes.sort(PlayState.sortByTime);
+		heapifyPreviewSpawns();
 	}
 
 	private function generateStaticArrows(player:Int):Void
@@ -746,8 +915,13 @@ class EditorPlayState extends MusicBeatSubstate
 			strumLineNotes.add(babyArrow);
 			babyArrow.postAddedToGroup();
 		}
-		adaptStrumline(opponentStrums);
-		adaptStrumline(playerStrums);
+		// Non-pixel ExtraKeys scales are shared by receptors and falling notes.
+		// Resizing only the receptors from atlas frame bounds desynchronizes custom skins.
+		if (PlayState.isPixelStage)
+		{
+			adaptStrumline(opponentStrums);
+			adaptStrumline(playerStrums);
+		}
 
 		if (ClientPrefs.data.showKeybinds)
 		{

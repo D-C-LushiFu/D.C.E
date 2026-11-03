@@ -14,7 +14,7 @@ class SelectGameSubState extends MusicBeatSubstate
 	var ui:FlxSprite = new FlxSprite().makeGraphic(FlxG.width - 200, FlxG.height - 200, 0xFF000000);
     var subcameras:FlxCamera;
 
-	var suppostedGames:Array<String> = #if (CODENAME_ENGINE_COMPAT && !mobile) ["Origin Funkin", "CodeName Engine"] #else ["Origin Funkin"] #end;
+	var suppostedGames:Array<String> = #if CODENAME_ENGINE_COMPAT ["Origin Funkin", "CodeName Engine"] #else ["Origin Funkin"] #end;
 	var selectedGroup:FlxSpriteGroup = new FlxSpriteGroup();
 	var backButton:GeneralBack;
 
@@ -126,6 +126,9 @@ class SelectGameSubState extends MusicBeatSubstate
 			return;
 		}
 
+		if (selectedGameTouchJustPressed())
+			return;
+
 		if (infoBackgroundJustPressed())
 		{
 			requestSelectedGame();
@@ -160,7 +163,7 @@ class SelectGameSubState extends MusicBeatSubstate
 			if (i == nowSelected) {
 				text.color = 0xFFFFFFFF;
 			} else {
-				#if (CODENAME_ENGINE_COMPAT && !mobile)
+				#if CODENAME_ENGINE_COMPAT
 				text.color = 0xA9A9A9;
 				#else
 				text.alpha = 0;
@@ -185,19 +188,47 @@ class SelectGameSubState extends MusicBeatSubstate
 		return false;
 	}
 
+	function selectedGameTouchJustPressed():Bool
+	{
+		#if FLX_TOUCH
+		for (touch in FlxG.touches.list)
+		{
+			if (!touch.justPressed)
+				continue;
+
+			for (i in 0...selectedGroup.members.length)
+			{
+				var option:FlxSprite = selectedGroup.members[i];
+				if (option != null && option.visible && pointerOverlapsSprite(touch, option))
+				{
+					if (nowSelected != i)
+					{
+						nowSelected = i;
+						toggleBG();
+					}
+
+					return true;
+				}
+			}
+		}
+		#end
+
+		return false;
+	}
+
 	function infoBackgroundJustPressed():Bool
 	{
 		var target:FlxSprite = nowSelected == 0 ? infoBG1 : infoBG2;
 		if (!target.visible)
 			return false;
 
-		if (FlxG.mouse.justPressed && pointerOverlapsInfoBackground(FlxG.mouse, target))
+		if (FlxG.mouse.justPressed && pointerOverlapsSprite(FlxG.mouse, target))
 			return true;
 
 		#if FLX_TOUCH
 		for (touch in FlxG.touches.list)
 		{
-			if (touch.justPressed && pointerOverlapsInfoBackground(touch, target))
+			if (touch.justPressed && pointerOverlapsSprite(touch, target))
 				return true;
 		}
 		#end
@@ -205,7 +236,7 @@ class SelectGameSubState extends MusicBeatSubstate
 		return false;
 	}
 
-	function pointerOverlapsInfoBackground(pointer:FlxPointer, target:FlxSprite):Bool
+	function pointerOverlapsSprite(pointer:FlxPointer, target:FlxSprite):Bool
 	{
 		var bounds = target.getScreenBounds(null, subcameras);
 		var position = pointer.getViewPosition(subcameras);
@@ -300,12 +331,12 @@ class SelectGameSubState extends MusicBeatSubstate
 				}
 				if (!originfunkin.OriginFunkinConfig.requestOrigin())
 				{
-					SUtil.showPopUp("Could not save the Origin Funkin startup request.", "NovaFlare Engine");
+					SUtil.showPopUp("Could not save the Origin Funkin startup request.", "D.C.E.");
 					return false;
 				}
 
 			case 1:
-				#if (CODENAME_ENGINE_COMPAT && !mobile)
+				#if CODENAME_ENGINE_COMPAT
 				if (!codenamechain.CodeNameMode.canEnter())
 				{
 					SUtil.showPopUp(codenamechain.CodeNameMode.preparationError, "CodeName");
@@ -313,12 +344,9 @@ class SelectGameSubState extends MusicBeatSubstate
 				}
 				if (!originfunkin.OriginFunkinConfig.requestCodeName())
 				{
-					SUtil.showPopUp("Could not save the CodeName startup request.", "NovaFlare Engine");
+					SUtil.showPopUp("Could not save the CodeName startup request.", "D.C.E.");
 					return false;
 				}
-				#else
-				SUtil.showPopUp("CodeName is currently available on PC only.", "NovaFlare Engine");
-				return false;
 				#end
 		}
 
@@ -331,7 +359,7 @@ class SelectGameSubState extends MusicBeatSubstate
 		}
 		catch (error:Dynamic)
 		{
-			trace('[SelectGameSubState] Could not save NovaFlare preferences: $error');
+			trace('[SelectGameSubState] Could not save D.C.E. preferences: $error');
 		}
 		switchAccepted = true;
 		LimeSystem.exit(0);

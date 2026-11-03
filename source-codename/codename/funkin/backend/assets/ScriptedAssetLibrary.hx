@@ -20,8 +20,18 @@ class ScriptedAssetLibrary extends ModsFolderLibrary {
 	public var scriptName:String;
 	private static var nullValue:Dynamic = {};
 
-	public function new(scriptName:String, args:Array<Dynamic> = null, basePath:String="./assets/", libName:String="assets", ?modName:String) {
+	public function new(scriptName:String, args:Array<Dynamic> = null, basePath:String = null, libName:String="assets", ?modName:String) {
 		if(modName == null) modName = scriptName;
+		if (basePath == null) {
+			#if CODENAME_ENGINE_COMPAT
+			var externalAssetsRoot = codenamechain.CodeNameMode.assetsRoot;
+			basePath = externalAssetsRoot == null || externalAssetsRoot.length == 0
+				? "./assets/"
+				: haxe.io.Path.addTrailingSlash(externalAssetsRoot);
+			#else
+			basePath = "./assets/";
+			#end
+		}
 		super(basePath, libName, modName);
 		this.scriptName = scriptName;
 		script = Script.create(Paths.script("data/library/" + scriptName));

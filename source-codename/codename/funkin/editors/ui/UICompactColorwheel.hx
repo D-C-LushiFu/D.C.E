@@ -95,7 +95,7 @@ class UICompactColorwheel extends UISliceSprite {
 			updateColor();
 			spritePos.put();
 
-			if (FlxG.mouse.justReleased) selectedSprite = null;
+			if (FlxG.mouse.released) selectedSprite = null;
 		}
 		mousePos.put();
 		super.update(elapsed);

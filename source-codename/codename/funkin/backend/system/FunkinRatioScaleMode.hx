@@ -43,8 +43,16 @@ class FunkinRatioScaleMode extends RatioScaleMode {
 	}
 
 	public function resetSize() {
-		width = null;
-		height = null;
+		@:bypassAccessor
+		if (this.width == null) {
+			@:bypassAccessor
+			if (this.height == null) return;
+		}
+
+		@:bypassAccessor this.width = null;
+		@:bypassAccessor this.height = null;
+		@:privateAccess
+		FlxG.game.onResize(null);
 	}
 	private inline function get_width():Null<Int>
 		return this.width == null ? FlxG.initialWidth : this.width;

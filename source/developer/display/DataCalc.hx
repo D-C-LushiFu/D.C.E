@@ -114,7 +114,7 @@ class DataCalc
 	}
 
 	/**
-	 * Heap statistics need a consistent NovaGC region snapshot. Large asset
+	 * Heap statistics need a consistent D.C.GC region snapshot. Large asset
 	 * sets can contain thousands of regions, so taking that snapshot on the
 	 * stage/update thread creates a visible one-second hitch. Keep the same
 	 * 1 Hz display accuracy, but let one persistent worker take the snapshot

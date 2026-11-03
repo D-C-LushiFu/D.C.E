@@ -26,7 +26,7 @@ class AlphabetSelectionScreen extends EditorTreeMenuScreen {
 
 		var modsList:Array<String> = [];
 		for (file in Paths.getFolderContent('data/alphabet/', true, BOTH)) // mods ? MODS : BOTH
-			if (Path.extension(file) == "xml") modsList.push(CoolUtil.getFilename(file));
+			if (Path.extension(file).toLowerCase() == "xml") modsList.push(CoolUtil.getFilename(file));
 
 		for (typeface in modsList)
 			add(new AlphabetIconOption(typeface, getID('acceptTypeface'), typeface, () -> FlxG.switchState(new AlphabetEditor(typeface))));

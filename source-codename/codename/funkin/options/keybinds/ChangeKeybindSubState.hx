@@ -15,6 +15,11 @@ class ChangeKeybindSubState extends MusicBeatSubstate {
 
 	public override function update(elapsed:Float) {
 		super.update(elapsed);
+		if (controls.BACK) {
+			close();
+			cancelCallback();
+			return;
+		}
 		if (stillPressed && controls.ACCEPT)
 			return;
 		stillPressed = false;

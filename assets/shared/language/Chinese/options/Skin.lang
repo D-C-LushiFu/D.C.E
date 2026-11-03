@@ -9,6 +9,8 @@ noteColorSwap => 旧版着色器
 NotesSubState => 颜色设置
 NotesSubStateLegacy => 旧版颜色设置
 
+KeyboardViewerSubState => 键盘反馈设置
+
 
 Splash => 溅射皮肤
 

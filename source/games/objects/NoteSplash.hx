@@ -48,21 +48,21 @@ class NoteSplash extends FlxSprite
 
 	var spawned:Bool = false;
 	var noteDataMap:Map<Int, String> = new Map();
-	var animStride:Int = 4; // how many "lanes" a full anim set spans (4 = default, 10 = NovaFlare Extra Keys)
-	var maniaScale:Float = 1; // NovaFlare Extra Keys: per-mania splash scale factor
+	var animStride:Int = 4; // how many "lanes" a full anim set spans (4 = default, 10 = D.C.E. Extra Keys)
+	var maniaScale:Float = 1; // D.C.E. Extra Keys: per-mania splash scale factor
 
 	public static var defaultNoteSplash(default, never):String = 'noteSplashes/noteSplashes';
 	public static var configs:Map<String, NoteSplashConfig> = new Map<String, NoteSplashConfig>();
 
 	static var oldPath:Bool = false;
 
-	/** NovaFlare: legacy 0.7-style mods keep a plain noteSplashes.png at the images root */
+	/** D.C.E.: legacy 0.7-style mods keep a plain noteSplashes.png at the images root */
 	public static function init()
 	{
 		oldPath = Paths.fileExists('images/noteSplashes.png', IMAGE);
 	}
 
-	/** NovaFlare Extra Keys: lane -> color name used inside the splash XML (falls back to the default 4 lanes) */
+	/** D.C.E. Extra Keys: lane -> color name used inside the splash XML (falls back to the default 4 lanes) */
 	public static function laneNoteNames():Array<String>
 	{
 		var ek:ExtraKeysHandler = ExtraKeysHandler.instance;
@@ -84,7 +84,7 @@ class NoteSplash extends FlxSprite
 
 		rgbShader = new PixelSplashShaderRef();
 
-		// NovaFlare: note color swap support
+		// D.C.E.: note color swap support
 		if (ClientPrefs.data.noteColorSwap)
 		{
 			colorSwap = new ColorSwap();
@@ -106,10 +106,10 @@ class NoteSplash extends FlxSprite
 		{
 			splash = defaultNoteSplash + getSplashSkinPostfix();
 			if (PlayState.SONG != null && PlayState.SONG.splashSkin != null && PlayState.SONG.splashSkin.length > 0) splash = PlayState.SONG.splashSkin;
-			else if (oldPath && ClientPrefs.data.splashSkin == ClientPrefs.defaultData.splashSkin) splash = 'noteSplashes'; // NovaFlare legacy mods
+			else if (oldPath && ClientPrefs.data.splashSkin == ClientPrefs.defaultData.splashSkin) splash = 'noteSplashes'; // D.C.E. legacy mods
 		}
 
-		// NovaFlare: Extra Keys per-mania scale factor
+		// D.C.E.: Extra Keys per-mania scale factor
 		maniaScale = 1;
 		var ek:ExtraKeysHandler = ExtraKeysHandler.instance;
 		if (ek != null && ek.data != null && ek.data.scales != null && PlayState.SONG != null && PlayState.SONG.mania >= 0 && PlayState.SONG.mania < ek.data.scales.length)
@@ -198,7 +198,7 @@ class NoteSplash extends FlxSprite
 		if (offsets.length < 1)
 			offsets = [[0, 0]];
 
-		// NovaFlare: discovery walks every Extra Keys lane (default XMLs recycle the 4 base colors)
+		// D.C.E.: discovery walks every Extra Keys lane (default XMLs recycle the 4 base colors)
 		var lanes:Array<String> = laneNoteNames();
 		var laneAmt:Int = lanes.length;
 
@@ -232,7 +232,7 @@ class NoteSplash extends FlxSprite
 		configs.set(path, this.config);
 	}
 
-	/** NovaFlare: route atlas loading through the engine-wide frame cache */
+	/** D.C.E.: route atlas loading through the engine-wide frame cache */
 	function loadFramesCached(skin:String):Bool
 	{
 		if (!Cache.checkFrame(skin))
@@ -265,6 +265,12 @@ class NoteSplash extends FlxSprite
 		if (note != null)
 			noteData = note.noteData;
 
+		// ★ 取色必须用「随机化之前」的原始按键轨号：
+		//   下面 randomize 会把 noteData 换成 `lane + 随机套数*animStride`（可能是 15、27…），
+		//   旧代码拿它去 `% Note.colArray.length` 取色，>4K 时（animStride=10）算出的
+		//   下标与真实轨道毫无关系 —— 溅射颜色错乱的直接原因。
+		var colorLane:Int = noteData;
+
 		if (randomize && maxAnims > 1)
 			noteData = (noteData % animStride) + (FlxG.random.int(0, maxAnims - 1) * animStride);
 
@@ -272,92 +278,102 @@ class NoteSplash extends FlxSprite
 		var anim:String = playDefaultAnim();
 
 		var tempShader:RGBPalette = null;
-		if (config.allowRGB)
+		var mania:Int = (PlayState.SONG != null) ? PlayState.SONG.mania : 3;
+		// · config.allowRGB 缺省（老 json 没写这个字段）视为允许
+		// · 溅射编辑器（inEditor）必须按配置原样预览，否则在「谱面禁用 RGB」的歌曲里
+		//   打开编辑器会完全看不到颜色，没法调色；
+		// · 正常游戏 / 编辑器试玩走统一策略（谱面 disableNoteRGB + 玩家 splashRGB + 色相替换）。
+		var useSplashRGB:Bool = (config.allowRGB != false) && (inEditor || Note.splashRGBAllowed(note));
+		if (useSplashRGB)
 		{
-			Note.initializeGlobalRGBShader(noteData % Note.colArray.length);
-			if (inEditor || (note == null || note.noteSplashData.useRGBShader) && (PlayState.SONG == null || !PlayState.SONG.disableNoteRGB))
+			var arr:Array<FlxColor> = Note.colorRow(mania, colorLane);
+
+			tempShader = new RGBPalette();
+
+			// ★★★ 关键：先把三个通道全部置成「不替换」的默认值，再让 config.rgb 覆盖。
+			//
+			//   RGBPalette 的构造器默认值是【纯红 FF0000 / 纯绿 00FF00 / 纯蓝 0000FF】，
+			//   而着色器算的是 newColor.rgb = color.r*r + color.g*g + color.b*b ——
+			//   只要 config.rgb 里少了某个通道（数组短于 3 项，或某项为 null），
+			//   那个通道就会原样保留一个「满强度纯色」。
+			//
+			//   而 config.rgb 少项是**正常情况**：编辑器里的「No Replace（不替换该通道）」
+			//   就是往 config.rgb 里写 null（见 NoteSplashEditorState.setConfigRGB）。
+			//   结果就是溅射恒定带上纯绿 + 纯蓝两个满强度通道，怎么调 R 都看不出变化
+			//   —— 也就是玩家反馈的「被设置成了纯红+纯绿，无论如何调整都是如此」。
+			//
+			//   修复方式：用「本轨默认配色行」把三通道预填成 不替换 状态（这与旧代码里
+			//   `if (rgb == null) tempShader.r = arr[0]` 的语义一致），再按 config 覆盖。
+			//   这样任何缺失项都不会再泄漏出构造器里那两个刺眼的纯色。
+			applyDefaultSplashChannels(tempShader, arr);
+
+			// If Note RGB is enabled:
+			if (note == null || !note.noteSplashData.useGlobalShader)
 			{
-				tempShader = new RGBPalette();
-				// If Note RGB is enabled:
-				if ((note == null || !note.noteSplashData.useGlobalShader) || inEditor)
+				var colors = config.rgb;
+				if (colors != null)
 				{
-					var colors = config.rgb;
-					if (colors != null)
+					for (i in 0...colors.length)
 					{
-						for (i in 0...colors.length)
+						if (i > 2) break;
+
+						var rgb = colors[i];
+						// null = 该通道「不替换」，已由 applyDefaultSplashChannels 填好默认值
+						if (rgb == null) continue;
+
+						var r:Null<Int> = rgb.r;
+						var g:Null<Int> = rgb.g;
+						var b:Null<Int> = rgb.b;
+
+						// ★ arr 可能为 null（arrowRGB 缺失/为空）——旧代码在这里直接 arr[0] 会 NPE
+						if (arr != null && arr.length > 2)
 						{
-							if (i > 2) break;
-
-							var arr:Array<FlxColor> = ClientPrefs.data.arrowRGB[noteData % Note.colArray.length];
-							if (PlayState.isPixelStage) arr = ClientPrefs.data.arrowRGBPixel[noteData % Note.colArray.length];
-
-							var rgb = colors[i];
-							if (rgb == null)
-							{
-								if (i == 0) tempShader.r = arr[0];
-								else if (i == 1) tempShader.g = arr[1];
-								else if (i == 2) tempShader.b = arr[2];
-								continue;
-							}
-
-							var r:Null<Int> = rgb.r;
-							var g:Null<Int> = rgb.g;
-							var b:Null<Int> = rgb.b;
-
 							if (r == null || Math.isNaN(r) || r < 0) r = arr[0];
 							if (g == null || Math.isNaN(g) || g < 0) g = arr[1];
 							if (b == null || Math.isNaN(b) || b < 0) b = arr[2];
-
-							var color:FlxColor = FlxColor.fromRGB(r, g, b);
-							if (i == 0) tempShader.r = color;
-							else if (i == 1) tempShader.g = color;
-							else if (i == 2) tempShader.b = color;
 						}
-					}
-					else
-					{
-						// NovaFlare's RGBPalette has no copyValues: copy the default lane colors manually
-						var rgbShit:RGBPalette = Note.globalRgbShaders[noteData % Note.colArray.length];
-						if (rgbShit != null)
-						{
-							tempShader.r = rgbShit.r;
-							tempShader.g = rgbShit.g;
-							tempShader.b = rgbShit.b;
-							tempShader.mult = rgbShit.mult;
-						}
-					}
+						if (r == null || Math.isNaN(r) || r < 0) r = 0xFFFFFF;
+						if (g == null || Math.isNaN(g) || g < 0) g = 0xFFFFFF;
+						if (b == null || Math.isNaN(b) || b < 0) b = 0xFFFFFF;
 
-					if (note != null)
-					{
-						if (note.noteSplashData.r != -1) tempShader.r = note.noteSplashData.r;
-						if (note.noteSplashData.g != -1) tempShader.g = note.noteSplashData.g;
-						if (note.noteSplashData.b != -1) tempShader.b = note.noteSplashData.b;
+						var color:FlxColor = FlxColor.fromRGB(r, g, b);
+						if (i == 0) tempShader.r = color;
+						else if (i == 1) tempShader.g = color;
+						else if (i == 2) tempShader.b = color;
 					}
 				}
 				else
+					copyGlobalLaneColors(tempShader, mania, colorLane);
+
+				if (note != null)
 				{
-					// NovaFlare's RGBPalette has no copyValues: copy the default lane colors manually
-					var rgbShit:RGBPalette = Note.globalRgbShaders[noteData % Note.colArray.length];
-					if (rgbShit != null)
-					{
-						tempShader.r = rgbShit.r;
-						tempShader.g = rgbShit.g;
-						tempShader.b = rgbShit.b;
-						tempShader.mult = rgbShit.mult;
-					}
+					if (note.noteSplashData.r != -1) tempShader.r = note.noteSplashData.r;
+					if (note.noteSplashData.g != -1) tempShader.g = note.noteSplashData.g;
+					if (note.noteSplashData.b != -1) tempShader.b = note.noteSplashData.b;
 				}
 			}
+			else
+				copyGlobalLaneColors(tempShader, mania, colorLane);
 		}
 		rgbShader.copyValues(tempShader);
 		if (!config.allowPixel) rgbShader.pixelAmount = 1;
 		else if (PlayState.isPixelStage) rgbShader.pixelAmount = PlayState.daPixelZoom;
 
-		// NovaFlare: note color swap (hue/sat/brt from arrow HSV or the note's own values)
+		// D.C.E.: note color swap (hue/sat/brt from arrow HSV or the note's own values)
 		if (colorSwap != null)
 		{
-			var hue:Float = ClientPrefs.data.arrowHSV[noteData % Note.colArray.length][0] / 360;
-			var sat:Float = ClientPrefs.data.arrowHSV[noteData % Note.colArray.length][1] / 100;
-			var brt:Float = ClientPrefs.data.arrowHSV[noteData % Note.colArray.length][2] / 100;
+			var hue:Float = 0;
+			var sat:Float = 0;
+			var brt:Float = 0;
+
+			// ★ 旧代码写死 `arrowHSV[noteData % 4]`：>4K 高轨会套到错误的基础色 HSV
+			var hsv:Array<Float> = Note.hsvRow(mania, colorLane);
+			if (hsv != null && hsv.length > 2)
+			{
+				hue = hsv[0] / 360;
+				sat = hsv[1] / 100;
+				brt = hsv[2] / 100;
+			}
 
 			if (note != null)
 			{
@@ -417,6 +433,45 @@ class NoteSplash extends FlxSprite
 			animation.play(anim, true);
 
 		return anim;
+	}
+
+	/**
+	 * 把三个通道预填成「不替换」状态（= 本轨默认配色行的 内色/边色/描边色）。
+	 *
+	 * 之所以必须先填：`new RGBPalette()` 的默认值是纯红/纯绿/纯蓝三个满强度向量，
+	 * 而 config.rgb 允许缺项（数组短于 3 项、或某项为 null —— 编辑器里
+	 * 「No Replace 不替换该通道」就会写 null）。缺项若保留构造器默认值，
+	 * 溅射就恒带纯绿+纯蓝两个满强度通道，调 R 根本看不出变化。
+	 *
+	 * arr 为 null（arrowRGB 表缺失/为空）时保持构造器默认 —— 那正好是恒等矩阵
+	 * (1,0,0)/(0,1,0)/(0,0,1)，等价于「完全不做替换」。
+	 */
+	static function applyDefaultSplashChannels(target:RGBPalette, arr:Array<FlxColor>):Void
+	{
+		if (target == null) return;
+		if (arr == null || arr.length < 3) return;
+		target.r = arr[0];
+		target.g = arr[1];
+		target.b = arr[2];
+	}
+
+	/**
+	 * 把某条轨道在「全局 RGB 调色板」里的当前颜色拷进 tempShader。
+	 *
+	 * D.C.E. 的 RGBPalette 没有 copyValues（它是 PsychEK 风格、还有一个 shader 构造函数），
+	 * 所以这里手动逐通道拷贝。轨道 → 槽位的映射走 Note.initializeGlobalRGBShader，
+	 * 与 Note / StrumNote 完全一致（旧代码用 `noteData % Note.colArray.length`，
+	 * >4K 时会取到别的轨道的颜色）。
+	 */
+	function copyGlobalLaneColors(target:RGBPalette, mania:Int, lane:Int):Void
+	{
+		if (target == null) return;
+		var pal:RGBPalette = Note.initializeGlobalRGBShader(lane, mania);
+		if (pal == null) return;
+		target.r = pal.r;
+		target.g = pal.g;
+		target.b = pal.b;
+		target.mult = pal.mult;
 	}
 
 	function checkForAnim(anim:String)
@@ -490,7 +545,7 @@ class NoteSplash extends FlxSprite
 		noteDataMap.clear();
 		maxAnims = 0;
 
-		// NovaFlare: detect the legacy "note<lane>-<set>" naming so randomization matches its lane stride
+		// D.C.E.: detect the legacy "note<lane>-<set>" naming so randomization matches its lane stride
 		animStride = Note.colArray.length;
 		for (i in value.animations)
 		{
@@ -540,17 +595,23 @@ class PixelSplashShaderRef
 
 	public function copyValues(tempShader:RGBPalette)
 	{
-		if (tempShader != null)
+		if (tempShader == null)
 		{
-			for (i in 0...3)
-			{
-				shader.r.value[i] = tempShader.shader.r.value[i];
-				shader.g.value[i] = tempShader.shader.g.value[i];
-				shader.b.value[i] = tempShader.shader.b.value[i];
-			}
-			shader.mult.value[0] = tempShader.shader.mult.value[0];
+			enabled = false;
+			return;
 		}
-		else enabled = false;
+
+		for (i in 0...3)
+		{
+			shader.r.value[i] = tempShader.shader.r.value[i];
+			shader.g.value[i] = tempShader.shader.g.value[i];
+			shader.b.value[i] = tempShader.shader.b.value[i];
+		}
+		// ★ 顺序很重要：set_enabled 会把 mult 强制成 1/0，所以先更新 enabled 标志、
+		//   再写 mult 的真实值。旧代码只写 mult 不更新 enabled，回收复用时标志会一直
+		//   停在 false，语义与真实渲染状态不一致。
+		enabled = (tempShader.shader.mult.value[0] != 0);
+		shader.mult.value[0] = tempShader.shader.mult.value[0];
 	}
 
 	public function set_enabled(value:Bool)

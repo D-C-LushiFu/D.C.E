@@ -12,11 +12,19 @@ import animate.FlxAnimateFrames;
 
 using StringTools;
 
+private typedef ScriptLookupCacheEntry = {
+	var path:String;
+	var expiresAt:Float;
+}
+
 class Paths
 {
 	public static var assetsTree:AssetsLibraryList;
 
 	public static var tempFramesCache:Map<String, FlxFramesCollection> = [];
+	private static var scriptLookupCache:Map<String, ScriptLookupCacheEntry> = [];
+	private static var scriptLookupTree:AssetsLibraryList;
+	private static var scriptLookupGeneration:Int = -1;
 
 	public static function init() {
 		FlxG.signals.preStateSwitch.add(function() {
@@ -24,8 +32,67 @@ class Paths
 		});
 	}
 
+	public static function clearLookupCaches():Void {
+		scriptLookupCache.clear();
+		scriptLookupTree = assetsTree;
+		scriptLookupGeneration = assetsTree == null ? -1 : assetsTree.cacheGeneration;
+	}
+
+	private static inline function prepareScriptLookupCache():Void {
+		var generation = assetsTree == null ? -1 : assetsTree.cacheGeneration;
+		if (scriptLookupTree != assetsTree || scriptLookupGeneration != generation)
+			clearLookupCaches();
+	}
+
+	private static inline function rawAssetPath(file:String, ?library:String):String
+		return library != null ? '$library:assets/$library/$file' : 'assets/$file';
+
+	private static function findExactScript(basePath:String):String {
+		if (OpenFlAssets.exists(basePath)) return basePath;
+		for (extension in Script.scriptExtensions) {
+			var candidate = '$basePath.$extension';
+			if (OpenFlAssets.exists(candidate)) return candidate;
+		}
+		return null;
+	}
+
+	#if (sys && !windows)
+	private static function fixAssetPathCase(path:String, ?library:String):String {
+		var fixedPath:String;
+		var relativePath:String;
+		var expectedPrefix = library != null ? '$library:assets/$library/' : 'assets/';
+		if (path.startsWith(expectedPrefix)) {
+			fixedPath = expectedPrefix;
+			relativePath = path.substr(expectedPrefix.length);
+		} else {
+			var assetsIndex = path.indexOf("assets/");
+			if (assetsIndex < 0) return null;
+			fixedPath = path.substr(0, assetsIndex + "assets/".length);
+			relativePath = path.substr(assetsIndex + "assets/".length);
+		}
+
+		var parts = relativePath.split("/");
+		for (index => part in parts) {
+			if (part.length == 0) continue;
+			var isFile = index == parts.length - 1;
+			var entries = isFile ? assetsTree.getFiles(fixedPath) : assetsTree.getFolders(fixedPath);
+			var matched:String = null;
+			var lowerPart = part.toLowerCase();
+			for (entry in entries) {
+				if (entry.toLowerCase() == lowerPart) {
+					matched = entry;
+					break;
+				}
+			}
+			if (matched == null) return null;
+			fixedPath += matched + (isFile ? "" : "/");
+		}
+		return fixedPath;
+	}
+	#end
+
 	public static inline function getPath(file:String, ?library:String) {
-		var returnedPath:String = library != null ? '$library:assets/$library/$file' : 'assets/$file';
+		var returnedPath:String = rawAssetPath(file, library);
 		#if (sys && !windows)
 		returnedPath = Path.normalize(returnedPath);
 		if (OpenFlAssets.exists(returnedPath)) return returnedPath;
@@ -115,17 +182,34 @@ class Paths
 		return getPath('images/$key.$ext', library);
 	}
 
-	public static inline function script(key:String, ?library:String, isAssetsPath:Bool = false) {
-		var scriptPath = isAssetsPath ? key : getPath(key, library);
-		if (!OpenFlAssets.exists(scriptPath)) {
-			var p:String;
-			for(ex in Script.scriptExtensions) {
-				if (OpenFlAssets.exists(p = scriptPath + '.' + ex)) {
-					scriptPath = p;
+	public static function script(key:String, ?library:String, isAssetsPath:Bool = false) {
+		prepareScriptLookupCache();
+		var basePath = isAssetsPath ? key : rawAssetPath(key, library);
+		#if (sys && !windows)
+		basePath = Path.normalize(basePath);
+		#end
+
+		var cacheKey = '${library == null ? "" : library}|$basePath';
+		var now = haxe.Timer.stamp();
+		var cached = scriptLookupCache.get(cacheKey);
+		if (cached != null && now < cached.expiresAt)
+			return cached.path;
+
+		var scriptPath = findExactScript(basePath);
+		#if (sys && !windows)
+		if (scriptPath == null) {
+			for (extension in Script.scriptExtensions) {
+				var fixedPath = fixAssetPathCase('$basePath.$extension', library);
+				if (fixedPath != null && OpenFlAssets.exists(fixedPath)) {
+					scriptPath = fixedPath;
 					break;
 				}
 			}
 		}
+		#end
+
+		if (scriptPath == null) scriptPath = basePath;
+		scriptLookupCache.set(cacheKey, {path: scriptPath, expiresAt: now + 6});
 		return scriptPath;
 	}
 

@@ -5,7 +5,7 @@ middleScroll => Put your lane in the center or on the right
 flipChart => Flip chart for playing
 ghostTapping => Toggle counting pressing a directional input when no arrow is there as a miss
 guitarHeroSustains => Hold Notes can't be pressed if you miss
-noReset => Toggle pressing R to gameover
+noReset => When on, pressing the Reset key (R by default) no longer kills you instantly
 showKeybinds => Displays each note lane's assigned key above the receptors when a song starts
 
 

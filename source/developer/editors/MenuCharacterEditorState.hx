@@ -26,7 +26,7 @@ import general.backend.language.Language;
 import general.objects.MenuCharacter;
 
 /**
- * 菜单角色编辑器（NovaFlare 深色风格新 UI）
+ * 菜单角色编辑器（D.C.E. 深色风格新 UI）
  *
  * 布局（水平居中 + 底对齐）：
  *  - 底部一条居中一级主菜单：[<] CharacterType | Character | Hint（提示）
@@ -38,7 +38,7 @@ import general.objects.MenuCharacter;
  *  - 面板上方跟随一条状态条：当前调整角色 + 实时偏移
  *  - 旧 UI（两个 FlxUITabMenu 框 / 旧按钮 / 旧提示文字 / 左上角偏移文字）不再显示
  *
- * 视觉：NovaFlare 设计 token（AARRGGBB 深色模式）
+ * 视觉：D.C.E. 设计 token（AARRGGBB 深色模式）
  *  - 页面底 0xFF12141A / 卡片 0xFF1C1F28 / 通用 hover 0x147C7FFF / 分割边框 0x14FFFFFF
  *  - 一级主菜单：未选中 0xFFC9CDD4；选中渐变 0xFF4F46E5→0xFF7C3AED + 白字 + 下缘装饰条 0xFFA78BFA
  *  - 二级子菜单：hover 0x0F8B5CF6；选中底 0x268B5CF6；选中文字 0xFFA78BFA
@@ -53,18 +53,27 @@ class MenuCharacterEditorState extends MusicBeatState
 	var defaultCharacters:Array<String> = ['dad', 'bf', 'gf'];
 
 	// ============ 布局常量 ============
-	static final PANEL_W:Int = 420; // 面板宽
-	static final BAR_H:Int = 36; // 底部一级菜单条高
-	static final ARROW_W:Int = 36; // 折叠箭头宽
-	static final BTN_W:Int = 140; // 每个一级按钮宽
-	static final PANEL_GAP:Int = 4; // 面板底 / 状态条底 与按钮条顶的间距
-	static final CHIP_H:Int = 20; // 面板上方状态条高
-	static final IN_H:Int = 22; // 输入框高
+	static var PANEL_W(get, never):Int;
+	static function get_PANEL_W():Int return EditorInputStyle.si(420);
+	static var BAR_H(get, never):Int;
+	static function get_BAR_H():Int return EditorInputStyle.si(36);
+	static var ARROW_W(get, never):Int;
+	static function get_ARROW_W():Int return EditorInputStyle.si(36);
+	static var BTN_W(get, never):Int;
+	static function get_BTN_W():Int return EditorInputStyle.si(140);
+	static var PANEL_GAP(get, never):Int;
+	static function get_PANEL_GAP():Int return EditorInputStyle.si(4);
+	static var CHIP_H(get, never):Int;
+	static function get_CHIP_H():Int return EditorInputStyle.si(20);
+	static var IN_H(get, never):Int;
+	static function get_IN_H():Int return EditorInputStyle.si(22);
 	static final PANEL_H_TYPE:Int = 122;
-	static final PANEL_H_CHAR:Int = 210;
-	static final PANEL_H_HINT:Int = 150;
+	static var PANEL_H_CHAR(get, never):Int;
+	static function get_PANEL_H_CHAR():Int return EditorInputStyle.si(210);
+	static var PANEL_H_HINT(get, never):Int;
+	static function get_PANEL_H_HINT():Int return EditorInputStyle.si(150);
 
-	// ============ NovaFlare 设计 token（AARRGGBB） ============
+	// ============ D.C.E. 设计 token（AARRGGBB） ============
 	// 中性色
 	static final C_PAGE_BG:Int = 0xFF12141A; // 页面底层背景
 	static final C_CARD_BG:Int = 0xFF1C1F28; // 卡片面板背景
@@ -173,11 +182,37 @@ class MenuCharacterEditorState extends MusicBeatState
 
 	var curTypeSelected:Int = 0; // 0 = Opponent, 1 = Boyfriend, 2 = Girlfriend
 
+	public var documentHistory:EditorDocumentHistory;
+
+	function historyRead():String return EditorDocumentHistory.jsonSnapshot(characterFile);
+	function historyRestore(snapshot:String):Void
+	{
+		characterFile = cast haxe.Json.parse(snapshot);
+		scaleVal = characterFile.scale;
+		charInputs[0].text = characterFile.image;
+		charInputs[1].text = characterFile.idle_anim;
+		charInputs[2].text = characterFile.confirm_anim;
+		cacheCharInputs();
+		reloadSelectedCharacter();
+		refreshCharPanel();
+		updateChip();
+	}
+	function exitEditor():Void
+	{
+		documentHistory.confirmDiscard(function() {
+			MusicBeatState.switchState(new MasterEditorMenu());
+			FlxG.sound.playMusic(Paths.music('freakyMenu'));
+		});
+	}
+
 	override function create()
 	{
+		// ★ 十三轮：编辑器统一走高分辨率设计（文字 1:1 光栅化 = 清晰）；
+		//   离开时由 EditorInputStyle 的 stateSwitched 钩子自动还原 1280×720。
+		EditorInputStyle.enterHiRes();
 		// 强制刷新语言数据，确保 menuchar 分组被加载（多语言文案）
 		Language.resetData();
-		// 页面底层背景（NovaFlare 深色）
+		// 页面底层背景（D.C.E. 深色）
 		FlxG.camera.bgColor = C_PAGE_BG;
 
 		characterFile = {
@@ -214,6 +249,10 @@ class MenuCharacterEditorState extends MusicBeatState
 		addVirtualPad(MENU_CHARACTER, MENU_CHARACTER);
 
 		super.create();
+		documentHistory = new EditorDocumentHistory(historyRead, historyRestore, () -> EditorDocumentHistory.inputFocused(cast charInputs), null);
+		documentHistory.onSave = saveCharacter;
+		add(documentHistory);
+
 	}
 
 	// ================= 几何 =================
@@ -350,7 +389,7 @@ class MenuCharacterEditorState extends MusicBeatState
 	/** 文本 */
 	function mkTxt(x:Float, y:Float, w:Int, str:String, size:Int, color:Int, align:FlxTextAlign):FlxText
 	{
-		var t:FlxText = new FlxText(x, y, w, str, size);
+		var t:FlxText = new EditorText(x, y, w, str, size);
 		t.setFormat(uiFont(), size, color, align);
 		t.wordWrap = false;
 		t.scrollFactor.set();
@@ -467,8 +506,8 @@ class MenuCharacterEditorState extends MusicBeatState
 		panelBits[idx].push(panelBgs[idx]);
 
 		var lblKeys:Array<String> = ['lbl_image', 'lbl_idle', 'lbl_confirm'];
-		var lblYs:Array<Float> = [2, 40, 78];
-		var boxYs:Array<Float> = [20, 58, 96];
+		var lblYs:Array<Float> = [EditorInputStyle.sv(2), EditorInputStyle.sv(40), EditorInputStyle.sv(78)];
+		var boxYs:Array<Float> = [EditorInputStyle.sv(20), EditorInputStyle.sv(58), EditorInputStyle.sv(96)];
 		var initVals:Array<String> = [characterFile.image, characterFile.idle_anim, characterFile.confirm_anim];
 
 		for (i in 0...3)
@@ -504,10 +543,10 @@ class MenuCharacterEditorState extends MusicBeatState
 		}
 
 		// 缩放行：标签 + [-][数值][+]
-		scaleLbl = mkTxt(px + 12, py + 124, PANEL_W - 24, tr('lbl_scale'), 12, C_TEXT_SEC, FlxTextAlign.LEFT);
+		scaleLbl = mkTxt(px + 12, py + EditorInputStyle.sv(124), PANEL_W - 24, tr('lbl_scale'), 12, C_TEXT_SEC, FlxTextAlign.LEFT);
 		panelBits[idx].push(scaleLbl);
 
-		var sy:Float = py + 140;
+		var sy:Float = py + EditorInputStyle.sv(140);
 		scaleBox = mkTintBox(px + 12, sy, PANEL_W - 24, IN_H, C_BORDER);
 		scaleInner = mkBox(px + 13, sy + 1, PANEL_W - 26, IN_H - 2, C_PAGE_BG);
 		scaleSelfTxt = mkTxt(px + 18, 0, PANEL_W - 96, scaleText(), 12, C_TEXT_MAIN, FlxTextAlign.LEFT);
@@ -543,7 +582,7 @@ class MenuCharacterEditorState extends MusicBeatState
 		panelBits[idx].push(scalePlusTxt);
 
 		// FlipX（次级按钮 + 勾选方块）与 Reload（次级按钮）半宽并排
-		var ay:Float = py + 166;
+		var ay:Float = py + EditorInputStyle.sv(166);
 		var bw:Int = Std.int((PANEL_W - 24 - 8) / 2);
 
 		// Flip X 块
@@ -590,15 +629,15 @@ class MenuCharacterEditorState extends MusicBeatState
 		var keys:Array<String> = ['h_arrow', 'h_space1', 'h_space2', 'h_esc'];
 		for (i in 0...4)
 		{
-			var t:FlxText = mkTxt(px + 12, py + 8 + i * 20, PANEL_W - 24, tr(keys[i]), 12, C_TEXT_HINT, FlxTextAlign.LEFT);
+			var t:FlxText = mkTxt(px + 12, py + EditorInputStyle.sv(8 + i * 20), PANEL_W - 24, tr(keys[i]), 12, C_TEXT_HINT, FlxTextAlign.LEFT);
 			hintLbls.push(t);
 			panelBits[idx].push(t);
 		}
 
-		var sep:FlxSprite = mkBox(px + 12, py + 92, PANEL_W - 24, 1, C_BORDER);
+		var sep:FlxSprite = mkBox(px + 12, py + EditorInputStyle.sv(92), PANEL_W - 24, 1, C_BORDER);
 		panelBits[idx].push(sep);
 
-		var ay:Float = py + 100;
+		var ay:Float = py + EditorInputStyle.sv(100);
 		var bw:Int = Std.int((PANEL_W - 24 - 8) / 2);
 
 		// Load Character：次级按钮（模拟边框 + hover）
@@ -674,7 +713,7 @@ class MenuCharacterEditorState extends MusicBeatState
 		chipPrefixTxt.text = prefix;
 		chipValueTxt.text = value;
 
-		var w:Int = Std.int(measureTextWidth(prefix + value)) + 22;
+		var w:Int = Std.int(chipPrefixTxt.width + chipValueTxt.width) + EditorInputStyle.si(22);
 		if (w < 80)
 			w = 80;
 		chipBg.makeGraphic(w, CHIP_H, C_CARD_BG);
@@ -692,7 +731,7 @@ class MenuCharacterEditorState extends MusicBeatState
 
 		chipPrefixTxt.x = chipBg.x + 10;
 		chipPrefixTxt.y = top + (CHIP_H - chipPrefixTxt.height) / 2;
-		chipValueTxt.x = chipPrefixTxt.x + Std.int(measureTextWidth(prefix)) + 2;
+		chipValueTxt.x = chipPrefixTxt.x + chipPrefixTxt.width + EditorInputStyle.sv(2);
 		chipValueTxt.y = chipPrefixTxt.y;
 	}
 
@@ -1001,6 +1040,7 @@ class MenuCharacterEditorState extends MusicBeatState
 	/** hover 视觉 + 点击处理（箭头折叠 / 一级按钮 / 面板控件 / 点外关闭） */
 	function updateNewUI():Void
 	{
+		if (mobile.objects.EditorMobileKeys.pointerOverButton()) return;
 		var mx:Float = FlxG.mouse.viewX;
 		var my:Float = FlxG.mouse.viewY;
 
@@ -1027,7 +1067,7 @@ class MenuCharacterEditorState extends MusicBeatState
 			barSelGrads[i].visible = (!barFolded && isOpen);
 			barAccents[i].visible = (!barFolded && isOpen);
 			barHoverOv[i].visible = (!barFolded && hovered && !isOpen);
-			// ★ NovaFlare 规范（ChartEditor 同款）：选中 = 主渐变底 + 白字；hover = 通用 hover 底 + 白字
+			// ★ D.C.E. 规范（ChartEditor 同款）：选中 = 主渐变底 + 白字；hover = 通用 hover 底 + 白字
 			barTexts[i].color = (isOpen || hovered) ? C_TITLE_HOVER : C_TITLE;
 		}
 
@@ -1176,7 +1216,7 @@ class MenuCharacterEditorState extends MusicBeatState
 			{
 				if (pointIn(mx, my, loadHit))
 				{
-					loadCharacter();
+					documentHistory.confirmDiscard(loadCharacter);
 					return;
 				}
 				if (pointIn(mx, my, saveHit))
@@ -1196,6 +1236,7 @@ class MenuCharacterEditorState extends MusicBeatState
 
 	override function update(elapsed:Float)
 	{
+		if (documentHistory != null && documentHistory.blocksInput()) { super.update(elapsed); return; }
 		// 输入框内容变化实时写回数据
 		updateCharInputTexts();
 		updateNewUI();
@@ -1218,8 +1259,7 @@ class MenuCharacterEditorState extends MusicBeatState
 					closePanel();
 				else
 				{
-					MusicBeatState.switchState(new developer.editors.MasterEditorMenu());
-					FlxG.sound.playMusic(Paths.music('freakyMenu'));
+					exitEditor();
 				}
 			}
 
@@ -1293,12 +1333,13 @@ class MenuCharacterEditorState extends MusicBeatState
 			var rawJson:String = File.getContent(fullPath);
 			if (rawJson != null)
 			{
-				var loadedChar:MenuCharacterFile = cast Json.parse(rawJson);
-				if (loadedChar.idle_anim != null && loadedChar.confirm_anim != null) // Make sure it's really a character
+				var loadedChar:MenuCharacterFile = cast EditorInputValidation.parseJsonObject(rawJson);
+				if (loadedChar != null && Std.isOfType(loadedChar.idle_anim, String) && Std.isOfType(loadedChar.confirm_anim, String) && Std.isOfType(loadedChar.image, String) && EditorInputValidation.numberPair(loadedChar.position) && EditorInputValidation.finiteNumber(loadedChar.scale))
 				{
 					var cutName:String = _file.name.substr(0, _file.name.length - 5);
 					trace("Successfully loaded file: " + cutName);
 					characterFile = loadedChar;
+					documentHistory.resetTimeline();
 					scaleVal = characterFile.scale;
 					charInputs[0].text = characterFile.image;
 					charInputs[1].text = characterFile.idle_anim;
@@ -1344,6 +1385,8 @@ class MenuCharacterEditorState extends MusicBeatState
 
 	function saveCharacter()
 	{
+		var history = documentHistory;
+		if (history != null) history.prepareSave();
 		var data:String = haxe.Json.stringify(characterFile, "\t");
 		if (data.length > 0)
 		{
@@ -1364,6 +1407,8 @@ class MenuCharacterEditorState extends MusicBeatState
 
 	function onSaveComplete(_):Void
 	{
+		var history = documentHistory;
+		if (history != null) history.markSaved();
 		_file.removeEventListener(#if desktop Event.SELECT #else Event.COMPLETE #end, onSaveComplete);
 		_file.removeEventListener(Event.CANCEL, onSaveCancel);
 		_file.removeEventListener(IOErrorEvent.IO_ERROR, onSaveError);

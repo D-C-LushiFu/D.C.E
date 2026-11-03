@@ -16,7 +16,7 @@ import mobile.objects.EditorMobileKeyData;
  * 路由：
  *   GET  /                  → 编辑器页面（HTML，内嵌常量）
  *   GET  /api/status        → 服务/目录/Editor 清单/最近 Editor
- *   GET  /api/load?id=X     → 读取 FuckYouNFEMobile/<X>NewFuckingButtonMobile.json
+ *   GET  /api/load?id=X     → 读取 FuckYouDCEMobile/<X>NewFuckingButtonMobile.json
  *   POST /api/save?id=X     → 写入（body = JSON 文本）
  *   GET  /api/template?id=X → 生成“从默认键位开始”的模板 JSON
  *
@@ -34,6 +34,9 @@ class EditorKeyServer
 	public static function startServer():Void
 	{
 		#if sys
+		#if EDITOR_TEST_NO_INBOUND_SERVERS
+		return;
+		#end
 		if (running) return;
 
 		// 与 TraceServer 同构：bind/listen 必须在主线程完成（hxcpp 子线程里
@@ -245,7 +248,7 @@ class EditorKeyServer
 		if (method == 'GET' && (path == '/' || path == '/index.html'))
 		{
 			mime = 'text/html; charset=utf-8';
-			// 开发迭代友好：若 FuckYouNFEMobile/editor.html 存在则优先用磁盘版本，
+			// 开发迭代友好：若 FuckYouDCEMobile/editor.html 存在则优先用磁盘版本，
 			// 改页面只需替换该文件并刷新浏览器，无需重新编译（正式发布仍回退内嵌常量）。
 			response = EditorKeyPage.HTML;
 			try
@@ -258,7 +261,7 @@ class EditorKeyServer
 		}
 		else if (method == 'GET' && path == '/api/bg')
 		{
-			// 外部窗口画布背景：FuckYouNFEMobile/bg/<EditorId>.png
+			// 外部窗口画布背景：FuckYouDCEMobile/bg/<EditorId>.png
 			var id:String = params.get('id');
 			var entry = EditorMobileKeyData.entryOf(id);
 			if (entry == null)

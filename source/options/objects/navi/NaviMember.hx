@@ -1,6 +1,7 @@
 package options.objects.navi;
 
 import options.FontFallback;
+import states.freeplayState.objects.PhiPanel;
 
 // 侧边栏里的一个设置分类项。
 //
@@ -24,7 +25,7 @@ class NaviMember extends FlxSpriteGroup
 	public var memberName:String;
 	public var horizontal:Bool;
 
-	var background:Rect;
+	var background:PhiPanel;
 	var specRect:Rect;
 	var icon:FlxSprite;
 	var textDis:FlxText;
@@ -51,7 +52,7 @@ class NaviMember extends FlxSpriteGroup
 		this.horizontal = horizontal;
 		this.mainHeight = height;
 
-		var fontSize:Int = Std.int(height * (horizontal ? 0.36 : 0.35));
+		var fontSize:Int = Std.int(height * (horizontal ? 0.38 : 0.40));
 
 		// 先建文字：横向模式下整项宽度要按文字宽自适应
 		textDis = new FlxText(0, 0, 0, Language.get(name, 'options'), fontSize);
@@ -67,7 +68,10 @@ class NaviMember extends FlxSpriteGroup
 		mainWidth = width;
 
 		// 悬停高亮（同时充当命中区）
-		background = new Rect(0, 0, width, height, height / 5, height / 5, EngineSet.mainColor, HIDDEN_ALPHA);
+		// Match Freeplay's PhiPanel 15° parallelogram rows. Keep the same sprite as
+		// the hit target so selection, hover and pointer geometry stay in sync.
+		background = new PhiPanel(0, 0, Std.int(Math.ceil(width)), Std.int(Math.ceil(height)), 0xFF101722);
+		background.alpha = HIDDEN_ALPHA;
 		add(background);
 
 		// 选中强调条：垂直在左侧竖着、横向在底部横着
@@ -75,13 +79,13 @@ class NaviMember extends FlxSpriteGroup
 		if (horizontal)
 		{
 			var th:Float = Math.max(2, height * 0.07);
-			specRect = new Rect(0, 0, height * 0.75, th, 0, 0, EngineSet.mainColor);
+			specRect = new Rect(0, 0, height * 0.75, th, 0, 0, FlxColor.WHITE);
 			specRect.scale.x = 0;
 		}
 		else
 		{
 			var tw:Float = Math.max(2, height * 0.06);
-			specRect = new Rect(0, 0, tw, height * 0.47, 0, 0, EngineSet.mainColor);
+			specRect = new Rect(0, 0, tw, height * 0.47, 0, 0, FlxColor.WHITE);
 			specRect.scale.y = 0;
 		}
 		specRect.alpha = 0;
@@ -97,7 +101,7 @@ class NaviMember extends FlxSpriteGroup
 		icon.setGraphicSize(Std.int(height * (horizontal ? 0.52 : 0.58)));
 		icon.updateHitbox();
 		icon.antialiasing = ClientPrefs.data.antialiasing;
-		icon.color = horizontal ? EngineSet.mainColor : 0x9BA1B8;
+		icon.color = 0xFFD8E0E5;
 		add(icon);
 
 		add(textDis);
@@ -174,7 +178,9 @@ class NaviMember extends FlxSpriteGroup
 		//   否则鼠标移到语言列表上，下面的分类项照样亮起 hover 高亮、
 		//   视觉上像"同时选中了别的元素"（点击由 onMemberClick 里的
 		//   langSwallowsMouse() 兜住，这里补的是 hover 高亮）。
-		onFocus = !OptionsState.instance.langBlockSwallow && mouse.overlaps(background);
+		onFocus = !OptionsState.instance.langBlockSwallow && (horizontal
+			? mouse.overlaps(background)
+			: background.contains(FlxG.mouse.x, FlxG.mouse.y));
 
 		// 选中强调条平滑伸缩，避免切换时硬跳
 		//
@@ -196,18 +202,12 @@ class NaviMember extends FlxSpriteGroup
 		specRect.updateHitbox();   // 改完 scale 必须更新，否则强调条会从中心往两边长/缩
 		centerSpec();
 
-		var bStep:Float = EngineSet.FPSfix(0.012);
-		if (!Math.isFinite(bStep) || bStep <= 0) bStep = 0.012;
+		var backgroundTarget:Float = cataChoose ? 0.92 : (onFocus ? 0.17 : HIDDEN_ALPHA);
+		background.alpha += (backgroundTarget - background.alpha) * step;
+		if (Math.abs(background.alpha - backgroundTarget) < 0.01) background.alpha = backgroundTarget;
 
-		if (onFocus)
-		{
-			if (background.alpha < 0.16) background.alpha += bStep;
-			if (mouse.justReleased && !OptionsState.instance.inputLocked) OptionsState.instance.onMemberClick(this);
-		}
-		else if (background.alpha > HIDDEN_ALPHA)
-		{
-			background.alpha = Math.max(HIDDEN_ALPHA, background.alpha - bStep);
-		}
+		if (onFocus && mouse.justReleased && !OptionsState.instance.inputLocked)
+			OptionsState.instance.onMemberClick(this);
 	}
 
 	public function changeLanguage()

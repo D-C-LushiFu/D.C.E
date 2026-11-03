@@ -59,17 +59,18 @@ class CreditsDataMacro
    */
   static function parseJSON(json:String):Null<CreditsData>
   {
+    var result:Null<CreditsData> = null;
     try
     {
       // TODO: Use something with better validation but that still works at macro time.
-      return haxe.Json.parse(json);
+      result = haxe.Json.parse(json);
     }
     catch (e)
     {
       trace(' ERROR '.error() + ' Failed to parse JSON data for credits.');
       trace(e);
-      return null;
     }
+    return result;
   }
   #end
 }

@@ -91,7 +91,8 @@ class CallbackHandler
 		{
 			var game:PlayState = PlayState.instance;
 			if (game != null)
-				game.addTextToDebug(msg, FlxColor.RED);
+				// 走报错专用通道：受「维护设置 › Lua 语法错误提示」控制（关闭时只写日志、不上屏）
+				game.addScriptErrorToDebug(msg);
 		}
 		catch (_:Dynamic) {}
 	}

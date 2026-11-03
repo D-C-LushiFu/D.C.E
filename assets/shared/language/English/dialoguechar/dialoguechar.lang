@@ -97,3 +97,7 @@ desc_help_shift => While held, offset steps are multiplied by 10
 desc_help_space => Replay the current animation and reset the dialogue typing
 desc_help_f1 => Open this help menu: F1
 desc_help_exit => Exit editor: ESC (confirms when unsaved changes exist)
+
+# ===== Exit confirmation popup (overrides the shared keys in the editors group) =====
+confirm_unsaved_title => Exit Dialogue Portrait Editor
+confirm_unsaved_message => This portrait has unsaved changes. They will be lost if you exit. Discard them and exit?

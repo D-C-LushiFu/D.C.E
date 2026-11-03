@@ -32,7 +32,7 @@ class PolymodHandler
   /**
    * Some base-game scripts import library classes that no compiled FNF class
    * references directly. Keep them in the executable so Polymod can resolve
-   * those imports at runtime without changing NovaFlare's selected haxelibs.
+   * those imports at runtime without changing D.C.E.'s selected haxelibs.
    */
   @:keep
   static final ORIGIN_CORE_SCRIPT_DEPENDENCIES:Array<Class<Dynamic>> = [
@@ -539,7 +539,6 @@ class PolymodHandler
   {
     var result = Polymod.getDefaultIgnoreList();
 
-    result.push('.vscode');
     result.push('.idea');
     result.push('.git');
     result.push('.gitignore');

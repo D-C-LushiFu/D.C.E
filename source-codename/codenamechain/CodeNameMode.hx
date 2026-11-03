@@ -10,7 +10,7 @@ import sys.FileSystem;
 
 /**
  * Locates and prepares the external Codename runtime without changing the
- * working directory used by NovaFlare or the V-Slice chain.
+ * working directory used by D.C.E. or the V-Slice chain.
  */
 class CodeNameMode
 {
@@ -23,14 +23,17 @@ class CodeNameMode
 	public static var root(default, null):Null<String>;
 	public static var assetsRoot(default, null):Null<String>;
 	public static var preparationError(default, null):Null<String>;
-	public static var novaFlareIntroVideoPath(default, null):Null<String>;
+	public static var dceIntroVideoPath(default, null):Null<String>;
 
-	static inline final NOVAFLARE_INTRO_ASSET:String = "assets/videos/menuExtend/titleIntro.mp4";
-	static inline final NOVAFLARE_INTRO_LIBRARY_ASSET:String = "videos:assets/videos/menuExtend/titleIntro.mp4";
+	static inline final DCE_INTRO_ASSET:String = "assets/videos/menuExtend/titleIntro.mp4";
+	static inline final DCE_INTRO_LIBRARY_ASSET:String = "videos:assets/videos/menuExtend/titleIntro.mp4";
 
 	public static function detect():Bool
 	{
 		active = false;
+		#if CODENAME_ENGINE_COMPAT
+		flixel.FlxCamera.cneShaderSizingEnabled = false;
+		#end
 		assetsAvailable = false;
 		root = null;
 		assetsRoot = null;
@@ -47,11 +50,12 @@ class CodeNameMode
 			validateLayout(candidate);
 			setResolvedRoot(candidate);
 			active = true;
+			flixel.FlxCamera.cneShaderSizingEnabled = true;
 		}
 		catch (error:Dynamic)
 		{
 			preparationError = describeError(error);
-			trace('[CodeName] $preparationError Falling back to NF.');
+			trace('[CodeName] $preparationError Falling back to D.C.E.');
 		}
 		#end
 
@@ -101,7 +105,7 @@ class CodeNameMode
 
 			codename.funkin.backend.assets.ModsFolder.modsPath = Path.addTrailingSlash(modRoot);
 			codename.funkin.backend.assets.ModsFolder.addonsPath = Path.addTrailingSlash(addonRoot);
-			novaFlareIntroVideoPath = resolveNovaFlareIntroVideoPath();
+			dceIntroVideoPath = resolveDCEIntroVideoPath();
 			trace('[CodeName] External assets: "$assetsRoot".');
 			trace('[CodeName] Mods: "$modRoot".');
 			return true;
@@ -128,11 +132,15 @@ class CodeNameMode
 	#if sys
 	static function locateRoot():Null<String>
 	{
+		#if mobile
+		var runtimeDirectory:String = Sys.getCwd();
+		#else
 		var executablePath:String = Sys.programPath();
 		var runtimeDirectory:String = executablePath == null || executablePath.length == 0
 			? Sys.getCwd()
 			: Path.directory(executablePath);
 		if (runtimeDirectory == null || runtimeDirectory.length == 0) runtimeDirectory = Sys.getCwd();
+		#end
 
 		var preferred:String = FileSystem.fullPath(Path.join([
 			runtimeDirectory,
@@ -182,13 +190,13 @@ class CodeNameMode
 	}
 	#end
 
-	static function resolveNovaFlareIntroVideoPath():Null<String>
+	static function resolveDCEIntroVideoPath():Null<String>
 	{
 		#if sys
-		if (FileSystem.exists(NOVAFLARE_INTRO_ASSET)) return FileSystem.fullPath(NOVAFLARE_INTRO_ASSET);
+		if (FileSystem.exists(DCE_INTRO_ASSET)) return FileSystem.fullPath(DCE_INTRO_ASSET);
 		#end
-		if (Assets.exists(NOVAFLARE_INTRO_LIBRARY_ASSET)) return Assets.getPath(NOVAFLARE_INTRO_LIBRARY_ASSET);
-		if (Assets.exists(NOVAFLARE_INTRO_ASSET)) return Assets.getPath(NOVAFLARE_INTRO_ASSET);
+		if (Assets.exists(DCE_INTRO_LIBRARY_ASSET)) return Assets.getPath(DCE_INTRO_LIBRARY_ASSET);
+		if (Assets.exists(DCE_INTRO_ASSET)) return Assets.getPath(DCE_INTRO_ASSET);
 		return null;
 	}
 

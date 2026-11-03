@@ -513,7 +513,7 @@ final class AudioAnalyzer {
 	#if lime_vorbis
 	inline function __prepareDecoder():Bool @:privateAccess {
 		#if CODENAME_ENGINE_COMPAT
-		// NF's Lime keeps a single native Vorbis handle and cannot safely clone it.
+		// D.C.E.'s Lime keeps a single native Vorbis handle and cannot safely clone it.
 		// Live sources are still handled by __readStream above.
 		return false;
 		#else

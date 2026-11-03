@@ -26,7 +26,16 @@ class UIState extends MusicBeatState {
 
 	public var buttonHandler:Void->Void = null;
 	public var hoveredSprite:UISprite = null;
-	public var currentFocus:IUIFocusable = null;
+	public var currentFocus(default, set):IUIFocusable = null;
+
+	private function set_currentFocus(value:IUIFocusable):IUIFocusable {
+		currentFocus = value;
+		#if mobile
+		var window = FlxG.stage != null ? FlxG.stage.window : null;
+		if (window != null) window.textInputEnabled = value is UITextBox;
+		#end
+		return value;
+	}
 
 	public var currentCursor:CodeCursor = ARROW;
 
@@ -75,6 +84,13 @@ class UIState extends MusicBeatState {
 	}
 
 	public function isOverlapping(spr:UISprite, rect:FlxRect) {
+		#if mobile
+		// TouchPad buttons are rendered above editor widgets. Do not let the
+		// primary touch also click a UIButton/slider underneath the same area.
+		if (controls.touchC && codename.mobile.CodeNameMobileInput.pointerOverActiveControl())
+			return false;
+		#end
+
 		for(camera in spr.__lastDrawCameras) {
 			var pos = FlxG.mouse.getScreenPosition(camera, __point);
 			__rect.copyFrom(rect);
@@ -98,6 +114,16 @@ class UIState extends MusicBeatState {
 	}
 
 	public override function tryUpdate(elapsed:Float) {
+		#if mobile
+		if (controls.BACK && subState == null) {
+			if (currentFocus != null) {
+				currentFocus = null;
+				return;
+			}
+			if (onMobileBack()) return;
+		}
+		#end
+
 		FlxG.mouse.getScreenPosition(FlxG.camera, __mousePos);
 
 		super.tryUpdate(elapsed);
@@ -107,7 +133,7 @@ class UIState extends MusicBeatState {
 			buttonHandler = null;
 		}
 
-		if (FlxG.mouse.justPressed) {
+		if (FlxG.mouse.justPressed && !controls.touchC) {
 			playEditorSound(Flags.DEFAULT_EDITOR_CLICK_SOUND);
 		}
 
@@ -124,7 +150,17 @@ class UIState extends MusicBeatState {
 		hoveredSprite = null;
 	}
 
+	#if mobile
+	/** Return true when a concrete editor consumed the platform back action. */
+	public function onMobileBack():Bool
+		return false;
+	#end
+
 	public override function destroy() {
+		#if mobile
+		var window = FlxG.stage != null ? FlxG.stage.window : null;
+		if (window != null) window.textInputEnabled = false;
+		#end
 		if (resolutionAware) {
 			resolutionAware = false;
 

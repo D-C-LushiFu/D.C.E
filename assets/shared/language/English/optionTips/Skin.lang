@@ -9,6 +9,8 @@ noteColorSwap => Use HSV Coloring like old psych for Note
 NotesSubState => Note color setup
 NotesSubStateLegacy => Note HSV setup
 
+KeyboardViewerSubState => Open the keyboard feedback editor: per-key colors, bars, alpha, stat colors, layout, and follow-the-song note colors
+
 Splash => Splash
 
 showSplash => Show on sick/marvelous judge

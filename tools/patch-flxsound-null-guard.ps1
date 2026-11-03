@@ -1,6 +1,6 @@
-# NovaFlare Engine - FlxSound null-pointer crash fixes (2 patches)
+# D.C.E. - FlxSound null-pointer crash fixes (2 patches)
 #
-# Crash evidence (novaflare-native-crash-v1 native crash log):
+# Crash evidence (dce-native-crash-v1 native crash log):
 #   SIGSEGV / fault_address=0x30, faulting instruction `str d0, [x8, #0x30]`, x8 == NULL.
 #   Reverse engineering identified flixel::sound::FlxSound_obj::updateTransform():
 #   it dereferences this->_transform (object offset +0xd8); SoundTransform.volume is at +0x30.
@@ -57,7 +57,7 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 function Read-Text([string]$p) { return [System.IO.File]::ReadAllText($p, $utf8NoBom) }
 function Write-Text([string]$p, [string]$t) { [System.IO.File]::WriteAllText($p, $t, $utf8NoBom) }
 function NewlineOf([string]$t) { if ($t.Contains("`r`n")) { return "`r`n" } else { return "`n" } }
-function Test-Applied([string]$t) { return ($t.Contains('>>> NovaFlare fix 1') -and $t.Contains('>>> NovaFlare fix 2')) }
+function Test-Applied([string]$t) { return ($t.Contains('>>> D.C.E. fix 1') -and $t.Contains('>>> D.C.E. fix 2')) }
 
 function Get-TargetPath {
   foreach ($c in $candidates) { if (Test-Path -LiteralPath $c) { return $c } }
@@ -77,7 +77,7 @@ $anchor2 = @"
 
 function Get-Block1([string]$nl) {
   @(
-    "`t`t// >>> NovaFlare fix 1: updateTransform() null guard",
+    "`t`t// >>> D.C.E. fix 1: updateTransform() null guard",
     "`t`t// destroy() nulls _transform, but SoundFrontEnd.destroy() leaves the destroyed",
     "`t`t// sounds inside FlxG.sound.list, so list.recycle() may reuse them and Lua may still",
     "`t`t// hold references. Dereferencing _transform then writes NULL+0x30 and raises a",
@@ -85,14 +85,14 @@ function Get-Block1([string]$nl) {
     "`t`t// _transform, so the destroyed state stays visible instead of being masked.",
     "`t`tif (_transform == null)",
     "`t`t`treturn;",
-    "`t`t// <<< NovaFlare fix 1",
+    "`t`t// <<< D.C.E. fix 1",
     ""
   ) -join $nl
 }
 
 function Get-Block2([string]$nl) {
   @(
-    "`t`t// >>> NovaFlare fix 2: rebuild _transform when the asset is empty",
+    "`t`t// >>> D.C.E. fix 2: rebuild _transform when the asset is empty",
     "`t`t// The original code returned right here, skipping cleanup(true) -> reset(), which",
     "`t`t// is the only place that recreates _transform. SoundFrontEnd.play() then calls",
     "`t`t// loadHelper() -> sound.volume = volume -> set_volume -> updateTransform, which",
@@ -105,7 +105,7 @@ function Get-Block2([string]$nl) {
     "`t`t`texists = false;",
     "`t`t`treturn this;",
     "`t`t}",
-    "`t`t// <<< NovaFlare fix 2",
+    "`t`t// <<< D.C.E. fix 2",
     ""
   ) -join $nl
 }

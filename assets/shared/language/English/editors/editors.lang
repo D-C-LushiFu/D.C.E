@@ -1,5 +1,15 @@
 # ===== 编辑器主菜单（主菜单按 7 进入） =====
 chartEditor => Chart Editor
+cameraEditor => Camera Editor (Beta)
+cameraEditorSongBrowserTitle => Choose a song from this mod
+cameraEditorNoSongs => No charted songs were found in the current mod.
+cameraEditorFolderReadFailed => Could not read this song's difficulty charts.
+cameraEditorSelectDifficulty => Choose a difficulty to preview:
+cameraEditorOpenDifficulty => Open difficulty
+cameraEditorOpenSong => Choose song
+cameraEditorBackToSongs => Back to song list
+cameraEditorDialogBusy => Finish the current file dialog first.
+cameraEditorLoadFailed => Could not load this chart.
 characterEditor => Character Editor
 stageEditor => Stage Editor
 weekEditor => Week Editor
@@ -11,3 +21,23 @@ noteSplashDebug => Note Splash Debug
 # ===== Mod 目录提示（底部状态条） =====
 noModDirectory => < No Mod Directory Loaded >
 loadedModDirectory => < Loaded Mod Directory:
+
+# ===== Shared confirmation popup (per-editor groups may override these keys) =====
+confirm_unsaved_title => Unsaved changes
+confirm_unsaved_message => This editor has unsaved changes. They will be lost if you leave now. Discard them and exit?
+confirm_btn_confirm => Discard & Exit
+confirm_btn_cancel => Cancel
+confirm_hint => Enter / Y confirm  |  Esc cancel
+confirm_hint_touch => Tap a button to choose
+
+history_undo => Undo
+history_redo => Redo
+history_open => History
+history_opened => Opened document
+history_changed => Edited document
+history_saved => No unsaved edits
+history_unsaved => Unsaved edits
+history_discard => Discard the unsaved changes and continue?
+history_imported => Imported configuration
+
+history_save => Save

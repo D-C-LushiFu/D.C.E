@@ -70,3 +70,14 @@ desc_help_anims => 上/下一个表情：W / S
 desc_help_replay => 重播当前行文字：SPACE
 desc_help_f1 => 打开本帮助菜单：F1
 desc_help_exit => 退出编辑器：ESC（有未保存修改时先确认）
+
+# ===== 退出确认弹窗（覆盖 editors 组的通用文案） =====
+confirm_unsaved_title => 退出对话编辑器
+confirm_unsaved_message => 当前对白还有未保存的修改，退出后这些对白行将会丢失。确定要放弃修改并退出吗？
+
+item_duplicate_line => 复制当前对白行
+desc_duplicate_line => 复制当前对白及其全部属性，并插入下一行
+item_move_line_up => 将当前行上移
+desc_move_line_up => 将当前对白向前移动一行
+item_move_line_down => 将当前行下移
+desc_move_line_down => 将当前对白向后移动一行

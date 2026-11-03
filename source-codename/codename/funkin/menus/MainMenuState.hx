@@ -75,11 +75,16 @@ class MainMenuState extends MusicBeatState
 		}
 
 		FlxG.camera.follow(camFollow, null, 0.06);
+		var modsKey:String = controls.getKeyName(SWITCHMOD);
+		#if TOUCH_CONTROLS
+		if (controls.touchC)
+			modsKey = codename.mobile.CodeNameMobileInput.getID(SWITCHMOD).toString();
+		#end
 
 		versionText = new FunkinText(5, FlxG.height - 2, 0, [
 			Flags.VERSION_MESSAGE,
 			TU.translate("mainMenu.commit", [Flags.COMMIT_NUMBER, Flags.COMMIT_HASH]),
-			TU.translate("mainMenu.openMods", [controls.getKeyName(SWITCHMOD)]),
+			TU.translate("mainMenu.openMods", [modsKey]),
 			''
 		].join('\n'));
 		versionText.y -= versionText.height;
@@ -134,7 +139,7 @@ class MainMenuState extends MusicBeatState
 
 			var upP = controls.UP_P;
 			var downP = controls.DOWN_P;
-			var scroll = FlxG.mouse.wheel;
+			var scroll = controls.touchC ? 0 : FlxG.mouse.wheel;
 
 			if (upP || downP || scroll != 0)  // like this we wont break mods that expect a 0 change event when calling sometimes  - Nex
 				changeItem((upP ? -1 : 0) + (downP ? 1 : 0) - scroll);

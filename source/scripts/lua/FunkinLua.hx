@@ -55,6 +55,7 @@ class FunkinLua
 	#end
 
 	public var callbacks:Map<String, Dynamic> = new Map<String, Dynamic>();
+	private var reportedRuntimeErrors:Map<String, Bool> = new Map<String, Bool>();
 
 	public static var customFunctions:Map<String, Dynamic> = new Map<String, Dynamic>();
 
@@ -180,7 +181,9 @@ load = nil
 		set('scrollSpeed', PlayState.SONG.speed);
 		set('crochet', Conductor.crochet);
 		set('stepCrochet', Conductor.stepCrochet);
-		set('songLength', FlxG.sound.music.length);
+		// Lua scripts can be constructed before startSong installs the music track.
+		// startSong later broadcasts the real duration to every script.
+		set('songLength', FlxG.sound.music != null ? FlxG.sound.music.length : 0);
 		set('songName', PlayState.SONG.song);
 		set('songPath', Paths.formatToSongPath(PlayState.SONG.song));
 		set('startedCountdown', false);
@@ -1267,7 +1270,15 @@ load = nil
 				var leSprite:ModchartSprite = new ModchartSprite(x, y);
 				if (image != null && image.length > 0)
 				{
-					leSprite.loadGraphic(Paths.image(image, null, null, disposeOnUpload));
+					var graphic = Paths.image(image, null, null, disposeOnUpload);
+					if (graphic == null)
+					{
+						reportRuntimeErrorOnce('makeLuaSprite:missing:$image',
+							'makeLuaSprite("$tag"): image "$image" could not be loaded.');
+						leSprite.destroy();
+						return;
+					}
+					leSprite.loadGraphic(graphic);
 				}
 				leSprite.imageName = image;
 				game.modchartSprites.set(tag, leSprite);
@@ -1283,7 +1294,33 @@ load = nil
 				LuaUtils.resetSpriteTag(tag);
 				var leSprite:ModchartSprite = new ModchartSprite(x, y);
 
-				LuaUtils.loadFrames(leSprite, image, spriteType);
+				if (image == null || image.length == 0 || Paths.image(image) == null)
+				{
+					reportRuntimeErrorOnce('makeAnimatedLuaSprite:missing:$image',
+						'makeAnimatedLuaSprite("$tag"): image "$image" could not be loaded.');
+					leSprite.destroy();
+					return;
+				}
+
+				try
+				{
+					LuaUtils.loadFrames(leSprite, image, spriteType);
+				}
+				catch (error:Dynamic)
+				{
+					reportRuntimeErrorOnce('makeAnimatedLuaSprite:atlas:$image',
+						'makeAnimatedLuaSprite("$tag"): atlas "$image" could not be loaded (${Std.string(error)}).');
+					leSprite.destroy();
+					return;
+				}
+
+				if (leSprite.frames == null || leSprite.numFrames <= 0)
+				{
+					reportRuntimeErrorOnce('makeAnimatedLuaSprite:frames:$image',
+						'makeAnimatedLuaSprite("$tag"): atlas "$image" contains no usable frames.');
+					leSprite.destroy();
+					return;
+				}
 				leSprite.imageName = image;
 				game.modchartSprites.set(tag, leSprite);
 			} /*else {
@@ -1299,6 +1336,16 @@ load = nil
 		});
 		set("addAnimationByPrefix", function(obj:String, name:String, prefix:String, framerate:Int = 24, loop:Bool = true)
 		{
+			// A reflected FlxAnimationController.frameName is nullable while its
+			// sprite has no atlas/frame. Never forward that null into Flixel's
+			// prefix matcher; an empty prefix remains supported for legacy mods.
+			if (prefix == null)
+			{
+				reportRuntimeErrorOnce('addAnimationByPrefix:null:$obj:$name',
+					'addAnimationByPrefix("$obj", "$name"): prefix is nil because the source sprite has no current frame.');
+				return;
+			}
+
 			if (PlayState.instance.getLuaObject(obj, false) != null)
 			{
 				var cock:FlxSprite = PlayState.instance.getLuaObject(obj, false);
@@ -1937,6 +1984,46 @@ load = nil
 				? LuaL.dostring(lua, scriptName)
 				: LuaL.dofile(lua, scriptName);
 
+			// ★ 中文 / 非 ASCII 路径兜底。
+			//   `luaL_dofile` 内部是 CRT 的窄字符 `fopen`，会把路径字节按「进程 ANSI
+			//   代码页」解释。简中系统上那是 936(GBK)，而 Haxe 传下去的是 UTF-8，
+			//   于是 `mods/中文模组/script.lua` 打不开（实测 status=1）。新构建的 exe
+			//   带 windows/DCE.manifest 的 activeCodePage=UTF-8（Win10 1903+），
+			//   已经把这条路径修好了；这里再兜一层，覆盖老系统 / 清单没生效的情况。
+			//
+			//   判定依据：`isString`（= FileSystem.exists 为 false）用的是 hxcpp 的
+			//   Unicode 安全实现，所以「文件存在但 dofile 失败」几乎必然是路径编码问题。
+			//   此时改用 File.getContent（内部 _wfopen，Unicode 安全）读源码再 dostring。
+			//   代价：错误信息里的 chunk 名会变成源码片段而不是文件路径 —— 但总比
+			//   「脚本根本加载不了」好。清单生效的正常情况下这条分支永远不会走到。
+			if (status != Lua.LUA_OK && !isString)
+			{
+				// 先把 dofile 压进来的错误对象弹掉，避免污染后面 call() 的栈假设
+				var failedTop:Int = Lua.gettop(lua);
+				if (failedTop > 0)
+					Lua.pop(lua, failedTop);
+
+				var recovered:Bool = false;
+				try
+				{
+					var src:String = File.getContent(scriptName);
+					if (src != null && src.length > 0)
+					{
+						status = LuaL.dostring(lua, src);
+						recovered = (status == Lua.LUA_OK);
+						if (recovered)
+							trace('[Lua] luaL_dofile 失败（路径含非 ASCII 字符？）→ 已用 File.getContent + dostring 兜底加载：$scriptName');
+					}
+				}
+				catch (e:Dynamic)
+				{
+					trace('[Lua] 中文路径兜底加载失败：$scriptName — ' + Std.string(e));
+				}
+
+				if (!recovered && Lua.gettop(lua) > 0)
+					Lua.pop(lua, Lua.gettop(lua));
+			}
+
 			if (status != Lua.LUA_OK)
 			{
 				var stackTop:Int = Lua.gettop(lua);
@@ -1995,52 +2082,70 @@ load = nil
 		if (closed)
 			return LuaUtils.Function_Continue;
 
+		var result:Dynamic = LuaUtils.Function_Continue;
 		lastCalledFunction = func;
 		lastCalledScript = this;
 		try
 		{
 			if (lua == null)
-				return LuaUtils.Function_Continue;
-
-			Lua.getglobal(lua, func);
-			var type:Int = Lua.type(lua, -1);
-
-			if (type != Lua.LUA_TFUNCTION)
-			{
-				if (type > Lua.LUA_TNIL)
-					luaTrace("ERROR (" + func + "): attempt to call a " + LuaUtils.typeToString(type) + " value", false, false, FlxColor.RED);
-
-				Lua.pop(lua, 1);
-				return LuaUtils.Function_Continue;
-			}
-
-			for (arg in args)
-				Convert.toLua(lua, arg);
-			var status:Int = Lua.pcall(lua, args.length, 1, 0);
-
-			// Checks if it's not successful, then show a error.
-			if (status != Lua.LUA_OK)
-			{
-				var error:String = getErrorMessage(status);
-				luaTrace("ERROR (" + func + "): " + error, false, false, FlxColor.RED);
-				return LuaUtils.Function_Continue;
-			}
-
-			// If successful, pass and then return the result.
-			var result:Dynamic = cast Convert.fromLua(lua, -1);
-			if (result == null)
 				result = LuaUtils.Function_Continue;
 
-			Lua.pop(lua, 1);
-			if (closed)
-				stop();
-			return result;
+			else
+			{
+				Lua.getglobal(lua, func);
+				var type:Int = Lua.type(lua, -1);
+
+				if (type != Lua.LUA_TFUNCTION)
+				{
+					if (type > Lua.LUA_TNIL)
+						reportRuntimeErrorOnce('lua-call-type:$func:$type',
+							'attempt to call a ${LuaUtils.typeToString(type)} value.');
+
+					Lua.pop(lua, 1);
+					result = LuaUtils.Function_Continue;
+				}
+				else
+				{
+					for (arg in args)
+						Convert.toLua(lua, arg);
+					var status:Int = Lua.pcall(lua, args.length, 1, 0);
+
+					// Checks if it's not successful, then show a error.
+					if (status != Lua.LUA_OK)
+					{
+						var error:String = getErrorMessage(status);
+						reportRuntimeErrorOnce('lua-runtime:$func:$error', error);
+						result = LuaUtils.Function_Continue;
+					}
+					else
+					{
+						// If successful, pass and then return the result.
+						var luaResult:Dynamic = cast Convert.fromLua(lua, -1);
+						if (luaResult == null)
+							luaResult = LuaUtils.Function_Continue;
+
+						Lua.pop(lua, 1);
+						if (closed)
+						{
+							stop();
+							result = LuaUtils.Function_Continue;
+						}
+						else
+						{
+							result = luaResult;
+						}
+					}
+				}
+			}
 		}
 		catch (e:Dynamic)
 		{
 			trace(e);
+			reportRuntimeErrorOnce('callback:$func:${Std.string(e)}', Std.string(e));
+			result = LuaUtils.Function_Continue;
 		}
-		return LuaUtils.Function_Continue;
+
+		return result;
 	}
 
 	public function set(variable:String, data:Dynamic)
@@ -2065,6 +2170,8 @@ load = nil
 			lastCalledScript = null;
 		if (callbacks != null)
 			callbacks.clear();
+		if (reportedRuntimeErrors != null)
+			reportedRuntimeErrors.clear();
 
 		if (lua == null)
 		{
@@ -2098,6 +2205,24 @@ load = nil
 		{
 			luaTrace('$funcName: Couldnt find object: $vars', false, false, FlxColor.RED);
 		}
+	}
+
+	public function reportRuntimeErrorOnce(key:String, message:String):Void
+	{
+		if (key == null || key.length == 0)
+			key = message;
+		if (reportedRuntimeErrors.exists(key))
+			return;
+
+		reportedRuntimeErrors.set(key, true);
+		var callbackName:String = lastCalledFunction != null && lastCalledFunction.length > 0 ? lastCalledFunction : 'unknown callback';
+		var sourceName:String = scriptName != null && scriptName.length > 0 ? scriptName : 'unknown Lua script';
+		var errorText:String = 'ERROR ($callbackName) [$sourceName]: $message';
+		if (PlayState.instance != null)
+			// 走报错专用通道：受「维护设置 › Lua 语法错误提示」控制（关闭时只写日志、不上屏）
+			PlayState.instance.addScriptErrorToDebug(errorText);
+		else
+			trace(errorText);
 	}
 
 	public static function luaTrace(text:String, ignoreCheck:Bool = false, deprecated:Bool = false, color:FlxColor = FlxColor.WHITE)

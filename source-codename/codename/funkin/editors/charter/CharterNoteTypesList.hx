@@ -51,7 +51,7 @@ class CharterNoteTypesList extends UISubstateWindow {
 
 	public function getNoteTypesList(?mods:Bool = false) {
 		var list:Array<String> = [];
-		for (path in Paths.getFolderContent(pathString, true, mods ? MODS : BOTH)) if(Path.extension(path) == "hx") {
+		for (path in Paths.getFolderContent(pathString, true, mods ? MODS : BOTH)) if(Path.extension(path).toLowerCase() == "hx") {
 				var file:String = Path.withoutDirectory(path);
 				list.pushOnce(file);
 			}

@@ -83,7 +83,8 @@ class EditorPicker extends MusicBeatSubstate {
 		}
 		sprites[0].selected = true;
 
-		FlxG.mouse.getScreenPosition(subCam, oldMousePos);
+		if (!controls.touchC) FlxG.mouse.getScreenPosition(subCam, oldMousePos);
+		FlxG.mouse.visible = !controls.touchC;
 	}
 
 	public override function update(elapsed:Float) {
@@ -96,16 +97,17 @@ class EditorPicker extends MusicBeatSubstate {
 			subCam.scroll.x += camVelocity * elapsed;
 			return;
 		}
-		changeSelection(-FlxG.mouse.wheel + (controls.UP_P ? -1 : 0) + (controls.DOWN_P ? 1 : 0));
+		var scroll = controls.touchC ? 0 : FlxG.mouse.wheel;
+		changeSelection(-scroll + (controls.UP_P ? -1 : 0) + (controls.DOWN_P ? 1 : 0));
 
-		FlxG.mouse.getScreenPosition(subCam, curMousePos);
-		if (curMousePos.x != oldMousePos.x || curMousePos.y != oldMousePos.y) {
+		if (!controls.touchC) FlxG.mouse.getScreenPosition(subCam, curMousePos);
+		if (!controls.touchC && (curMousePos.x != oldMousePos.x || curMousePos.y != oldMousePos.y)) {
 			oldMousePos.set(curMousePos.x, curMousePos.y);
 			curSelected = -1;
 			changeSelection(Std.int(curMousePos.y / optionHeight)+1);
 		}
 
-		if (controls.ACCEPT || FlxG.mouse.justReleased) {
+		if (controls.ACCEPT || (!controls.touchC && FlxG.mouse.justReleased)) {
 			if(options[curSelected].onClick != null)
 				options[curSelected].onClick();
 			else if (options[curSelected].state != null) {
@@ -176,7 +178,6 @@ class EditorPickerOption extends FlxTypedSpriteGroup<FlxSprite> {
 	public function new(name:String, iconID:String, height:Float) {
 		super();
 
-		FlxG.mouse.visible = true;
 		iconSpr = new FlxSprite();
 		if(iconID != null)
 			iconSpr.loadGraphic(Paths.image('editors/icons/$iconID'));

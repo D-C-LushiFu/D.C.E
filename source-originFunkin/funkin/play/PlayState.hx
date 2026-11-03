@@ -55,6 +55,7 @@ import funkin.play.scoring.Scoring;
 import funkin.play.song.Song;
 import funkin.play.stage.Stage;
 import funkin.save.Save;
+import general.objects.screen.MouseEffect;
 #if FEATURE_CHART_EDITOR
 import funkin.ui.debug.charting.ChartEditorState;
 #end
@@ -833,6 +834,8 @@ class PlayState extends MusicBeatSubState
   @:nullSafety(Off)
   public override function create():Void
   {
+    MouseEffect.enterGameplay();
+
     if (instance != null)
     {
       // TODO: Do something in this case? IDK.
@@ -902,29 +905,20 @@ class PlayState extends MusicBeatSubState
     initPopups();
 
     #if mobile
-    if (!ControlsHandler.hasExternalInputDevice)
+    // Keep official Funkin hitbox controls always available; external devices can
+    // still be used concurrently.
+    addHitbox(false);
+    if (hitbox != null)
     {
-      // Initialize the official Funkin hitbox controls.
-      addHitbox(false);
-      if (hitbox != null)
-      {
-        hitbox.isPixel = currentChart.noteStyle == "pixel";
+      hitbox.isPixel = currentChart.noteStyle == "pixel";
 
-        if (Preferences.usesOriginControls())
+      if (Preferences.usesOriginControls())
+      {
+        for (direction in Strumline.DIRECTIONS)
         {
-          for (direction in Strumline.DIRECTIONS)
-          {
-            hitbox.getFirstHintByDirection(direction).follow(playerStrumline.getByDirection(direction));
-          }
+          hitbox.getFirstHintByDirection(direction).follow(playerStrumline.getByDirection(direction));
         }
       }
-    }
-    else
-    {
-      // The camera is still needed for the pause button!
-      camControls = new FunkinCamera('camControls');
-      FlxG.cameras.add(camControls, false);
-      camControls.bgColor = 0x0;
     }
     #end
 
@@ -1932,6 +1926,8 @@ class PlayState extends MusicBeatSubState
 
   public override function destroy():Void
   {
+    MouseEffect.leaveGameplay();
+
     performCleanup();
 
     #if mobile
@@ -1991,9 +1987,7 @@ class PlayState extends MusicBeatSubState
      */
   function initHealthBar():Void
   {
-    final isDownscroll:Bool = #if mobile (Preferences.usesOriginArrowLayout()
-      && !ControlsHandler.hasExternalInputDevice)
-      || #end Preferences.downscroll;
+    final isDownscroll:Bool = #if mobile (Preferences.usesOriginArrowLayout()) || #end Preferences.downscroll;
 
     var healthBarYPos:Float = isDownscroll ? FlxG.height * 0.1 : FlxG.height * 0.9;
 
@@ -2031,9 +2025,7 @@ class PlayState extends MusicBeatSubState
     // Create subtitles if they are enabled.
     if (Preferences.subtitles)
     {
-      final isDownscroll:Bool = #if mobile (Preferences.usesOriginArrowLayout()
-        && !ControlsHandler.hasExternalInputDevice)
-        || #end Preferences.downscroll;
+      final isDownscroll:Bool = #if mobile (Preferences.usesOriginArrowLayout()) || #end Preferences.downscroll;
 
       final subtitlesAlignment:SubtitlesAlignment = isDownscroll ? SubtitlesAlignment.SUBTITLES_TOP : SubtitlesAlignment.SUBTITLES_BOTTOM;
       subtitles = new Subtitles(0, 139, subtitlesAlignment);
@@ -2280,7 +2272,7 @@ class PlayState extends MusicBeatSubState
     }
 
     #if mobile
-    if (Preferences.usesOriginArrowLayout() && !ControlsHandler.hasExternalInputDevice)
+    if (Preferences.usesOriginArrowLayout())
     {
       initNoteHitbox();
     }

@@ -38,16 +38,24 @@ import cpp.Lib;
 class MainMenuState extends MusicBeatState
 {
 	public static var psychEngineVersion:String = '0.7.3'; // This is also used for Discord RPC
-	public static var novaFlareEngineDataVersion:Float = 2.9;
-	public static var novaFlareEngineVersion:String = '1.2.2';
-	public static var novaFlareEngineCommit:String = 
+	// 数据版本：与仓库根 gitVersion.txt 的第 2 行一一对应，InitState 用它做更新检查
+	// （onlineData > localData 即提示更新），同时也是 build-number 的前缀来源
+	// （见 Project.xml：build-number = 数据版本去点 + 构建日期）。
+	// 注意官方各版本实测值：V1.2.1 = 2.9，而 V1.2.1-Hotfix 的**发布包**用的是 3.3
+	// （tag 里写的 3.0 并不是发布包实际值）。本 1.2.2 已包含 Hotfix 的全部数据/资源
+	// 改动，故取 3.4 —— 让它同时满足两个目的：既在 Hotfix 发布包之上（versionCode
+	// 34260921 > 33260811，不会被 Android 判为降级），也让仍在旧数据版本的用户
+	// 能正确收到更新提示。改这里必须同步改 gitVersion.txt 第 2 行。
+	public static var dceEngineDataVersion:Float = 3.4;
+	public static var dceEngineVersion:String = '20261024Beta1.0Fix1';
+	public static var dceEngineCommit:String = 
 	    #if commit_sha
             haxe.macro.Compiler.getDefine("commit_sha");
         #else
             "dev";
         #end
 
-	public static var NovaFlareGithubAction:String = '????';
+	public static var DCEGithubAction:String = '????';
 	public static var createTime:String = 'Time: ????';
 
 	public static var curSelected:Int = 0;
@@ -105,6 +113,12 @@ class MainMenuState extends MusicBeatState
 	{
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
+
+		// Freeplay previews can destroy FlxG.sound.music before this state is
+		// created. Recreate the menu track here instead of assuming the caller
+		// always left a live music sound behind.
+		if (FlxG.sound.music == null)
+			FlxG.sound.playMusic(Paths.music('freakyMenu'), 0);
 
 		Mainbpm = TitleState.bpm;
 		bpm = TitleState.bpm;
@@ -239,13 +253,13 @@ class MainMenuState extends MusicBeatState
 			{
 				ActionStatus = result;
 			});
-			trace(NovaFlareGithubAction);
+			trace(DCEGithubAction);
 			try
 			{
 				createTime = StringTools.replace(createTime, "T", " ");
 				createTime = StringTools.replace(createTime, "Z", " ");
 				createTime = StringTools.replace(createTime, "U C", "UTC"); // fix
-				var updateShit:FlxText = new FlxText(0, 10, 0, NovaFlareGithubAction + '\n' + createTime, 12);
+				var updateShit:FlxText = new FlxText(0, 10, 0, DCEGithubAction + '\n' + createTime, 12);
 
 				updateShit.setFormat(Paths.font('Lang-ZH.ttf'), 16, FlxColor.WHITE, RIGHT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 				updateShit.x = FlxG.width - updateShit.width - 10;
@@ -306,7 +320,7 @@ class MainMenuState extends MusicBeatState
 			}
 		}); */
 
-		var versionShit:FlxText = new FlxText(12, FlxG.height - 44, 400, Language.get('novaFlareEngine', 'mainmenu') + " v " + novaFlareEngineVersion, 12);
+		var versionShit:FlxText = new FlxText(12, FlxG.height - 44, 400, Language.get('dceEngine', 'mainmenu') + " v " + dceEngineVersion, 12);
 		versionShit.scrollFactor.set();
 		versionShit.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		versionShit.antialiasing = ClientPrefs.data.antialiasing;
@@ -348,6 +362,9 @@ class MainMenuState extends MusicBeatState
 		
 		super.create();
 			GABridge.sendDesign("menu:main");
+
+		// （2026-09-27 的 NF_MEMLEAK_TEST 临时钩子已迁到 -D NF_LEAK_PROBE 的
+		//   general.backend.debug.LeakHarness，环境变量改为 NF_LEAK_ROUNDS/NF_LEAK_MODE。）
 	}
 
 	var canClick:Bool = true;
@@ -368,9 +385,10 @@ class MainMenuState extends MusicBeatState
 				if (StatusIcon != null)
 					StatusIcon.angle += 6 * (elapsed / (1 / 60));
 
-		if (FlxG.sound.music.volume < 0.8)
+		var menuMusic = FlxG.sound.music;
+		if (menuMusic != null && menuMusic.volume < 0.8)
 		{
-			FlxG.sound.music.volume += 0.5 * FlxG.elapsed;
+			menuMusic.volume += 0.5 * FlxG.elapsed;
 		}
 
 		FlxG.camera.followLerp = FlxMath.bound(elapsed * 9 / (FlxG.updateFramerate / 60), 0, 1);
@@ -478,10 +496,11 @@ class MainMenuState extends MusicBeatState
 			}
 		}
 
-		SoundTime = FlxG.sound.music.time / 1000;
-		BeatTime = 60 / bpm;
+		menuMusic = FlxG.sound.music;
+		SoundTime = menuMusic != null ? menuMusic.time / 1000 : 0;
+		BeatTime = bpm > 0 ? 60 / bpm : 0;
 
-		if (Math.floor(SoundTime / BeatTime) % 4 == 0 && canClick && canBeat)
+		if (BeatTime > 0 && Math.floor(SoundTime / BeatTime) % 4 == 0 && canClick && canBeat)
 		{
 			canBeat = false;
 
@@ -505,7 +524,7 @@ class MainMenuState extends MusicBeatState
 				FlxTween.tween(spr.scale, {y: 0.6}, 0.6, {ease: FlxEase.cubeOut});
 			});
 		}
-		if (Math.floor(SoundTime / BeatTime + 0.5) % 4 == 2)
+		if (BeatTime > 0 && Math.floor(SoundTime / BeatTime + 0.5) % 4 == 2)
 			canBeat = true;
 
 		menuItems.forEach(function(spr:FlxSprite)
@@ -597,8 +616,16 @@ class MainMenuState extends MusicBeatState
 						{
 							FlxG.sound.playMusic(Paths.music('Options Screen/' + ClientPrefs.data.optionMusic), 0);
 						}
+						// ★ 显式声明「本次是从主菜单进来的」。
+						//   stateType 是 static，只有走完 OptionsState.backMenu() 才会归零；
+						//   上一次若来自暂停菜单(2)/自由模式(1)且没走正常退出路径
+						//   （比如从设置里点了「音画偏移」跳去 NoteOffsetState 就没回来），
+						//   残留值会让这次退出直接跳进 PlayState —— 而 PlayState.SONG 还留着
+						//   上次的曲目（见下面那段清 arrowSkin/splashSkin 的代码），
+						//   于是表现成「从设置退出后进了 test 曲目」，且只在残留时复现 = 偶发。
+						//   这行原来是被注释掉的旧标记 `OptionsState.onPlayState = false;`
+						OptionsState.stateType = 0;
 						MusicBeatState.switchState(new OptionsState());
-						// OptionsState.onPlayState = false;
 						if (PlayState.SONG != null)
 						{
 							PlayState.SONG.arrowSkin = null;
@@ -641,13 +668,13 @@ class MainMenuState extends MusicBeatState
 		try
 		{
 			trace('checking for Github Action');
-			var http = new haxe.Http("https://api.github.com/repos/D-C-LushiFu/NovaFlare-Engine-LushiFuFixedsss/actions/runs?per_page=1");
-			http.setHeader("User-Agent", "NovaFlareEngine");
+			var http = new haxe.Http("https://api.github.com/repos/D-C-LushiFu/Different-Creatingness-Engine/actions/runs?per_page=1");
+			http.setHeader("User-Agent", "DCEEngine");
 
 			http.onData = function(data:String)
 			{
 				var actionJson = Json.parse(data);
-				MainMenuState.NovaFlareGithubAction = actionJson.workflow_runs[0].display_title;
+				MainMenuState.DCEGithubAction = actionJson.workflow_runs[0].display_title;
 				MainMenuState.createTime = 'UTC-' + actionJson.workflow_runs[0].updated_at + '\nBy ' + actionJson.workflow_runs[0].actor.login;
 				var Sus = actionJson.workflow_runs[0].status;
 				var Con = actionJson.workflow_runs[0].conclusion;
@@ -656,7 +683,7 @@ class MainMenuState extends MusicBeatState
 
 			http.onError = function(error)
 			{
-				MainMenuState.NovaFlareGithubAction = '$error';
+				MainMenuState.DCEGithubAction = '$error';
 				trace('error: $error');
 				callback({status: "error", conclusion: "error"});
 			};

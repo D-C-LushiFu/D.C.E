@@ -13,6 +13,10 @@ import openfl.display.ShaderParameterType;
 import openfl.display3D._internal.GLProgram;
 import openfl.display3D._internal.GLShader;
 import openfl.utils._internal.Log;
+#if mobile
+import codename.funkin.backend.utils.NativeAPI.MessageBoxIcon;
+import general.shaders.MobileShaderConverter;
+#end
 
 using StringTools;
 @:access(openfl.display3D.Context3D)
@@ -78,6 +82,43 @@ class FunkinShader extends FlxShader implements IHScriptCustomBehaviour {
 	static var ERROR_POS_REGEX = ~/(\d+):(\d+): (.*)/g;
 	static var ERROR_REGEX = ~/ERROR: (\d+):(\d+): (.*)/g;
 	static var ERROR_REGEX_2 = ~/(\d+)\((\d+)\) : error ([^:]+): (.*)/g;
+
+	static function reportShaderFailure(title:String, message:String, kind:String):Void
+	{
+		Logs.error(message, RED, "Shader");
+		Log.error(message);
+
+		var logPath:Null<String> = null;
+		#if sys
+		try
+		{
+			if (!sys.FileSystem.exists("logs")) sys.FileSystem.createDirectory("logs");
+
+			var date = Date.now().toString().replace(" ", "_").replace(":", "-");
+			var basePath = 'logs/CNE_Shader${kind}Error_${date}';
+			logPath = '$basePath.txt';
+			var suffix = 1;
+			while (sys.FileSystem.exists(logPath)) {
+				logPath = '${basePath}_$suffix.txt';
+				suffix++;
+			}
+			sys.io.File.saveContent(logPath, '$title\n\n$message');
+			Logs.infos('Shader error log saved to: $logPath', LIGHTGRAY, "Shader");
+		}
+		catch (error:Dynamic)
+		{
+			logPath = null;
+			Logs.error('Could not save shader error log: ${Std.string(error)}', RED, "Shader");
+		}
+		#end
+
+		#if mobile
+		var dialogMessage = message;
+		if (logPath != null) dialogMessage += '\n\nError log saved to: $logPath';
+		codename.funkin.backend.utils.NativeAPI.showMessageBox(title, dialogMessage, MSG_ERROR);
+		#end
+	}
+
 	@:noCompletion private override function __createGLShader(source:String, type:Int):GLShader
 	{
 		var gl = __context.gl;
@@ -153,7 +194,9 @@ class FunkinShader extends FlxShader implements IHScriptCustomBehaviour {
 			messageBuf.add(source);
 
 			var message = messageBuf.toString();
-			if (compileStatus == 0) Log.error(message);
+			if (compileStatus == 0) {
+				reportShaderFailure("Shader Compile Error", message, "Compile");
+			}
 			else if (hasInfoLog) Log.debug(message);
 		}
 
@@ -193,16 +236,12 @@ class FunkinShader extends FlxShader implements IHScriptCustomBehaviour {
 				messageBuf.add("\n");
 				messageBuf.add(gl.getProgramInfoLog(program));
 				var message = messageBuf.toString();
-				Log.error(message);
+				reportShaderFailure("Shader Link Error", message, "Link");
 			}
 		}
 		catch (error:Dynamic)
 		{
-			Logs.traceColored([
-				Logs.logText('[Shader] ', BLUE),
-				Logs.logText('Failed to compile shader ${fileName}: ', RED),
-				Logs.logText(Std.string(error))
-			], TRACE);
+			reportShaderFailure("Shader Compile Error", 'Failed to compile shader $fileName:\n${Std.string(error)}', "Exception");
 		}
 		return program;
 
@@ -300,7 +339,25 @@ class FunkinShader extends FlxShader implements IHScriptCustomBehaviour {
 			var vertex = prefix + vertexPrefix + glVertexSource;
 			var fragment = prefix + fragmentPrefix + glFragmentSource;
 
+			#if mobile
+			// FunkinShader owns its complete GL program path, so OpenFL's base
+			// Shader converter never sees these sources. Convert the final,
+			// pragma-expanded program here before it reaches the mobile driver.
+			var glVersion = MobileShaderConverter.configureFromGL(gl);
+			// The user-facing converter toggle may disable compatibility work for
+			// ordinary OpenFL shaders, but FunkinShader always prepends desktop GLSL
+			// (`#version 120`). That source is never legal on OpenGL ES as-is, so the
+			// CNE-owned program path must always perform its platform conversion.
+			var preparedSources = MobileShaderConverter.prepareProgram(vertex, fragment, glVersion, true);
+			for (diagnostic in preparedSources.diagnostics)
+				Log.warn('D.C.E. GLSL ES conversion [${diagnostic.stage}:${diagnostic.line}]: ${diagnostic.message}', null);
+			vertex = preparedSources.vertex;
+			fragment = preparedSources.fragment;
+			var id = preparedSources.cacheKey + '\nvertex:' + vertex.length + '\n' + vertex
+				+ '\nfragment:' + fragment.length + '\n' + fragment;
+			#else
 			var id = vertex + fragment;
+			#end
 
 			if (__context.__programs.exists(id))
 			{
@@ -315,6 +372,12 @@ class FunkinShader extends FlxShader implements IHScriptCustomBehaviour {
 
 			if (program != null)
 			{
+				#if mobile
+				@:privateAccess {
+					__glTransformRevision = MobileShaderConverter.revision;
+					__glProgramDirty = false;
+				}
+				#end
 				glProgram = program.__glProgram;
 
 				for (input in __inputBitmapData) {

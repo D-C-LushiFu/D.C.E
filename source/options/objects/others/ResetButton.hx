@@ -1,23 +1,18 @@
 package options.objects.others;
 
 /**
- * 面板标题栏右上角的重置按钮。
- *
- * ★ 外观对齐 web 原型标题栏右上那枚幽灵按钮（原型里是 `.pclose`）：
- *   background:rgba(255,255,255,.035) + 1px 描边 + 暗灰文字（--dim #9BA1B8），
- *   悬停时才泛起强调色（rgba(255,144,220,.16) + 白字）。
- *   以前这里画的是 `OptionsState.mainColor` + alpha 1 —— 一整块实心深色板，
- *   在标题栏里比分类名还抢眼（用户："数据重置这四个字未免太显眼了"）。
+ * 顶部工具栏右侧的重置按钮。深色实底和白字保证它从背景中分离，
+ * 鼠标悬停时切换成浅色强调态，避免按钮与工具栏或主面板叠在一起时变暗。
  */
 class ResetButton extends FlxSpriteGroup
 {
-	/** 常态底色（原型 .pclose 的 .035，这里给到 .045 保证在深底上能看出边界） */
-	inline static var IDLE_BG:Float = 0.045;
+	/** 常态底色（深色顶栏上保持低调但清晰可见） */
+	inline static var IDLE_BG:Float = 0.94;
 	/** 悬停底色（原型 .pclose:hover） */
 	inline static var HOVER_BG:Float = 0.16;
 	/** 二次确认时的底色（同族强调色） */
 	inline static var CONFIRM_BG:Float = 0.22;
-	inline static var IDLE_TEXT:Int = 0x9BA1B8;
+	inline static var IDLE_TEXT:Int = 0xFFFFFF;
 	inline static var HOVER_TEXT:Int = 0xFFFFFF;
 	inline static var CONFIRM_TINT:Int = 0xFF90DC;
 
@@ -36,10 +31,10 @@ class ResetButton extends FlxSpriteGroup
 	{
 		super(x, y);
 
-		rect = new Rect(0, 0, width, height, height / 3, height / 3, 0xFFFFFF, IDLE_BG);
+		rect = new Rect(0, 0, width, height, height / 3, height / 3, 0x111821, IDLE_BG);
 		add(rect);
 
-		text = new FlxText(0, 0, 0, Language.get('Reset'), Std.int(height * 0.44));
+		text = new FlxText(0, 0, 0, Language.get('Reset'), Std.int(height * 0.48));
 		text.font = Paths.font(Language.get('fontName', 'main') + '.ttf');
 		text.antialiasing = ClientPrefs.data.antialiasing;
 		text.color = IDLE_TEXT;
@@ -127,7 +122,7 @@ class ResetButton extends FlxSpriteGroup
 		}
 		else
 		{
-			rect.color = 0xFFFFFF;
+			rect.color = 0x111821;
 			bgAlpha = IDLE_BG;
 			text.color = IDLE_TEXT;
 			if (waitingForConfirm)
@@ -146,7 +141,7 @@ class ResetButton extends FlxSpriteGroup
 		waitingForConfirm = false;
 		confirmTimer = 0;
 		text.text = Language.get('Reset');
-		text.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(rect.height * 0.44), IDLE_TEXT);
+		text.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(rect.height * 0.48), IDLE_TEXT);
 		text.borderStyle = NONE;
 		text.antialiasing = ClientPrefs.data.antialiasing;
 		text.x = rect.x + rect.width / 2 - text.width / 2;

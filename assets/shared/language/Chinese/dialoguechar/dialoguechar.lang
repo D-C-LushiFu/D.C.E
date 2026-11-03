@@ -97,3 +97,7 @@ desc_help_shift => 按住 Shift 时偏移步长 ×10
 desc_help_space => 重播当前动画并重置对话文字打字
 desc_help_f1 => 打开本帮助菜单：F1
 desc_help_exit => 退出编辑器：ESC（有未保存修改时先确认）
+
+# ===== 退出确认弹窗（覆盖 editors 组的通用文案） =====
+confirm_unsaved_title => 退出对话立绘编辑器
+confirm_unsaved_message => 当前立绘还有未保存的修改，退出后这些改动将会丢失。确定要放弃修改并退出吗？

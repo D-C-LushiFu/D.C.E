@@ -8,6 +8,8 @@ NotesSubState =>箭头颜色设置
 noteColorSwap => 使用旧版 Psych 的 HSV 着色方式调整箭头颜色
 NotesSubStateLegacy => 打开旧版 HSV 箭头颜色设置
 
+KeyboardViewerSubState => 打开键盘反馈设置：各键颜色、长条、透明度、统计配色、布局，并支持颜色跟随曲目音符配色
+
 
 Splash => 溅射皮肤设置
 

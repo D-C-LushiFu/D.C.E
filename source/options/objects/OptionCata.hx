@@ -76,22 +76,11 @@ class OptionCata extends FlxSpriteGroup
 	}
 
 	var lastAdd:Option;
-	var shouldSame:Bool = false;
 	function posCheck(tar):Bool 
 	{
-		var output:Bool;
-
-		if (lastAdd != null && (lastAdd.type == TEXT || lastAdd.type == TITLE || lastAdd.type == INT || lastAdd.type == FLOAT || lastAdd.type == PERCENT)) {
-			output = false;
-		} else if (tar.type == TEXT || tar.type == TITLE || tar.type == INT || tar.type == FLOAT || tar.type == PERCENT){
-			output = false;
-		} else {
-			output = !lastAdd.sameY;
-		}
-
+		// 每项都占满自己的一行，避免原来的自动单双列造成左右错列。
 		lastAdd = tar;
-		
-		return output;
+		return false;
 	}
 
 	override function update(elapsed:Float)
@@ -100,6 +89,19 @@ class OptionCata extends FlxSpriteGroup
 		mainY = this.y;
 		bg.mainX = mainX;
 		bg.mainY = mainY;
+
+		// Rows follow both slanted panel edges: their left position tracks rowY while
+		// the shared width stays constant, keeping card backgrounds and controls aligned.
+		var state = OptionsState.instance;
+		var areaX:Float = state.contentAreaX();
+		for (option in optionArray)
+		{
+			if (option.type == TITLE) continue;
+			var rowY:Float = this.y + option.innerY + option.yOff;
+			var rowX:Float = state.contentRowX(rowY);
+			option.innerX = option.layoutBaseX + rowX - areaX;
+			option.x = this.x + option.innerX + option.xOff;
+		}
 
 		super.update(elapsed);
 
@@ -184,6 +186,22 @@ class OptionCata extends FlxSpriteGroup
 		heightSetOffset += outputData;
 
 		changeHeight(time);
+		OptionsState.instance.cataMoveChange();
+	}
+
+	/** Clear dropdown-only row offsets synchronously when leaving this category. */
+	public function resetDropdownLayout():Void
+	{
+		for (option in optionArray)
+		{
+			if (option.yTween != null) option.yTween.cancel();
+			option.yTween = null;
+			option.yOff = 0;
+			option.waitYOff = 0;
+			option.y = this.y + option.innerY;
+		}
+		heightSetOffset = 0;
+		changeHeight(0.001);
 		OptionsState.instance.cataMoveChange();
 	}
 

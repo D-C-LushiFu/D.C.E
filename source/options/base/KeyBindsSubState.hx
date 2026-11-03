@@ -193,6 +193,38 @@ class KeyBindsSubState extends MusicBeatSubstate
 	var isBinding:Bool = false;
 	var holdingTime:Float = 0;
 
+	/**
+	 * ★ 重置所有键位必须"按住"多久才生效（秒）。
+	 *
+	 * 以前这里是一按 RESET（默认 R）就 `ClientPrefs.resetKeys(false)`，把**全部**键盘键位
+	 * 恢复成编译默认值（4K 的 DFJK → ASKL 就是这么来的），而且离开本界面时会
+	 * `saveSettings()` 写进存档 —— 玩家在键位界面随手按一下 R 就再也回不去了。
+	 * 用户反馈的"键位莫名其妙被重置成默认"就是这条路径。
+	 *
+	 * 现在跟同界面的其它破坏性操作保持一致（长按 Backspace 0.5s 删键、长按 ESC 2s 撤回）：
+	 * 长按 RESET（移动端为 C 键）1.2 秒才重置，中途松手即取消，提示行会显示进度。
+	 */
+	static inline var RESET_HOLD_TIME:Float = 1.2;
+	var resetHoldTime:Float = 0;
+	/** 一次长按只重置一次；松手后才重新武装（防止一直按着反复清） */
+	var resetArmed:Bool = true;
+
+	/**
+	 * ★ 刚进入界面后的"宽限期"（秒）：这段时间内完全不累计重置长按。
+	 *
+	 * 为什么必须有它（用户反馈"没点 R 也被重置"的另一条路径）：
+	 * `controls.pressed('reset')` 读的是 **FlxG.keys 的全局状态**，而这个全局状态会被
+	 * 移动端虚拟按键**直接改写** —— `mobile.flixel.FlxTypedButton.handleInput()` 在按钮
+	 * 按下时会把 `IDs` 里对应的键写成 PRESSED，键位界面本身的虚拟摇杆（A/B = accept/back）
+	 * 就在改写同一份状态。因此"刚打开界面时 reset 键恰好已经是按下"完全可能发生，
+	 * 此时长按计数器从第一帧就开始跑，玩家一根手指都没碰 R，1.2 秒后键位就被清空了。
+	 *
+	 * 给一个短宽限期 + "必须松手才重新武装"，这条路径就彻底断掉：
+	 * 宽限期内按住不算数，要么松手重按，要么从一开始就别按。
+	 */
+	static inline var RESET_INPUT_GRACE:Float = 0.35;
+	var resetGrace:Float = RESET_INPUT_GRACE;
+
 	override function create()
 	{
 		// ★ 关键：子状态的 cameras 必须是主相机（FlxG.camera），不能是最后一个相机
@@ -282,7 +314,8 @@ class KeyBindsSubState extends MusicBeatSubstate
 		buildKeyboard();
 
 		// ===== Reset text =====
-		var resetLabel:String = tr('reset_to_default', 'controls', 'R-重置为默认按键', 'R-Reset to Default Keys');
+		// ★ 文案跟着行为走：现在是"长按"才重置（见 update 里的 RESET_HOLD_TIME）。
+		var resetLabel:String = tr('reset_to_default', 'controls', '长按 R 重置为默认按键', 'Hold R to Reset to Default Keys');
 		resetText = new FlxText(0, 0, FlxG.width, resetLabel, 14);
 		resetText.setFormat(getFontPath(), 14, FlxColor.GRAY, FlxTextAlign.CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		resetText.borderSize = 1.5;
@@ -405,7 +438,28 @@ class KeyBindsSubState extends MusicBeatSubstate
 		var up = controls.UI_UP_P;
 		var down = controls.UI_DOWN_P;
 		var back = controls.BACK;
-		var reset = controls.RESET || (virtualPad != null && virtualPad.buttonC.justPressed);
+		// ★ 按住检测（不是 justPressed）：长按 RESET / 移动端 C 才重置全部键位，
+		//   避免"随手按一下 R"就把用户所有键位清成默认值。
+		// ★ 再加两道防误触：
+		//   1) 虚拟摇杆只有在**真的显示且激活**时，它上面的 C 才算数 ——
+		//      桌面端 needMobileControl=false 时整个 pad 是 visible/active = false，
+		//      以前仍然读 buttonC.pressed（而且 buttonC 在别的 DPad/Action 组合下可能是 null），
+		//      属于"看不见的按钮也能清空键位"；
+		//   2) 进界面头 RESET_INPUT_GRACE 秒内不累计（见上面的字段注释）。
+		var padResetHeld:Bool = virtualPad != null
+			&& virtualPad.exists
+			&& virtualPad.active
+			&& virtualPad.visible
+			&& virtualPad.buttonC != null
+			&& virtualPad.buttonC.pressed;
+		var resetBinds:Array<FlxKey> = ClientPrefs.keyBinds.get('reset');
+		var resetBindingMissing:Bool = resetBinds == null || resetBinds.length == 0
+			|| (resetBinds[0] == FlxKey.NONE && (resetBinds.length < 2 || resetBinds[1] == FlxKey.NONE));
+		// Keep a physical recovery key when an empty/corrupt profile has erased RESET itself.
+		// Holding R still goes through the normal 1.2s confirmation below.
+		var keyResetHeld:Bool = !controls.controllerMode
+			&& (controls.pressed('reset') || (resetBindingMissing && FlxG.keys.pressed.R));
+		var resetHeld:Bool = padResetHeld || keyResetHeld;
 
 		if (isBinding)
 		{
@@ -413,12 +467,47 @@ class KeyBindsSubState extends MusicBeatSubstate
 			return;
 		}
 
-		// ===== Browsing mode =====
-		if (reset)
+		if (resetGrace > 0)
 		{
-			FlxG.sound.play(Paths.sound('cancelMenu'));
-			ClientPrefs.resetKeys(false);
-			updateView();
+			resetGrace -= elapsed;
+			resetHeld = false;
+			resetHoldTime = 0;
+		}
+
+		// ===== Browsing mode =====
+		if (resetHeld && resetArmed)
+		{
+			resetHoldTime += elapsed;
+			if (resetHoldTime >= RESET_HOLD_TIME)
+			{
+				resetHoldTime = 0;
+				// 一直按着不放不要反复清：必须松手再按才重新武装
+				resetArmed = false;
+				FlxG.sound.play(Paths.sound('cancelMenu'));
+				ClientPrefs.resetKeys(false);
+				ClientPrefs.reloadVolumeKeys();
+				// 重置后再给一次宽限期：避免"刚好还按着"在同一帧里重新开始计数
+				resetGrace = RESET_INPUT_GRACE;
+				updateView();
+			}
+			else
+			{
+				// 长按进度：写在这一行的提示上（松手会由下面的分支恢复成常规提示）
+				var percent:Int = Std.int(Math.min(100, Math.max(0, resetHoldTime / RESET_HOLD_TIME * 100)));
+				hintText.text = tr('keybinds_reset_holding', 'controls',
+					'继续按住 RESET 重置为默认按键… ' + percent + '%',
+					'Hold RESET to reset to default keys… ' + percent + '%');
+			}
+		}
+		else if (!resetHeld)
+		{
+			resetArmed = true;
+			if (resetHoldTime > 0)
+			{
+				// 松手（没按满）：什么都不做，恢复常规提示
+				resetHoldTime = 0;
+				updateView();
+			}
 		}
 
 		if (left || right)

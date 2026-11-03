@@ -57,6 +57,7 @@ class CreditsSubState extends MusicBeatSubstate
 	{
 		FlxG.mouse.visible = !ClientPrefs.data.needMobileControl;
 		persistentUpdate = true;
+
 		bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
 		bg.antialiasing = ClientPrefs.data.antialiasing;
 		add(bg);

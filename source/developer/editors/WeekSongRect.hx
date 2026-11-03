@@ -105,14 +105,14 @@ class WeekSongRect extends FlxSpriteGroup
 		icon.updateHitbox();
 		add(icon);
 
-		songName = new FlxText(0, 0, 0, songNameSt, 20);
+		songName = new EditorText(0, 0, 0, songNameSt, 20);
 		songName.setFormat(Paths.font(EditorInputStyle.langFontFileName()), Std.int(selectShow.height * 0.3), 0xFFFFFFFF, LEFT, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
 		songName.borderStyle = NONE;
 		songName.antialiasing = ClientPrefs.data.antialiasing;
 		songName.x += bg.height / 2 - icon.height / 2 + icon.width * 1.1;
 		add(songName);
 
-		musican = new FlxText(0, 0, 0, songMusican, 20);
+		musican = new EditorText(0, 0, 0, songMusican, 20);
 		musican.setFormat(Paths.font(EditorInputStyle.langFontFileName()), Std.int(selectShow.height * 0.2), 0xFFFFFFFF, LEFT, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
 		musican.borderStyle = NONE;
 		musican.antialiasing = ClientPrefs.data.antialiasing;

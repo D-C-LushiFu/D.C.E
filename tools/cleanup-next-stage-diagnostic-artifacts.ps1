@@ -25,7 +25,7 @@ $directoryTargets = @(
 
 $fileTargets = @(
     '_build\next-stage-mainmenu-diagnostics-180s-20260723\cpu-stacks.etl',
-    '_build\next-stage-mainmenu-diagnostics-180s-20260723\novaflare-symbols.map',
+    '_build\next-stage-mainmenu-diagnostics-180s-20260723\dce-symbols.map',
     '_build\next-stage-mainmenu-diagnostics-180s-20260723\symbol-layout.exe',
     '_build\next-stage-mainmenu-diagnostics-180s-20260723\symbol-link.rsp'
 )

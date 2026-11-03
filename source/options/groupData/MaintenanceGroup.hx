@@ -33,6 +33,22 @@ class MaintenanceGroup extends OptionCata
 		addOption(option);
 		#end
 
+		// Lua 语法错误提示：脚本报错要不要一条条铺在屏幕左上角。
+		// 默认关闭 —— 报错只写进日志（控制台/日志文件里照样查得到），屏幕不再被 mod 的
+		// 一堆 "image could not be loaded" 刷满；打开则回到以前的表现。
+		// ★ 只管脚本报错这一条通道（PlayState.addScriptErrorToDebug）；
+		//   debugPrint、luaTrace 和引擎自身的报错不受影响，始终显示。
+		var option:Option = new Option(this, 'luaErrorOverlay', BOOL);
+		addOption(option);
+
+		// HScript 语法错误提示：与上一条对称，各自独立、互不影响。
+		// ★ 先说清楚：HScript 脚本自身的报错（Iris.error / Iris.warn）**本来就不上屏** ——
+		//   走的是 Iris.logLevel → Sys.println + 开发者控制台 + 1145 trace 客户端。
+		//   这个开关管的是 HScriptBase 里那几处会铺到屏幕上的脚本报错
+		//   （runHaxeCode 执行抛错、addHaxeLibrary 解析失败）。
+		var option:Option = new Option(this, 'hscriptErrorOverlay', BOOL);
+		addOption(option);
+
 		// 调整移动端各 Editor 键位：开启后暂时隐藏所有默认 Editor 虚拟按键，
 		// 并打开外部窗口（本地 HTTP 页面）创建/删除/保存自定义按键。
 		var option:Option = new Option(this, 'adjustMobileEditorKeys', BOOL);
@@ -50,7 +66,8 @@ class MaintenanceGroup extends OptionCata
 		addOption(option);
 
 		#if android
-		var storageFolderArray:Array<String> = ['NovaFlare Engine', 'NovaFlare Engine-1.2'];
+		var storageFolderArray:Array<String> = [SUtil.DEFAULT_STORAGE_FOLDER, SUtil.VERSIONED_STORAGE_FOLDER];
+		ClientPrefs.data.storageFolder = SUtil.normalizeStorageFolder(ClientPrefs.data.storageFolder);
 		var option:Option = new Option(this, 'storageFolder', STRING, storageFolderArray);
 		option.onChange = onChangeStorageFolder;
 		addOption(option);
@@ -107,7 +124,7 @@ class MaintenanceGroup extends OptionCata
 		}
 		catch (error:Dynamic)
 		{
-			trace('[originFunkin] Could not save NovaFlare preferences before entering Origin Funkin: $error');
+			trace('[originFunkin] Could not save D.C.E. preferences before entering Origin Funkin: $error');
 		}
 		LimeSystem.exit(0);
 	}
@@ -120,7 +137,7 @@ class MaintenanceGroup extends OptionCata
 		ClientPrefs.saveSettings();
 		
 		// Write the config file for next startup
-		var configFile:String = AndroidEnvironment.getExternalStorageDirectory() + '/.novaflare_storage_config';
+		var configFile:String = SUtil.getStorageConfigPath();
 		try {
 			sys.io.File.saveContent(configFile, ClientPrefs.data.storageFolder);
 		} catch (e:Dynamic) {

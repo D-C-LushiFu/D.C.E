@@ -66,7 +66,7 @@ class MouseEvent extends FlxBasic
         if (tar == null) {
             if (!reportedNullOverlap) {
                 reportedNullOverlap = true;
-                trace('novagc:ui-null-overlap target=null');
+                trace('dcgc:ui-null-overlap target=null');
             }
             return false;
         }

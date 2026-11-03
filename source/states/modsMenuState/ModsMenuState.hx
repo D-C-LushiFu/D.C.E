@@ -1,6 +1,8 @@
 package states.modsMenuState;
 
 import flixel.graphics.FlxGraphic;
+import flixel.input.touch.FlxTouch;
+import flixel.math.FlxPoint;
 import flixel.math.FlxRect;
 import flixel.util.FlxSpriteUtil;
 
@@ -8,7 +10,11 @@ import general.shapeEx.Rect; // 设置界面 BoolButton 用的圆角矩形控件
 import general.objects.WindowControlBar;
 import general.objects.WindowBarMode;
 
-import options.base.ModSettingsSubState;
+import flixel.input.keyboard.FlxKey;
+import flixel.math.FlxMatrix;
+import openfl.display.BitmapData;
+import openfl.geom.Rectangle;
+import openfl.geom.Point;
 
 import states.mainMenuState.MainMenuState;
 import states.titleState.TitleState;
@@ -31,7 +37,10 @@ import states.freeplayState.FreeplayState;
  *  - pack 显示逻辑与原版完全一致（pack.png → pack-pixel.png → unknownMod.png，150px 切帧）。
  *
  * 保留的旧语义：`isFreePlay`、`waitingToRestart`、`modsList.txt` 读写、`Mods.currentModDirectory`、
- * 空列表每秒轮询、退出时 FlxG.resetGame()、设置按钮打开 ModSettingsSubState。
+ * 空列表每秒轮询、退出时 FlxG.resetGame()。
+ * 模组设置：点齿轮**不再弹出** ModSettingsSubState，而是整个菜单原地变形（2026-09-27）——
+ * 右侧详情整体上滚、左列表横向滚出只剩当前模组的卡片、卡片上移到标签栏位置（标签淡出），
+ * 然后设置项在卡片下方排开（可滚动），右侧显示所选设置项的详情 + 顶部的调整值控件。
  */
 class ModsMenuState extends MusicBeatState
 {
@@ -63,6 +72,87 @@ class ModsMenuState extends MusicBeatState
 		catch (e:Dynamic) {}
 	}
 
+	// ═══════════════ 指针：鼠标 + 触点统一入口 ═══════════════
+	/**
+	 * 为什么需要这一层：
+	 *  ① 引擎默认把鼠标光标藏起来（`ClientPrefs.needMobileControl` 默认就是 true，
+	 *     而 MainMenuState 里写的是 `FlxG.mouse.visible = !needMobileControl`）。
+	 *     老代码把 `FlxG.mouse.visible` 当命中开关（`var over = FlxG.mouse.visible && ...`），
+	 *     于是手机上（以及桌面开了"虚拟按键"时）**整个自绘界面都点不动** ——
+	 *     没有模组时最明显：满屏按钮一个都点不了（用户报的就是这个）。
+	 *  ② 移动端引擎自己的按钮走的是 `FlxG.touches`（见 source/mobile/flixel/FlxButton.hx），
+	 *     这里一并支持触点，不依赖 OpenFL 的 touch→mouse 合成。
+	 * 坐标统一取 `FlxG.camera` 的世界坐标：手机宽屏的黑边由 lime 缩放处理，
+	 * `gameX/gameY` 已经算进去了，和自绘界面用的 1280×720 舞台坐标一致。
+	 */
+	static var ptrP:FlxPoint = FlxPoint.get();
+	static var scratchRect:Rectangle = new Rectangle();
+	static var scratchPoint:Point = new Point();
+
+	/** 当前活动触点（按下 / 刚按下 / 刚抬起）；桌面返回 null */
+	static function activeTouch():FlxTouch
+	{
+		for (t in FlxG.touches.list)
+			if (t.pressed || t.justPressed || t.justReleased) return t;
+		return null;
+	}
+
+	public static function pointerPressed():Bool
+	{
+		var t = activeTouch();
+		if (t != null) return t.pressed;
+		return (FlxG.mouse != null) && FlxG.mouse.pressed;
+	}
+
+	public static function pointerJustPressed():Bool
+	{
+		var t = activeTouch();
+		if (t != null) return t.justPressed;
+		return (FlxG.mouse != null) && FlxG.mouse.justPressed;
+	}
+
+	public static function pointerJustReleased():Bool
+	{
+		var t = activeTouch();
+		if (t != null) return t.justReleased;
+		return (FlxG.mouse != null) && FlxG.mouse.justReleased;
+	}
+
+	public static function pointerX():Float
+	{
+		var t = activeTouch();
+		if (t != null) return t.getWorldPosition(FlxG.camera, ptrP).x;
+		return (FlxG.mouse != null) ? FlxG.mouse.viewX : 0;
+	}
+
+	public static function pointerY():Float
+	{
+		var t = activeTouch();
+		if (t != null) return t.getWorldPosition(FlxG.camera, ptrP).y;
+		return (FlxG.mouse != null) ? FlxG.mouse.viewY : 0;
+	}
+
+	/** 指针是否落在矩形内（所有悬停/命中判定统一走这里） */
+	public static function pointerOver(px:Float, py:Float, pw:Float, ph:Float):Bool
+	{
+		var t = activeTouch();
+		if (t != null)
+		{
+			var p = t.getWorldPosition(FlxG.camera, ptrP);
+			return p.x >= px && p.x < px + pw && p.y >= py && p.y < py + ph;
+		}
+		if (FlxG.mouse == null) return false;
+		// 没有光标时，"正在按 / 刚按下"也算命中（桌面关掉光标同样能用）
+		if (!FlxG.mouse.visible && !FlxG.mouse.pressed && !FlxG.mouse.justPressed) return false;
+		return FlxG.mouse.viewX >= px && FlxG.mouse.viewX < px + pw && FlxG.mouse.viewY >= py && FlxG.mouse.viewY < py + ph;
+	}
+
+	/** 滚轮（移动端没有滚轮 → 0） */
+	public static function pointerWheel():Int
+	{
+		return (FlxG.mouse != null) ? FlxG.mouse.wheel : 0;
+	}
+
 	// ═══════════════ 布局常量（1280×720，全部贴边） ═══════════════
 	public static inline var BAR_H:Int = 36;
 	public static inline var LEFT_W:Int = 384; // 30%
@@ -75,10 +165,20 @@ class ModsMenuState extends MusicBeatState
 	public static inline var RIGHT_W:Int = 1280 - LEFT_W; // 896
 	public static inline var DESC_BASE_Y:Int = BAR_H + 170; // 描述正文的基准 y
 
+	// ── 模组设置（内嵌视图）──
+	public static inline var SET_CARD_H:Int = 56; // 左侧卡片高度（复用列表行的视觉比例）
+	public static inline var OPT_H:Int = 34; // 设置项行高
+	public static inline var OPT_HEAD_H:Int = 30; // 分组标题行高
+	public static inline var OPT_TOP:Int = BAR_H + 64; // 100：卡片下方选项列表的起始 y
+	public static inline var OPT_VIEW_H:Int = 720 - OPT_TOP - FOOT_H; // 选项列表可视高度
+	public static inline var SET_WY:Int = BAR_H + 64; // 右侧"调整值"控件空间的 y
+	public static inline var SET_DESC_Y:Int = BAR_H + 128; // 右侧描述正文的基准 y
+
 	// 交互常量
 	static inline var LONG_PRESS:Float = 1.0; // 长按判定（秒）
 	static inline var SCROLL_TOL:Float = 18; // 先移动超过这个距离 = 拖动列表滚动（不再长按）
 	public static inline var MARQ_SPEED:Float = 32; // 走马灯速度 px/s（对齐 CharacterEditorMenuBar）
+	public static inline var MARQ_GAP:Int = 48; // 循环衔接处的透明间隔
 	public static inline var MARQ_HOLD:Float = 0.9; // 走马灯起点停留秒数
 	public static inline var MARQ_END_HOLD:Float = 0.9; // 滑到底后的停留秒数
 
@@ -87,7 +187,7 @@ class ModsMenuState extends MusicBeatState
 	static inline var SB_PAD:Int = 3; // 距列表右边缘
 	static inline var SB_MIN:Float = 36; // 滑块最小高度
 
-	// 颜色（NovaFlare 深色规范）
+	// 颜色（D.C.E. 深色规范）
 	public static inline var C_TEXT:FlxColor = 0xFFEDEFF7;
 	public static inline var C_DIM:FlxColor = 0xFF9BA1B8;
 	public static inline var C_HINT:FlxColor = 0xFF6F7690;
@@ -97,8 +197,9 @@ class ModsMenuState extends MusicBeatState
 	public static inline var C_DANGER:FlxColor = 0xFFEF4444;
 	static inline var C_PANEL:FlxColor = 0x66090A0F;
 	static inline var C_BAR:FlxColor = 0xF20E0F15;
-	public static inline var C_ROW_BG:FlxColor = 0x08FFFFFF;
-	public static inline var C_ROW_SEL:FlxColor = 0x33FFFFFF;
+	// 行底色：白底靠 alpha 控制深浅（选中 ~0.20 / 未选中 ~0.03）
+	public static inline var ROW_BG_A:Float = 0.03;
+	public static inline var ROW_SEL_A:Float = 0.20;
 
 	// ═══════════════ 数据 ═══════════════
 	var modsList:ModsList = null;
@@ -160,13 +261,19 @@ class ModsMenuState extends MusicBeatState
 	var searchPlaceholder:FlxText = null;
 	var hintTxt:FlxText;
 	var hintDefault:String = '';
+	var lastHintW:Float = 200;
 	var lastBarW:Int = -1;
 
 	// 左栏
 	var tabOn:TabButton = null;
 	var tabOff:TabButton = null;
 	var tabLine:FlxSprite;
+	var tabBottom:FlxSprite;
 	var listBg:FlxSprite;
+	var listDiv:FlxSprite;
+	var footTop:FlxSprite;
+	/** 空状态（没有任何模组）：常规界面整片收起，只留空状态卡片 */
+	var emptyMode:Bool = false;
 	var dropLine:FlxSprite;
 	var filterEmptyTxt:FlxText;
 	var footReload:FlatButton = null;
@@ -175,6 +282,7 @@ class ModsMenuState extends MusicBeatState
 
 	// 右栏
 	var detailBg:FlxSprite;
+	var detailLine:FlxSprite;
 	var dIcon:FlxSprite;
 	var dName:FlxText; // 23px（对齐原型 #dName），原先误用 Alphabet → 字体过大
 	var dMetaTxt:FlxText;
@@ -182,8 +290,9 @@ class ModsMenuState extends MusicBeatState
 	var dBadgeBg:FlxSprite;
 	var dToggle:SwitchButton = null;
 	var dDescLabel:FlxText;
-	var dDesc:FlxText;
-	var dDescClip:FlxRect = null;
+	var dDesc:FlxSprite; // 固定窗口位图（内容由 dDescContent blit 进来）
+	var dDescGen:SharpText; // 超采样光栅源
+	var dDescContent:BitmapData; // 完整描述位图（1:1）
 	var descScrollY:Float = 0;
 	var descMaxScroll:Float = 0;
 	var descDragging:Bool = false;
@@ -217,6 +326,53 @@ class ModsMenuState extends MusicBeatState
 	public var allButtons:Array<FlatButton> = [];
 	var bgColorTween:FlxTween = null;
 
+	// ═══════════════ 模组设置（内嵌视图） ═══════════════
+	var settingsMode:Bool = false; // 当前处于模组设置视图
+	var setAnim:Bool = false; // 进出场动画进行中（屏蔽交互）
+	var setReady:Bool = false; // 进入动画完成，设置 UI 可交互
+	var setMod:ModRow = null; // 正在设置的模组
+	var setFolder:String = '';
+	var saveMap:Map<String, Dynamic> = null; // FlxG.save.data.modSettings[folder] 的工作副本
+	var setOpts:Array<SettOpt> = []; // 解析后的设置项
+	var optSel:Int = -1; // 当前选中的设置项（setOpts 下标，标题行不可选）
+	var optScrollY:Float = 0;
+	var setContentH:Float = 0;
+	var capturing:Bool = false; // keybind 抓键中
+	var setQuery:String = ''; // 设置视图的搜索词（小写）
+	// 左侧卡片（camHUD）
+	var cardBg:FlxSprite;
+	var cardIcon:FlxSprite;
+	var cardName:FlxText;
+	var cardFolder:FlxText;
+	// 左侧选项列表（setCam）+ 滚动条（camTop）
+	var setCam:FlxCamera;
+	var sTrack:FlxSprite;
+	var sThumb:FlxSprite;
+	var sThumbH:Float = SB_MIN;
+	var sDrag:Bool = false;
+	var sDragOfs:Float = 0;
+	var optDragging:Bool = false;
+	var optDragBase:Float = 0;
+	var optDragY:Float = 0;
+	var optMoved:Bool = false;
+	// 右侧设置详情（camHUD）
+	var setTitleTxt:FlxText;
+	var wVal:FlxText;
+	var wPrev:FlatButton;
+	var wNext:FlatButton;
+	var wKey:FlatButton;
+	var tog:SettToggle = null;
+	var sDesc:FlxSprite; // 固定窗口位图
+	var sDescGen:SharpText; // 超采样光栅源
+	var sDescContent:BitmapData; // 完整描述位图（1:1）
+	var setDescScrollY:Float = 0;
+	var setDescMax:Float = 0;
+	var setDescDragging:Bool = false;
+	var setDescDragY:Float = 0;
+	var backBtn:FlatButton = null;
+	/** 进场时记录的右侧详情元素原始 y（退场时逐个落回） */
+	var detailSavedY:Array<{o:Dynamic, base:Float}> = [];
+
 	public function new(startMod:String = null)
 	{
 		this.startMod = startMod;
@@ -231,6 +387,8 @@ class ModsMenuState extends MusicBeatState
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
 		persistentUpdate = false;
+		// 文字清晰化不再走 FlxText.renderScale（InitState A/B 与实测都有重影/错位），
+		// 改为每个文字 fmtSharp()：1.5 倍光栅 + 精灵缩回，见 TXT_SS 注释。
 
 		modsList = Mods.parseList();
 		Mods.currentModDirectory = modsList.all[0] != null ? modsList.all[0] : '';
@@ -257,6 +415,11 @@ class ModsMenuState extends MusicBeatState
 		listCam.bgColor.alpha = 0;
 		FlxG.cameras.add(listCam, false);
 
+		// 模组设置选项列表专用相机：视口从卡片下方开始（列表行横向滚出时不会穿帮到设置行）
+		setCam = new FlxCamera(0, OPT_TOP, LEFT_W, OPT_VIEW_H);
+		setCam.bgColor.alpha = 0;
+		FlxG.cameras.add(setCam, false);
+
 		// 顶层相机（在 listCam 之后加入 → 永远画在列表之上）：
 		// 滚动条、长按提示气泡、确认框、toast 都放这里，否则会被列表行盖住
 		camTop = new FlxCamera();
@@ -270,6 +433,7 @@ class ModsMenuState extends MusicBeatState
 		buildEmptyState();
 		buildConfirmOverlay();
 		buildToast();
+		buildSettingsPanel();
 
 		// 插入指示线要在列表行之上（同一相机内后加 = 后画）
 		remove(dropLine, false);
@@ -298,6 +462,24 @@ class ModsMenuState extends MusicBeatState
 		dbg('  buttons=' + allButtons.length + ' tools=' + tools.length);
 	}
 
+	#if NF_LEAK_PROBE
+	/**
+	 * 内存泄漏自动化测试入口（LeakHarness 的 mods 模式调用）。
+	 * 复刻用户上报的完整流程：全部启用/禁用 → 等落定 → 🏠 确认弹窗 → "重启游戏"。
+	 * 只在 `-D NF_LEAK_PROBE` 构建里存在。
+	 */
+	public function debugToggleAllAndRestart(enableAll:Bool):Void
+	{
+		dbg('[LeakTest] debugToggleAllAndRestart enableAll=' + enableAll);
+		setAll(enableAll);
+		new FlxTimer().start(4, function(_)
+		{
+			showConfirm();
+			new FlxTimer().start(1, function(_) doRestartNow());
+		});
+	}
+	#end
+
 	// ══════════════════════════════════════════════════════════════════════
 	// 构建：窗口条
 	// ══════════════════════════════════════════════════════════════════════
@@ -319,12 +501,27 @@ class ModsMenuState extends MusicBeatState
 			tools.push(b);
 		}
 
-		btnFolder = new FlatButton(0, 5, Language.get('openFolderShort', 'mods'), function() openModsFolder());
+		// 顶栏右侧两颗按钮的语义随视图切换：
+		//   常规视图：[打开外部mods]（退出按钮多余 —— 顶栏 🏠 本身就回主菜单）
+		//   设置视图：[退出mods设置] [不保存设置退出mods界面]
+		btnFolder = new FlatButton(0, 5, Language.get('openFolderShort', 'mods'), function()
+		{
+			if (settingsMode) exitSettings();
+			else openModsFolder();
+		});
 		btnFolder.dbgName = 'bar:folder';
 		btnFolder.addTo(this, camHUD);
-		btnExit = new FlatButton(0, 5, Language.get('exitListShort', 'mods'), function() exitMenu());
+		btnExit = new FlatButton(0, 5, Language.get('exitListShort', 'mods'), function()
+		{
+			if (settingsMode)
+			{
+				exitSettingsNoSave();
+			}
+			else exitMenu();
+		});
 		btnExit.dbgName = 'bar:exit';
 		btnExit.addTo(this, camHUD);
+		btnExit.setVisible(false); // 常规视图不需要它（🏠 可回主菜单）
 
 		// 搜索框（引擎自绘 PsychUIInputText —— 与选歌界面同一个控件）
 		searchBg = FlxSpriteUtil.drawRoundRect(new FlxSprite(0, 5).makeGraphic(196, 26, FlxColor.TRANSPARENT), 0, 0, 196, 26, 7, 7, 0xFF06070B);
@@ -342,6 +539,15 @@ class ModsMenuState extends MusicBeatState
 		{
 			query = (cur == null) ? '' : cur;
 			if (searchPlaceholder != null) searchPlaceholder.visible = (query.length < 1);
+			if (settingsMode)
+			{
+				// 设置视图：搜索框过滤的是设置项
+				setQuery = query.toLowerCase();
+				optScrollY = 0;
+				setCam.scroll.y = 0;
+				applyOptFilter();
+				return;
+			}
 			scrollY = 0;
 			var vis = visibleIndices();
 			if (vis.length > 0 && vis.indexOf(sel) < 0) sel = vis[0];
@@ -356,13 +562,13 @@ class ModsMenuState extends MusicBeatState
 		searchBox.scrollFactor.set();
 		add(searchBox);
 
-		searchPlaceholder = new FlxText(0, 12, 0, Language.get('search', 'mods'), 12);
-		searchPlaceholder.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 12, C_HINT);
+		searchPlaceholder = new SharpText(0, 12, 0, Language.get('search', 'mods'), 12);
+		fmtSharp(searchPlaceholder, 12, C_HINT);
 		addHud(searchPlaceholder);
 
 		hintDefault = Language.get('hintBar', 'mods');
-		hintTxt = new FlxText(288, 11, 400, hintDefault, 11);
-		hintTxt.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 11, C_HINT);
+		hintTxt = new SharpText(288, 11, 400, hintDefault, 11);
+		fmtSharp(hintTxt, 11, C_HINT);
 		addHud(hintTxt);
 
 		// 引擎自绘窗口条（CONSTANT：分隔线 + 图标标题 + [恢复默认][−][□][×]）
@@ -405,15 +611,32 @@ class ModsMenuState extends MusicBeatState
 		if (right > w - 300) right = w - 300;
 		if (right < 640) right = 640;
 
-		btnExit.setX(right - btnExit.w);
-		btnFolder.setX(btnExit.x - 8 - btnFolder.w);
+		if (settingsMode)
+		{
+			btnExit.setX(right - btnExit.w);
+			btnFolder.setX(btnExit.x - 8 - btnFolder.w);
+		}
+		else
+		{
+			btnFolder.setX(right - btnFolder.w);
+		}
+		// 设置视图的【返回】按钮：跟着右上角按钮组走（搜索框左边；searchBg.x 在下一行才更新）
+		if (backBtn != null) backBtn.setX(btnFolder.x - 8 - 196 - 8 - backBtn.w);
 		searchBg.x = btnFolder.x - 8 - 196;
 		searchBox.x = searchBg.x + 10;
 		searchPlaceholder.x = searchBg.x + 10;
-		hintTxt.x = 288;
+		// ★ 应用户要求：9 个工具按钮组与提示文案互换位置——提示文案贴左、按钮组靠右（紧挨搜索框左侧）
+		var toolsStart:Float = searchBg.x - 16 - tools.length * 29;
+		if (toolsStart < 150) toolsStart = 150;
+		for (i in 0...tools.length)
+			tools[i].setPosXY(toolsStart + i * 29, 5);
+		hintTxt.x = 96; // too narrow on 1280 - hover tooltip covers it // 左上角是 FPS 显示的地盘，提示文案从它右侧起步
+		hintTxt.y = 11;
 		// ★ 提示栏宽度按实际可用空间给：太窄就换短文案，绝不让文字被裁断
-		var avail:Float = Math.max(100, searchBg.x - 300);
-		hintTxt.fieldWidth = avail;
+		var avail:Float = Math.max(100, toolsStart - 12 - 16);
+		sharpFieldW(hintTxt, avail);
+		hintTxt.visible = avail >= 140; // 1280 宽下顶栏塞不下常驻提示，靠悬停浮动提示
+		lastHintW = avail;
 		hintTxt.text = hintFor(avail);
 	}
 
@@ -444,12 +667,12 @@ class ModsMenuState extends MusicBeatState
 		listBg = new FlxSprite(0, BAR_H).makeGraphic(LEFT_W, 720 - BAR_H - FOOT_H, 0x55101319);
 		addHud(listBg);
 
-		var div = new FlxSprite(LEFT_W - 1, BAR_H).makeGraphic(1, 720 - BAR_H, 0x22FFFFFF);
-		addHud(div);
+		listDiv = new FlxSprite(LEFT_W - 1, BAR_H).makeGraphic(1, 720 - BAR_H, 0x22FFFFFF);
+		addHud(listDiv);
 
 		// 筛选/搜索后没有可见行时的占位文案
-		filterEmptyTxt = new FlxText(0, LIST_TOP + 40, LEFT_W, Language.get('filterNone', 'mods'), 12);
-		filterEmptyTxt.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 12, C_HINT, CENTER);
+		filterEmptyTxt = new SharpText(0, LIST_TOP + 40, LEFT_W, Language.get('filterNone', 'mods'), 12);
+		fmtSharp(filterEmptyTxt, 12, C_HINT, CENTER);
 		addHud(filterEmptyTxt);
 		filterEmptyTxt.visible = false;
 
@@ -465,7 +688,7 @@ class ModsMenuState extends MusicBeatState
 		tabLine = new FlxSprite(0, BAR_H + TAB_H - 2).makeGraphic(Std.int(LEFT_W / 2), 2, C_ACCENT, true);
 		addHud(tabLine);
 
-		var tabBottom = new FlxSprite(0, BAR_H + TAB_H - 1).makeGraphic(LEFT_W, 1, 0x22FFFFFF, true);
+		tabBottom = new FlxSprite(0, BAR_H + TAB_H - 1).makeGraphic(LEFT_W, 1, 0x22FFFFFF, true);
 		addHud(tabBottom);
 
 		// 拖拽插入指示线（挂在列表相机里 → 随滚动一起移动；不能设 scrollFactor(0,0)，否则不跟滚）
@@ -492,8 +715,8 @@ class ModsMenuState extends MusicBeatState
 
 		// 光标旁提示气泡（原型 #pressHint）
 		pressHintBg = FlxSpriteUtil.drawRoundRect(new FlxSprite(0, 0).makeGraphic(1, 1, FlxColor.TRANSPARENT, true), 0, 0, 1, 1, 8, 8, 0xF208090D);
-		pressHintTxt = new FlxText(0, 0, 0, '', 11);
-		pressHintTxt.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 11, C_TEXT);
+		pressHintTxt = new SharpText(0, 0, 0, '', 11);
+		fmtSharp(pressHintTxt, 11, C_TEXT);
 		addTop(pressHintBg);
 		addTop(pressHintTxt);
 		pressHintBg.visible = pressHintTxt.visible = false;
@@ -518,7 +741,7 @@ class ModsMenuState extends MusicBeatState
 		footDisableAll.dbgName = 'foot:disableAll';
 		footDisableAll.addTo(this, camHUD);
 
-		var footTop = new FlxSprite(0, 720 - FOOT_H).makeGraphic(LEFT_W, 1, 0x22FFFFFF);
+		footTop = new FlxSprite(0, 720 - FOOT_H).makeGraphic(LEFT_W, 1, 0x22FFFFFF);
 		addHud(footTop);
 	}
 
@@ -534,22 +757,22 @@ class ModsMenuState extends MusicBeatState
 		dIcon.antialiasing = ClientPrefs.data.antialiasing;
 		addHud(dIcon);
 
-		dName = new FlxText(RIGHT_X + 136, BAR_H + 30, 0, "", 23);
-		dName.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 23, C_TEXT);
+		dName = new SharpText(RIGHT_X + 136, BAR_H + 30, 0, "", 23);
+		fmtSharp(dName, 23, C_TEXT);
 		dName.bold = true;
 		dName.wordWrap = false;
 		addHud(dName);
 
-		dMetaTxt = new FlxText(RIGHT_X + 136, BAR_H + 70, RIGHT_W - 200, "", 12);
-		dMetaTxt.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 12, C_DIM);
+		dMetaTxt = new SharpText(RIGHT_X + 136, BAR_H + 70, RIGHT_W - 200, "", 12);
+		fmtSharp(dMetaTxt, 12, C_DIM);
 		addHud(dMetaTxt);
 
 		dBadgeBg = new FlxSprite(RIGHT_X + 136, BAR_H + 92).makeGraphic(1, 24, 0x33FFFFFF);
 		dBadgeBg.visible = false;
 		addHud(dBadgeBg);
 
-		dBadgeTxt = new FlxText(RIGHT_X + 146, BAR_H + 96, 0, "", 12);
-		dBadgeTxt.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 12, C_TEXT);
+		dBadgeTxt = new SharpText(RIGHT_X + 146, BAR_H + 96, 0, "", 12);
+		fmtSharp(dBadgeTxt, 12, C_TEXT);
 		addHud(dBadgeTxt);
 
 		// 右上角【启用 / 禁用】：宽度自适应内容，右对齐到面板内边距
@@ -557,26 +780,28 @@ class ModsMenuState extends MusicBeatState
 		dToggle.addTo(this, camHUD);
 		dToggle.setRight(RIGHT_X + RIGHT_W - 24);
 
-		var line = new FlxSprite(RIGHT_X, BAR_H + 132).makeGraphic(RIGHT_W, 1, 0x22FFFFFF);
-		addHud(line);
+		detailLine = new FlxSprite(RIGHT_X, BAR_H + 132).makeGraphic(RIGHT_W, 1, 0x22FFFFFF);
+		addHud(detailLine);
 
-		dDescLabel = new FlxText(RIGHT_X + 20, BAR_H + 148, 0, Language.get('descLabel', 'mods'), 11);
-		dDescLabel.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 11, C_HINT);
+		dDescLabel = new SharpText(RIGHT_X + 20, BAR_H + 148, 0, Language.get('descLabel', 'mods'), 11);
+		fmtSharp(dDescLabel, 11, C_HINT);
 		addHud(dDescLabel);
 
-		dDesc = new FlxText(RIGHT_X + 20, DESC_BASE_Y, RIGHT_W - 56, "", 13);
-		dDesc.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 13, 0xFFD7DBE6);
-		dDesc.wordWrap = true;
+		dDescGen = new SharpText(RIGHT_X + 20, DESC_BASE_Y, RIGHT_W - 56, "", 13);
+		fmtSharp(dDescGen, 13, 0xFFD7DBE6);
+		dDescGen.wordWrap = true;
+		dDesc = new FlxSprite(RIGHT_X + 20, DESC_BASE_Y).makeGraphic(Std.int((RIGHT_W - 56) * TXT_SS), Std.int((720 - DESC_BASE_Y - 60) * TXT_SS), FlxColor.TRANSPARENT, true);
+		dDesc.scale.set(1 / TXT_SS, 1 / TXT_SS);
+		dDesc.origin.set(0, 0);
+		dDesc.offset.set(0, 0);
 		addHud(dDesc);
-		dDescClip = new FlxRect(0, 0, RIGHT_W - 56, 720 - DESC_BASE_Y - 60);
-		dDesc.clipRect = dDescClip;
 
-		restartHint = new FlxText(RIGHT_X + 20, 720 - 32, 0, Language.get('restartHint', 'mods'), 11);
-		restartHint.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 11, 0xFFF4C46B);
+		restartHint = new SharpText(RIGHT_X + 20, 720 - 32, 0, Language.get('restartHint', 'mods'), 11);
+		fmtSharp(restartHint, 11, 0xFFF4C46B);
 		addHud(restartHint);
 
-		footNote = new FlxText(RIGHT_X + RIGHT_W - 24, 720 - 32, 0, "", 11);
-		footNote.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 11, C_HINT);
+		footNote = new SharpText(RIGHT_X + RIGHT_W - 24, 720 - 32, 0, "", 11);
+		fmtSharp(footNote, 11, C_HINT);
 		addHud(footNote);
 	}
 
@@ -611,19 +836,19 @@ class ModsMenuState extends MusicBeatState
 		addHud(box);
 		emptyGfx.push(box);
 
-		emptyTitle = new FlxText(0, 360, 1280, Language.get('emptyTitle', 'mods'), 24);
-		emptyTitle.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 24, C_TEXT, CENTER);
+		emptyTitle = new SharpText(0, 360, 1280, Language.get('emptyTitle', 'mods'), 24);
+		fmtSharp(emptyTitle, 24, C_TEXT, CENTER);
 		addHud(emptyTitle);
 		emptyGfx.push(emptyTitle);
 
-		emptyBody = new FlxText(320, 398, 640, Language.get('emptyBody1', 'mods') + '  mods/  ' + Language.get('emptyBody2', 'mods'), 13);
-		emptyBody.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 13, C_DIM, CENTER);
+		emptyBody = new SharpText(320, 398, 640, Language.get('emptyBody1', 'mods') + '  mods/  ' + Language.get('emptyBody2', 'mods'), 13);
+		fmtSharp(emptyBody, 13, C_DIM, CENTER);
 		emptyBody.wordWrap = true;
 		addHud(emptyBody);
 		emptyGfx.push(emptyBody);
 
-		emptyEgg = new FlxText(0, 428, 1280, '', 13);
-		emptyEgg.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 13, 0xFFFF90DC, CENTER);
+		emptyEgg = new SharpText(0, 428, 1280, '', 13);
+		fmtSharp(emptyEgg, 13, 0xFFFF90DC, CENTER);
 		addHud(emptyEgg);
 		emptyGfx.push(emptyEgg);
 
@@ -636,8 +861,8 @@ class ModsMenuState extends MusicBeatState
 		emptyExitBtn.dbgName = 'empty:exit';
 		emptyExitBtn.addTo(this, camHUD);
 
-		emptyScan = new FlxText(0, 496, 1280, Language.get('scanning', 'mods'), 12);
-		emptyScan.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 12, C_HINT, CENTER);
+		emptyScan = new SharpText(0, 496, 1280, Language.get('scanning', 'mods'), 12);
+		fmtSharp(emptyScan, 12, C_HINT, CENTER);
 		addHud(emptyScan);
 		emptyGfx.push(emptyScan);
 
@@ -654,12 +879,12 @@ class ModsMenuState extends MusicBeatState
 		confirmBg.y = 360 - 105;
 		addTop(confirmBg);
 
-		confirmTitle = new FlxText(confirmBg.x, confirmBg.y + 26, 460, Language.get('exitTitle', 'mods'), 18);
-		confirmTitle.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 18, C_TEXT, CENTER);
+		confirmTitle = new SharpText(confirmBg.x, confirmBg.y + 26, 460, Language.get('exitTitle', 'mods'), 18);
+		fmtSharp(confirmTitle, 18, C_TEXT, CENTER);
 		addTop(confirmTitle);
 
-		confirmBody = new FlxText(confirmBg.x + 24, confirmBg.y + 66, 412, Language.get('exitBody', 'mods'), 12);
-		confirmBody.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 12, C_DIM, CENTER);
+		confirmBody = new SharpText(confirmBg.x + 24, confirmBg.y + 66, 412, Language.get('exitBody', 'mods'), 12);
+		fmtSharp(confirmBody, 12, C_DIM, CENTER);
 		confirmBody.wordWrap = true;
 		addTop(confirmBody);
 
@@ -681,8 +906,8 @@ class ModsMenuState extends MusicBeatState
 	{
 		toastBg = new FlxSprite(0, 0).makeGraphic(360, 32, FlxColor.TRANSPARENT, true);
 		addTop(toastBg);
-		toastTxt = new FlxText(0, 0, 360, '', 12);
-		toastTxt.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 12, C_TEXT, CENTER);
+		toastTxt = new SharpText(0, 0, 360, '', 12);
+		fmtSharp(toastTxt, 12, C_TEXT, CENTER);
 		addTop(toastTxt);
 		toastBg.visible = false;
 		toastTxt.visible = false;
@@ -746,6 +971,7 @@ class ModsMenuState extends MusicBeatState
 
 	function refreshTabs()
 	{
+		if (settingsMode) return; // 设置视图：标签已淡出，别动它们
 		var on = 0;
 		for (m in modsList.all) if (!modsList.disabled.contains(m)) on++;
 		var off = modsList.all.length - on;
@@ -753,7 +979,7 @@ class ModsMenuState extends MusicBeatState
 		tabOff.setCount(off);
 		tabOn.setActive(filter == 0);
 		tabOff.setActive(filter == 1);
-		tabLine.visible = (filter != 2);
+		tabLine.visible = (filter != 2) && !emptyMode;
 		tabLine.x = (filter == 1) ? LEFT_W / 2 : 0;
 		dbg('tabs on=' + on + ' off=' + off + ' filter=' + filter + ' underline=' + (tabLine.visible ? Std.int(tabLine.x) + '..' + Std.int(tabLine.x + tabLine.width) : 'hidden')
 			+ ' tabOn(count=' + on + ') tabOff(count=' + off + ')');
@@ -761,6 +987,7 @@ class ModsMenuState extends MusicBeatState
 
 	function refreshList()
 	{
+		if (settingsMode) return; // 设置视图：列表已滚出，行交给卡片接管
 		var y = 0.0;
 		for (i in 0...rows.length)
 		{
@@ -814,11 +1041,9 @@ class ModsMenuState extends MusicBeatState
 				+ ') thumb=(' + Std.int(sbThumb.x) + ',' + Std.int(ty) + ',' + SB_W + ',' + Std.int(th)
 				+ ') content=' + Std.int(content) + ' scrollY=' + Std.int(scrollY) + '/' + Std.int(maxScroll));
 		}
-		var hot = FlxG.mouse.visible
-			&& FlxG.mouse.viewX > sbTrack.x - 10
-			&& FlxG.mouse.viewX < sbTrack.x + SB_W + 10
-			&& FlxG.mouse.viewY >= sbTrack.y - 6
-			&& FlxG.mouse.viewY <= sbTrack.y + trackH + 6;
+		var px:Float = ModsMenuState.pointerX();
+		var py:Float = ModsMenuState.pointerY();
+		var hot = (px > sbTrack.x - 10 && px < sbTrack.x + SB_W + 10 && py >= sbTrack.y - 6 && py <= sbTrack.y + trackH + 6);
 		sbThumb.alpha = (hot || sbDrag) ? 1 : 0.72;
 		sbTrack.alpha = (hot || sbDrag) ? 1 : 0.75;
 	}
@@ -830,9 +1055,8 @@ class ModsMenuState extends MusicBeatState
 	function applyDescScroll()
 	{
 		descScrollY = Math.max(0, Math.min(descScrollY, descMaxScroll));
-		dDescClip.y = descScrollY;
-		dDesc.clipRect = dDescClip;
-		dDesc.y = DESC_BASE_Y - descScrollY;
+		blitWindow(dDesc.pixels, dDescContent, Std.int(descScrollY * TXT_SS), Std.int((RIGHT_W - 56) * TXT_SS),
+			Std.int((720 - DESC_BASE_Y - 60) * TXT_SS));
 	}
 	/** 光标旁的提示气泡（原型 #pressHint）：按住阶段 / 拖拽阶段两句文案 */
 	function showPressHint(mx:Float, my:Float, holding:Bool)
@@ -864,12 +1088,40 @@ class ModsMenuState extends MusicBeatState
 		pressHintBg.visible = false;
 	}
 
+	/** floating tooltip for the 9 tool buttons (reuses the pressHint bubble) */
+	function showToolTip(text:String)
+	{
+		if (pressHintTxt == null || pressIdx >= 0) return;
+		if (pressHintTxt.text != text)
+		{
+			pressHintTxt.text = text;
+			var pw = Std.int(pressHintTxt.width) + 20;
+			var ph = Std.int(pressHintTxt.height) + 10;
+			pressHintBg.makeGraphic(pw, ph, FlxColor.TRANSPARENT, true);
+			FlxSpriteUtil.drawRoundRect(pressHintBg, 0, 0, pw, ph, 8, 8, 0xF208090D);
+		}
+		var mx:Float = pointerX();
+		var my:Float = pointerY();
+		var px = Math.min(mx + 14, 1280 - pressHintBg.width - 6);
+		var py = my + 18;
+		if (py + pressHintBg.height > 716) py = my - pressHintBg.height - 10;
+		pressHintBg.x = px - 6;
+		pressHintBg.y = py - 4;
+		pressHintTxt.x = px + 4;
+		pressHintTxt.y = py + 1;
+		pressHintBg.visible = true;
+		pressHintTxt.visible = true;
+	}
+
 	function refreshDetail()
 	{
+		if (settingsMode) return; // 设置视图：右侧详情已整体上滚
 		if (rows.length < 1 || sel < 0 || sel >= rows.length)
 		{
 			dName.text = '';
-			dDesc.text = '';
+			dDescGen.text = '';
+			dDescContent = rasterizeBitmap(dDescGen);
+		applyDescScroll();
 			dMetaTxt.text = '';
 			dBadgeTxt.text = '';
 			dBadgeBg.visible = false;
@@ -902,22 +1154,20 @@ class ModsMenuState extends MusicBeatState
 
 		// 名称：23px（对齐原型 #dName），过长才缩字号，最小 15
 		var fontName:String = Paths.font(Language.get('fontName', 'main') + '.ttf');
-		dName.setFormat(fontName, 23, C_TEXT);
+		fmtSharp(dName, 23, C_TEXT);
 		dName.bold = true;
 		dName.text = m.name;
-		dName.updateHitbox();
 		var maxNameW:Float = RIGHT_W - 320;
 		if (dToggle != null) maxNameW = dToggle.left() - 16 - (RIGHT_X + 136); // 别撞上右上角的开关
 		if (maxNameW < 120) maxNameW = 120;
 		if (dName.width > maxNameW && dName.width > 0)
 		{
 			var s2:Int = Std.int(Math.max(15, 23 * (maxNameW / dName.width)));
-			dName.setFormat(fontName, s2, C_TEXT);
+			fmtSharp(dName, s2, C_TEXT);
 			dName.bold = true;
-			dName.updateHitbox();
 		}
 		dbg('detail sel=#' + pad2(sel + 1) + ' name="' + m.name + '" nameW=' + Std.int(dName.width) + ' nameH=' + Std.int(dName.height)
-			+ ' fontSize=' + Std.int(dName.size) + ' text="' + dDesc.text.substr(0, 24) + '"');
+			+ ' fontSize=' + Std.int(dName.size) + ' text="' + dDescGen.text.substr(0, 24) + '"');
 
 		dMetaTxt.text = Language.get('chipFolder', 'mods') + ': ' + m.folder
 			+ '    #' + pad2(sel + 1)
@@ -943,9 +1193,10 @@ class ModsMenuState extends MusicBeatState
 
 		if (dToggle != null) dToggle.setState(isEnabled(m));
 
-		dDesc.text = (m.desc != null && m.desc.length > 0) ? m.desc : Language.get('noDesc', 'mods');
-		dDesc.updateHitbox();
-		descMaxScroll = Math.max(0, dDesc.height - dDescClip.height);
+		dDescGen.text = (m.desc != null && m.desc.length > 0) ? m.desc : Language.get('noDesc', 'mods');
+		dDescContent = rasterizeBitmap(dDescGen);
+		// height 是视觉尺寸（帧 x scale），裁剪窗高度换算回视觉单位再相减
+		descMaxScroll = Math.max(0, Std.int(dDescContent.height / TXT_SS) - (720 - DESC_BASE_Y - 60));
 		applyDescScroll();
 
 		restartHint.visible = m.mustRestart;
@@ -968,7 +1219,7 @@ class ModsMenuState extends MusicBeatState
 	function refreshDirty()
 	{
 		hintTxt.color = (dirty > 0) ? 0xFFF4C46B : C_HINT;
-		hintTxt.text = hintFor(hintTxt.fieldWidth);
+		hintTxt.text = hintFor(lastHintW);
 	}
 
 	// ══════════════════════════════════════════════════════════════════════
@@ -1035,6 +1286,7 @@ class ModsMenuState extends MusicBeatState
 		}
 		dirty++;
 		waitingToRestart = true; // 与原版一致：任何开关都置位
+		saveTxt(); // ★ 立即落盘：顶栏 🏠 直接回主菜单也不会丢改动
 		FlxG.sound.play(Paths.sound('scrollMenu'), 0.6);
 		var vis = visibleIndices();
 		if (vis.length > 0 && vis.indexOf(sel) < 0) sel = vis[0];
@@ -1070,6 +1322,7 @@ class ModsMenuState extends MusicBeatState
 		{
 			dirty += changed;
 			waitingToRestart = true;
+			saveTxt(); // ★ 立即落盘
 			FlxG.sound.play(Paths.sound('scrollMenu'), 0.6);
 		}
 		var vis = visibleIndices();
@@ -1109,6 +1362,7 @@ class ModsMenuState extends MusicBeatState
 		sel = to;
 		dirty++;
 		waitingToRestart = true; // 与原版一致：排序也置位
+		saveTxt(); // ★ 立即落盘
 		FlxG.sound.play(Paths.sound('scrollMenu'), 0.6);
 		refreshList();
 		refreshDetail();
@@ -1133,8 +1387,935 @@ class ModsMenuState extends MusicBeatState
 		dbg('openModSettings sel=' + sel);
 		if (rows.length < 1 || sel < 0 || sel >= rows.length) return;
 		var m = rows[sel];
-		if (m.settings == null || m.settings.length < 1) return;
-		openSubState(new ModSettingsSubState(m.settings, m.folder, m.name));
+		if (m.settings == null || m.settings.length < 1)
+		{
+			showToast(Language.get('setNoneMod', 'mods'));
+			return;
+		}
+		enterSettings(m);
+	}
+
+	// ══════════════════════════════════════════════════════════════════════
+	// 模组设置（内嵌视图）：
+	//   点齿轮 → 右侧详情整体上滚 / 左列表横向滚出只剩当前模组 / 标签淡出 /
+	//   当前模组卡片上移到标签栏位置 → 设置项在卡片下方排开（可滚动），
+	//   右侧 = 所选项详情 + 顶部调整值控件。Esc / 返回按钮退回（反向动画）。
+	// ══════════════════════════════════════════════════════════════════════
+	function buildSettingsPanel()
+	{
+		var fontName:String = Paths.font(Language.get('fontName', 'main') + '.ttf');
+
+		// 返回按钮：设置模式下顶在右上角按钮组（左上角是 FPS 丈量地盘，不去凑热闹）
+		backBtn = new FlatButton(0, 5, Language.get('setBack', 'mods'), function() exitSettings());
+		backBtn.setSize(96, 26);
+		backBtn.dbgName = 'set:back';
+		backBtn.addTo(this, camHUD);
+		backBtn.setVisible(false);
+
+		// 左侧卡片（进场时从所选行的屏幕位置上移到标签栏位置）
+		cardBg = new FlxSprite(0, 0).makeGraphic(LEFT_W, SET_CARD_H, 0xFFFFFFFF, true);
+		cardBg.alpha = ROW_SEL_A;
+		addHud(cardBg);
+
+		cardIcon = new FlxSprite(12, 8);
+		cardIcon.antialiasing = ClientPrefs.data.antialiasing;
+		addHud(cardIcon);
+
+		cardName = new SharpText(64, 11, LEFT_W - 76, '', 13);
+		fmtSharp(cardName, 13, C_TEXT);
+		cardName.wordWrap = false;
+		addHud(cardName);
+
+		cardFolder = new SharpText(64, 32, LEFT_W - 76, '', 11);
+		fmtSharp(cardFolder, 11, C_HINT);
+		cardFolder.wordWrap = false;
+		addHud(cardFolder);
+		setCardVisible(false);
+
+		// 右侧：设置项名称 / 调整值空间 / 描述
+		setTitleTxt = new SharpText(RIGHT_X + 24, BAR_H + 20, RIGHT_W - 48, '', 20);
+		fmtSharp(setTitleTxt, 20, C_TEXT);
+		setTitleTxt.bold = true;
+		addHud(setTitleTxt);
+
+		wVal = new SharpText(RIGHT_X + 24, SET_WY + 8, RIGHT_W - 48, '', 14);
+		fmtSharp(wVal, 14, C_TEXT);
+		addHud(wVal);
+
+		sDescGen = new SharpText(RIGHT_X + 24, SET_DESC_Y, RIGHT_W - 48, '', 13);
+		fmtSharp(sDescGen, 13, 0xFFD7DBE6);
+		sDescGen.wordWrap = true;
+		sDesc = new FlxSprite(RIGHT_X + 24, SET_DESC_Y).makeGraphic(Std.int((RIGHT_W - 48) * TXT_SS), Std.int((720 - SET_DESC_Y - 48) * TXT_SS), FlxColor.TRANSPARENT, true);
+		sDesc.scale.set(1 / TXT_SS, 1 / TXT_SS);
+		sDesc.origin.set(0, 0);
+		sDesc.offset.set(0, 0);
+		addHud(sDesc);
+
+		// 调整值控件：◀ 值 ▶ / 开关 / 重设按键
+		wPrev = new FlatButton(0, SET_WY, '<', function() adjustOpt(curOptSel(), -1));
+		wPrev.setSize(44, 34);
+		wPrev.dbgName = 'set:prev';
+		wPrev.addTo(this, camHUD);
+		wPrev.setVisible(false);
+
+		wNext = new FlatButton(0, SET_WY, '>', function() adjustOpt(curOptSel(), 1));
+		wNext.setSize(44, 34);
+		wNext.dbgName = 'set:next';
+		wNext.addTo(this, camHUD);
+		wNext.setVisible(false);
+
+		wKey = new FlatButton(0, SET_WY, Language.get('setBindReset', 'mods'), function() startCapture());
+		wKey.setSize(110, 34);
+		wKey.dbgName = 'set:rebind';
+		wKey.addTo(this, camHUD);
+		wKey.setVisible(false);
+
+		tog = new SettToggle(RIGHT_X + 24, SET_WY + 2, function() adjustOpt(curOptSel(), 1));
+		tog.addTo(this, camHUD);
+		tog.setVisible(false);
+
+		// 选项列表滚动条（同列表滚动条样式，挂在 camTop）
+		sTrack = new FlxSprite(LEFT_W - SB_W - SB_PAD, OPT_TOP + 4).makeGraphic(SB_W, OPT_VIEW_H - 8, 0x14FFFFFF, true);
+		sTrack.alpha = 0.9;
+		addTop(sTrack);
+		sThumb = new FlxSprite(sTrack.x, sTrack.y).makeGraphic(SB_W, Std.int(SB_MIN), 0x4296B5FF, true);
+		sThumb.origin.set(0, 0); // ★ 归零 origin：绕中心缩放会让滑块溢出轨道
+		addTop(sThumb);
+		sTrack.visible = sThumb.visible = false;
+	}
+
+	function setCardVisible(v:Bool)
+	{
+		cardBg.visible = cardIcon.visible = cardName.visible = cardFolder.visible = v;
+	}
+
+	/** 卡片内容 = 当前模组（图标 / 名称 / 文件夹名，禁用态与列表行同色） */
+	function setCardContent(m:ModRow)
+	{
+		if (m.iconGraphic != null)
+		{
+			cardIcon.loadGraphic(m.iconGraphic, true, 150, 150);
+			cardIcon.antialiasing = m.iconAA && ClientPrefs.data.antialiasing;
+			cardIcon.scale.set(40 / 150, 40 / 150);
+			cardIcon.updateHitbox();
+			if (m.frames > 1)
+			{
+				cardIcon.animation.add('icon', [for (i in 0...m.frames) i], m.iconFps);
+				cardIcon.animation.play('icon');
+			}
+			else
+				cardIcon.animation.stop();
+		}
+		cardName.text = m.name;
+		cardFolder.text = m.folder;
+		var en = isEnabled(m);
+		cardName.color = en ? C_TEXT : 0xFF8A8F9E;
+		cardFolder.color = en ? C_HINT : 0xFF6A6E7C;
+		cardIcon.color = en ? FlxColor.WHITE : 0xFFFF6666;
+	}
+
+	/** 读取 FlxG.save.data.modSettings[folder] + 把 settings.json 解析成运行时选项 */
+	function loadSettingsData(m:ModRow)
+	{
+		setFolder = m.folder;
+		if (FlxG.save.data.modSettings == null) FlxG.save.data.modSettings = new Map<String, Dynamic>();
+		saveMap = new Map<String, Dynamic>();
+		var raw:Dynamic = cast(FlxG.save.data.modSettings, Map<String, Dynamic>)[setFolder];
+		if (raw != null)
+		{
+			try
+			{
+				var cm:Map<String, Dynamic> = cast raw;
+				for (k in cm.keys())
+					saveMap.set(k, cm.get(k));
+			}
+			catch (e:Dynamic) {}
+		}
+
+		setOpts = [];
+		for (option in m.settings)
+		{
+			var o = new SettOpt();
+			o.saveKey = option.save;
+			o.name = (option.name != null) ? Std.string(option.name) : Std.string(option.save);
+			o.desc = (option.description != null) ? Std.string(option.description) : '';
+
+			var t:String = (option.type != null ? Std.string(option.type) : 'bool').toLowerCase().trim();
+			if (t == 'key' || t == 'keybind') t = 'keybind';
+			else if (t == 'integer') t = 'int';
+			else if (t == 'str') t = 'string';
+			else if (t == 'fl') t = 'float';
+			else if (t != 'bool' && t != 'int' && t != 'float' && t != 'percent' && t != 'string') t = 'bool';
+			o.type = t;
+
+			if (option.format != null) o.format = Std.string(option.format);
+			if (option.scroll != null) o.scrollSpeed = option.scroll;
+
+			switch (t)
+			{
+				case 'string':
+					o.options = (option.options != null) ? (option.options : Array<String>) : [];
+					// 单值 string 只在【没有描述】时才算分组标题；
+					// Toolbox 的 Notice 项就是"单值 string + 长描述"，必须能选中查看描述
+					o.isHeader = o.options.length < 2 && (o.desc == null || o.desc.length < 1);
+					o.def = (option.value != null) ? option.value : (o.options.length > 0 ? o.options[0] : '');
+					var v = saveMap.get(o.saveKey);
+					o.value = (v != null) ? v : o.def;
+					o.curIdx = o.options.indexOf(o.value);
+					if (o.curIdx < 0) o.curIdx = 0;
+					o.decimals = 0;
+				case 'keybind':
+					var v = saveMap.get(o.saveKey);
+					if (v != null && v.keyboard != null)
+						o.keys = {keyboard: v.keyboard, gamepad: (v.gamepad != null ? v.gamepad : 'NONE')};
+					else
+						o.keys = {keyboard: (option.keyboard != null ? Std.string(option.keyboard) : 'NONE'),
+							gamepad: (option.gamepad != null ? Std.string(option.gamepad) : 'NONE')};
+					o.value = o.keys.keyboard;
+					saveMap.set(o.saveKey, o.keys);
+					o.decimals = 0;
+				case 'bool':
+					o.def = (option.value != null) ? option.value : false;
+					var v = saveMap.get(o.saveKey);
+					o.value = (v != null) ? v : o.def;
+					o.decimals = 0;
+				case 'percent':
+					if (option.format == null) o.format = '%v%';
+					o.min = (option.min != null) ? option.min : 0;
+					o.max = (option.max != null) ? option.max : 1;
+					o.step = (option.step != null) ? option.step : 0.01;
+					o.decimals = (option.decimals != null) ? Std.int(option.decimals) : 2;
+					o.def = (option.value != null) ? option.value : 1;
+					var v = saveMap.get(o.saveKey);
+					o.value = (v != null) ? v : o.def;
+				default: // int / float
+					if (option.min != null) o.min = option.min;
+					if (option.max != null) o.max = option.max;
+					if (option.step != null) o.step = option.step;
+					o.decimals = (option.decimals != null) ? Std.int(option.decimals) : (t == 'int' ? 0 : 1);
+					o.def = (option.value != null) ? option.value : 0;
+					var v = saveMap.get(o.saveKey);
+					o.value = (v != null) ? v : o.def;
+			}
+			if (t != 'keybind') saveMap.set(o.saveKey, o.value);
+			setOpts.push(o);
+		}
+	}
+
+	/** 构建（重建）左侧选项行（setCam 世界坐标：y = uiY，相机滚动负责可视窗口） */
+	function buildSettingsOptions()
+	{
+		// 上一模组的行先清掉（remove + kill，绝不 destroy —— 共享 FlxFrame 的教训）
+		for (o in setOpts)
+		{
+			if (o.rowBg != null) remove(o.rowBg, true);
+			if (o.nameTxt != null) remove(o.nameTxt, true);
+			if (o.valTxt != null) remove(o.valTxt, true);
+			o.rowBg = null;
+			o.nameTxt = null;
+			o.valTxt = null;
+		}
+
+		var fontName:String = Paths.font(Language.get('fontName', 'main') + '.ttf');
+		var y:Float = 8;
+		for (o in setOpts)
+		{
+			o.uiY = y;
+			if (o.isHeader)
+			{
+				o.nameTxt = new SharpText(12, y + 6, LEFT_W - 24, flatName(o.name), 12);
+				fmtSharp(o.nameTxt, 12, C_DIM);
+				o.nameTxt.bold = true;
+				o.nameTxt.cameras = [setCam];
+				add(o.nameTxt);
+				y += OPT_HEAD_H;
+			}
+			else
+			{
+				o.rowBg = new FlxSprite(0, y).makeGraphic(LEFT_W, OPT_H, 0xFFFFFFFF, true);
+				o.rowBg.alpha = ROW_BG_A;
+				o.rowBg.cameras = [setCam];
+				add(o.rowBg);
+
+				o.nameTxt = new SharpText(12, y + 8, LEFT_W - 150, flatName(o.name), 12);
+				fmtSharp(o.nameTxt, 12, C_TEXT);
+				o.nameTxt.wordWrap = false;
+				o.nameTxt.cameras = [setCam];
+				add(o.nameTxt);
+
+				o.valTxt = new SharpText(12, y + 9, LEFT_W - 24, '', 11);
+				fmtSharp(o.valTxt, 11, C_ACCENT, RIGHT);
+				o.valTxt.cameras = [setCam];
+				add(o.valTxt);
+				y += OPT_H;
+			}
+		}
+		setContentH = y + 8;
+	}
+
+	function flatName(s:String):String
+	{
+		return (s == null) ? '' : s.split('\n').join(' ');
+	}
+
+	// ── 进入 / 退出 ──
+	function enterSettings(m:ModRow)
+	{
+		if (settingsMode || setAnim) return;
+		settingsMode = true;
+		setAnim = true;
+		setReady = false;
+		setMod = m;
+		optSel = -1;
+		optScrollY = 0;
+		capturing = false;
+		loadSettingsData(m);
+		buildSettingsOptions();
+		FlxG.sound.play(Paths.sound('scrollMenu'), 0.6);
+		dbg('enterSettings folder=' + m.folder + ' opts=' + setOpts.length);
+
+		// ① 左列表（含除当前行外的所有卡片）整体横向滚出视野
+		FlxTween.tween(listCam.scroll, {x: -(LEFT_W + 60)}, 0.45, {ease: FlxEase.quadIn});
+		rows[sel].setVisible(false); // 当前行由"卡片"接管
+
+		// ② 卡片从行的屏幕位置上移到标签栏位置
+		var visIdx = visibleIndices().indexOf(sel);
+		var rowScreenY:Float = LIST_TOP + (visIdx < 0 ? 0 : visIdx) * ROW_H - scrollY;
+		cardBg.setPosition(0, rowScreenY);
+		cardIcon.x = 12;
+		cardIcon.y = rowScreenY + 8;
+		cardName.x = cardFolder.x = 64;
+		cardName.y = rowScreenY + 11;
+		cardFolder.y = rowScreenY + 32;
+		setCardContent(m);
+		setCardVisible(true);
+		FlxTween.tween(cardBg, {y: BAR_H}, 0.45, {ease: FlxEase.quadOut});
+		FlxTween.tween(cardIcon, {y: BAR_H + 8}, 0.45, {ease: FlxEase.quadOut});
+		FlxTween.tween(cardName, {y: BAR_H + 11}, 0.45, {ease: FlxEase.quadOut});
+		FlxTween.tween(cardFolder, {y: BAR_H + 32}, 0.45, {ease: FlxEase.quadOut});
+
+		// ③ 已启用/已禁用 标签透明度归零
+		fadeTabs(0, 0.35);
+		sbTrack.visible = sbThumb.visible = false;
+
+		// ④ 右侧详情页整体上滚（记录原始 y，退场时逐个落回）
+		detailSavedY = [];
+		var contents:Array<FlxSprite> = [dIcon, dName, dMetaTxt, dBadgeBg, dBadgeTxt, detailLine, dDescLabel, dDesc, restartHint, footNote];
+		for (s in contents)
+		{
+			detailSavedY.push({o: s, base: s.y});
+			FlxTween.tween(s, {y: s.y - 820}, 0.4, {ease: FlxEase.quadIn});
+		}
+		for (s in dToggle.contentSprites())
+		{
+			detailSavedY.push({o: s, base: s.y});
+			FlxTween.tween(s, {y: s.y - 820}, 0.4, {ease: FlxEase.quadIn});
+		}
+
+		// ⑤ 常规控件让位
+		for (t in tools)
+			t.setVisible(false);
+		footReload.setVisible(false);
+		footEnableAll.setVisible(false);
+		footDisableAll.setVisible(false);
+		filterEmptyTxt.visible = false;
+		backBtn.setVisible(true);
+		hidePressHint(); // 悬浮的工具提示不能带进设置视图
+
+		// 顶栏切换到设置语义：[退出mods设置] [不保存设置退出mods界面] [搜索设置项]
+		btnFolder.setText(Language.get('setExitSettings', 'mods'));
+		btnExit.setSize(190, 26);
+		btnExit.setText(Language.get('setExitNoSave', 'mods'));
+		btnExit.setVisible(true);
+		searchPlaceholder.text = Language.get('searchSettings', 'mods');
+		searchPlaceholder.visible = (query.length < 1);
+		setQuery = '';
+		applyOptFilter();
+		lastBarW = -1; // 强制下一帧重排顶栏
+
+		// ⑥ 动画完成后：设置项在卡片下方排开 + 右侧详情淡入
+		new FlxTimer().start(0.5, function(_)
+		{
+			setAnim = false;
+			setReady = true;
+			optSel = firstSelectable();
+			refreshOptRows();
+			showSettingsUi(true);
+			refreshSettingsDetail();
+			ensureOptVisible();
+			dbg('settings ready: sel=' + optSel);
+		});
+	}
+
+	function exitSettings()
+	{
+		if (!settingsMode || setAnim) return;
+		saveSettings();
+		animateOutSettings();
+	}
+
+	/** 不保存设置，直接退出整个 mods 界面（设置改动丢弃 —— saveMap 只是工作副本） */
+	function exitSettingsNoSave()
+	{
+		if (!settingsMode || setAnim) return;
+		dbg('exitSettingsNoSave folder=' + setFolder);
+		animateOutSettings();
+		exitMenu();
+	}
+
+	function animateOutSettings()
+	{
+		capturing = false;
+		setAnim = true;
+		setReady = false;
+		FlxG.sound.play(Paths.sound('cancelMenu'), 0.6);
+		dbg('settings animateOut folder=' + setFolder);
+
+		// 设置 UI 立即收起
+		showSettingsUi(false);
+		backBtn.setVisible(false);
+
+		// 卡片滑回行的屏幕位置
+		var visIdx = visibleIndices().indexOf(sel);
+		var rowScreenY:Float = LIST_TOP + (visIdx < 0 ? 0 : visIdx) * ROW_H - scrollY;
+		FlxTween.tween(cardBg, {y: rowScreenY}, 0.4, {ease: FlxEase.quadIn});
+		FlxTween.tween(cardIcon, {y: rowScreenY + 8}, 0.4, {ease: FlxEase.quadIn});
+		FlxTween.tween(cardName, {y: rowScreenY + 11}, 0.4, {ease: FlxEase.quadIn});
+		FlxTween.tween(cardFolder, {y: rowScreenY + 32}, 0.4, {ease: FlxEase.quadIn});
+
+		// 左列表滚回
+		FlxTween.tween(listCam.scroll, {x: 0}, 0.4, {ease: FlxEase.quadOut});
+
+		// 右侧详情落回原位
+		for (r in detailSavedY)
+			FlxTween.tween(r.o, {y: r.base}, 0.4, {ease: FlxEase.quadOut});
+
+		// 标签恢复（直接按当前筛选态还原各元素的本征 alpha，避免和补间打架）
+		tabOn.restoreVisual();
+		tabOff.restoreVisual();
+		tabLine.alpha = 1;
+		tabBottom.alpha = 1;
+		tabLine.visible = (filter != 2);
+
+		// 常规控件回归
+		for (t in tools)
+			t.setVisible(true);
+		footReload.setVisible(true);
+		footEnableAll.setVisible(true);
+		footDisableAll.setVisible(true);
+		refreshFooter();
+
+		// 顶栏还原常规语义
+		btnFolder.setText(Language.get('openFolderShort', 'mods'));
+		btnExit.setSize(120, 26);
+		btnExit.setVisible(false); // 常规视图不需要（🏠 回主菜单）
+		searchPlaceholder.text = Language.get('search', 'mods');
+		setQuery = '';
+		applyOptFilter();
+		lastBarW = -1;
+
+		new FlxTimer().start(0.45, function(_)
+		{
+			setAnim = false;
+			settingsMode = false;
+			setCardVisible(false);
+			rows[sel].setVisible(true);
+			refreshList();
+			refreshDetail();
+			refreshTabs();
+			refreshScrollbar();
+			dbg('settings closed');
+		});
+	}
+
+	/** 保存到存档（与原 ModSettingsSubState.close() 同语义） */
+	function saveSettings()
+	{
+		if (FlxG.save.data.modSettings == null) FlxG.save.data.modSettings = new Map<String, Dynamic>();
+		cast(FlxG.save.data.modSettings, Map<String, Dynamic>).set(setFolder, saveMap);
+		FlxG.save.flush();
+		dbg('settings saved: ' + setFolder);
+	}
+
+	function fadeTabs(to:Float, dur:Float)
+	{
+		for (s in tabOn.contentSprites())
+			FlxTween.tween(s, {alpha: to}, dur);
+		for (s in tabOff.contentSprites())
+			FlxTween.tween(s, {alpha: to}, dur);
+		FlxTween.tween(tabLine, {alpha: to}, dur);
+		FlxTween.tween(tabBottom, {alpha: to}, dur);
+	}
+
+	/** 显示/隐藏全部设置 UI（行 + 右侧面板 + 滚动条），显示时带 0.25s 淡入 */
+	function showSettingsUi(v:Bool)
+	{
+		var fade:Float = v ? 0 : 0;
+		for (i in 0...setOpts.length)
+		{
+			var o = setOpts[i];
+			var rv:Bool = v && o.rowVisible;
+			if (o.rowBg != null)
+			{
+				o.rowBg.visible = rv;
+				o.rowBg.alpha = rv ? 0.01 : 0;
+				if (rv) FlxTween.tween(o.rowBg, {alpha: (i == optSel) ? ROW_SEL_A : ROW_BG_A}, 0.25);
+			}
+			if (o.nameTxt != null)
+			{
+				o.nameTxt.visible = rv;
+				o.nameTxt.alpha = fade;
+				if (rv) FlxTween.tween(o.nameTxt, {alpha: 1}, 0.25);
+			}
+			if (o.valTxt != null)
+			{
+				o.valTxt.visible = rv;
+				o.valTxt.alpha = fade;
+				if (rv) FlxTween.tween(o.valTxt, {alpha: 1}, 0.25);
+			}
+		}
+		setTitleTxt.visible = v;
+		setTitleTxt.alpha = fade;
+		if (v) FlxTween.tween(setTitleTxt, {alpha: 1}, 0.25);
+		sDesc.visible = v;
+		sDesc.alpha = fade;
+		if (v) FlxTween.tween(sDesc, {alpha: 1}, 0.25);
+		// ★ 类型相关控件（◀▶/开关/重设按键/wVal）的显隐由 refreshSettingsDetail 决定，
+		//   这里只在收起时统一藏掉 —— 显示时越权全开会让 Notice 冒出红开关（实测教训）
+		if (!v)
+		{
+			wVal.visible = false;
+			wVal.alpha = 0;
+			wPrev.setVisible(false);
+			wNext.setVisible(false);
+			wKey.setVisible(false);
+			tog.setVisible(false);
+			sTrack.visible = sThumb.visible = false;
+		}
+	}
+
+	function firstSelectable():Int
+	{
+		for (i in 0...setOpts.length)
+			if (!setOpts[i].isHeader && setOpts[i].rowVisible) return i;
+		return -1;
+	}
+
+	/** 设置视图搜索：按名称过滤选项行（搜索框在设置视图里就是"搜索设置项"） */
+	function applyOptFilter()
+	{
+		for (o in setOpts)
+		{
+			o.rowVisible = (setQuery.length < 1) || (o.name.toLowerCase().indexOf(setQuery) >= 0);
+			var v:Bool = o.rowVisible && setReady && settingsMode;
+			if (o.rowBg != null) o.rowBg.visible = v;
+			if (o.nameTxt != null) o.nameTxt.visible = v;
+			if (o.valTxt != null) o.valTxt.visible = v;
+		}
+		var cur = curOptSel();
+		if (cur == null || !cur.rowVisible)
+		{
+			optSel = firstSelectable();
+			refreshOptRows();
+			refreshSettingsDetail();
+		}
+	}
+
+	function curOptSel():SettOpt
+	{
+		return (optSel >= 0 && optSel < setOpts.length) ? setOpts[optSel] : null;
+	}
+
+	// ── 设置视图的刷新 ──
+	function refreshOptRows()
+	{
+		for (i in 0...setOpts.length)
+		{
+			var o = setOpts[i];
+			if (o.rowBg == null) continue;
+			o.rowBg.alpha = (i == optSel) ? ROW_SEL_A : ROW_BG_A;
+			o.valTxt.text = optValueText(o);
+		}
+	}
+
+	/** 值的显示文案（与 BaseOptionsMenu.updateTextFrom 同一套 %v / %d 规则） */
+	function optValueText(o:SettOpt):String
+	{
+		switch (o.type)
+		{
+			case 'bool':
+				return (o.value == true) ? 'ON' : 'OFF';
+			case 'string':
+				return Std.string(o.value);
+			case 'keybind':
+				return o.keys != null ? o.keys.keyboard : 'NONE';
+			default:
+				var val:Float = o.value;
+				if (o.type == 'percent') val *= 100;
+				val = FlxMath.roundDecimal(val, o.decimals);
+				return o.format.split('%v').join(Std.string(val)).split('%d').join(Std.string(o.def));
+		}
+	}
+
+	/** 右侧详情 = 所选项名称 + 调整值控件 + 描述（instant=false 时开关用动画过渡） */
+	function refreshSettingsDetail(instant:Bool = true)
+	{
+		var o = curOptSel();
+		if (o == null)
+		{
+			setTitleTxt.text = '';
+			sDescGen.text = '';
+			sDescContent = rasterizeBitmap(sDescGen);
+		applySetDescScroll();
+			wVal.visible = false;
+			wPrev.setVisible(false);
+			wNext.setVisible(false);
+			wKey.setVisible(false);
+			tog.setVisible(false);
+			return;
+		}
+		setTitleTxt.text = flatName(o.name); // 单行化，避免两行标题压到调整值控件
+		sDescGen.text = (o.desc != null && o.desc.length > 0) ? o.desc : Language.get('noDesc', 'mods');
+		sDescContent = rasterizeBitmap(sDescGen);
+		setDescMax = Math.max(0, Std.int(sDescContent.height / TXT_SS) - (720 - SET_DESC_Y - 48));
+		setDescScrollY = 0;
+		applySetDescScroll();
+
+		var isStr = (o.type == 'string');
+		var isBool = (o.type == 'bool');
+		var isKey = (o.type == 'keybind');
+		var isNum = (!isStr && !isBool && !isKey);
+
+		var canCycle = (isStr && o.options != null && o.options.length >= 2); // 单值 string 没得切，藏掉箭头
+		wPrev.setVisible(canCycle || isNum);
+		wNext.setVisible(canCycle || isNum);
+		wKey.setVisible(isKey);
+		tog.setVisible(isBool);
+		wVal.visible = (canCycle || isNum || isKey);
+
+		if (canCycle || isNum)
+		{
+			wPrev.setX(RIGHT_X + 24);
+			wNext.setX(RIGHT_X + RIGHT_W - 24 - wNext.w);
+			wVal.x = wPrev.x + wPrev.w + 14;
+			sharpFieldW(wVal, wNext.x - 14 - wVal.x);
+			wVal.alignment = CENTER;
+			wVal.y = SET_WY + (34 - wVal.height) / 2;
+			wVal.text = optValueText(o);
+		}
+		else if (isKey)
+		{
+			wVal.alignment = LEFT;
+			sharpFieldW(wVal, RIGHT_W - 48);
+			wVal.x = RIGHT_X + 24;
+			wVal.y = SET_WY + 8;
+			wKey.setX(RIGHT_X + 24);
+			wKey.setPos(RIGHT_X + 24, SET_WY + 44);
+			updateKeyText();
+		}
+		else
+		{
+			wVal.visible = false;
+		}
+		if (isBool) tog.setState(o.value == true, instant);
+	}
+
+	/** 调整值后只更新值区（不动描述、不让描述滚动归零） */
+	function refreshSettingsValue()
+	{
+		var o = curOptSel();
+		if (o == null) return;
+		if (o.type == 'bool') tog.setState(o.value == true, false);
+		else if (o.type == 'keybind') updateKeyText();
+		else if (wVal.visible) wVal.text = optValueText(o);
+	}
+
+	function updateKeyText()
+	{
+		var o = curOptSel();
+		if (o == null || o.type != 'keybind') return;
+		wVal.text = capturing ? Language.get('setBindPrompt', 'mods') :
+			ModsMenuState.fmt(ModsMenuState.fmt(Language.get('setBindTip', 'mods'), 'kb', o.keys.keyboard), 'gp', o.keys.gamepad);
+	}
+
+	function startCapture()
+	{
+		var o = curOptSel();
+		if (o == null || o.type != 'keybind') return;
+		capturing = true;
+		updateKeyText();
+	}
+
+	/** 调整一项设置（dir：-1 / 1；bool 视 dir 为"切换"） */
+	function adjustOpt(o:SettOpt, dir:Int)
+	{
+		if (o == null || o.isHeader || !setReady) return;
+		switch (o.type)
+		{
+			case 'bool':
+				o.value = !(o.value == true);
+			case 'string':
+				if (o.options.length < 2) return;
+				var n = o.curIdx + dir;
+				if (n < 0) n = o.options.length - 1;
+				else if (n >= o.options.length) n = 0;
+				o.curIdx = n;
+				o.value = o.options[n];
+			case 'int':
+				var v = Std.int(o.value) + Std.int(o.step) * dir;
+				if (o.min != null && v < o.min) v = Std.int(o.min);
+				if (o.max != null && v > o.max) v = Std.int(o.max);
+				o.value = v;
+			case 'keybind':
+				return; // 按键走抓键流程
+			default: // float / percent
+				var v:Float = o.value + o.step * dir;
+				if (o.min != null && v < o.min) v = o.min;
+				if (o.max != null && v > o.max) v = o.max;
+				o.value = FlxMath.roundDecimal(v, o.decimals);
+		}
+		saveMap.set(o.saveKey, o.value);
+		refreshOptRows();
+		refreshSettingsValue();
+		FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
+	}
+
+	function selectOpt(i:Int)
+	{
+		if (i < 0 || i >= setOpts.length || setOpts[i].isHeader) return;
+		if (i == optSel) return;
+		optSel = i;
+		refreshOptRows();
+		refreshSettingsDetail();
+		ensureOptVisible();
+		FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
+	}
+
+	function stepOptSel(step:Int)
+	{
+		if (setOpts.length < 1) return;
+		var i = optSel;
+		while (true)
+		{
+			i += step;
+			if (i < 0 || i >= setOpts.length) return; // 到头就停（不绕圈，标题多时不乱跳）
+			if (!setOpts[i].isHeader && setOpts[i].rowVisible)
+			{
+				selectOpt(i);
+				return;
+			}
+		}
+	}
+
+	function maxOptScroll():Float
+	{
+		return Math.max(0, setContentH - OPT_VIEW_H);
+	}
+
+	function ensureOptVisible()
+	{
+		var o = curOptSel();
+		if (o == null) return;
+		var top = o.uiY;
+		var bottom = o.uiY + ((o.isHeader) ? OPT_HEAD_H : OPT_H);
+		if (top < optScrollY + 8) optScrollY = top - 8;
+		else if (bottom > optScrollY + OPT_VIEW_H - 8) optScrollY = bottom - OPT_VIEW_H + 8;
+		optScrollY = Math.max(0, Math.min(optScrollY, maxOptScroll()));
+		setCam.scroll.y = optScrollY;
+	}
+
+	function applySetDescScroll()
+	{
+		setDescScrollY = Math.max(0, Math.min(setDescScrollY, setDescMax));
+		blitWindow(sDesc.pixels, sDescContent, Std.int(setDescScrollY * TXT_SS), Std.int((RIGHT_W - 48) * TXT_SS),
+			Std.int((720 - SET_DESC_Y - 48) * TXT_SS));
+	}
+
+	/** 选项行命中（返回 setOpts 下标；标题行也返回，交由 selectOpt 拒绝） */
+	function optRowAt(sy:Float):Int
+	{
+		var local = sy - OPT_TOP + optScrollY;
+		for (i in 0...setOpts.length)
+		{
+			var o = setOpts[i];
+			if (!o.rowVisible) continue;
+			var h:Float = o.isHeader ? OPT_HEAD_H : OPT_H;
+			if (local >= o.uiY && local < o.uiY + h) return i;
+		}
+		return -1;
+	}
+
+	function updateSetScrollbar()
+	{
+		if (sTrack == null || sThumb == null || !setReady) return;
+		var need = setContentH > OPT_VIEW_H + 0.5;
+		sTrack.visible = sThumb.visible = need;
+		if (!need) return;
+
+		var trackH = sTrack.height;
+		var maxScroll = Math.max(1, maxOptScroll());
+		var th = Math.max(SB_MIN, trackH * (OPT_VIEW_H / setContentH));
+		var ty = sTrack.y + (trackH - th) * Math.max(0, Math.min(1, optScrollY / maxScroll));
+		sThumbH = th;
+		sThumb.y = ty;
+		sThumb.scale.y = th / Math.max(1, sThumb.frameHeight);
+		var px:Float = pointerX();
+		var py:Float = pointerY();
+		var hot = (px > sTrack.x - 10 && px < sTrack.x + SB_W + 10 && py >= sTrack.y - 6 && py <= sTrack.y + trackH + 6);
+		sThumb.alpha = (hot || sDrag) ? 1 : 0.72;
+		sTrack.alpha = (hot || sDrag) ? 1 : 0.75;
+	}
+
+	// ── 设置视图的鼠标 / 键盘 ──
+	function settingsMouse(elapsed:Float)
+	{
+		var mx:Float = pointerX();
+		var my:Float = pointerY();
+		var wheel:Int = pointerWheel();
+		var justPressed:Bool = pointerJustPressed();
+		var pressedNow:Bool = pointerPressed();
+		var justReleased:Bool = pointerJustReleased();
+
+		// 滚轮：左 = 滚设置项；右控件带 = 调整值；右下描述区 = 滚描述
+		if (wheel != 0)
+		{
+			if (mx < LEFT_W && my >= OPT_TOP && my < 720 - FOOT_H)
+			{
+				optScrollY = Math.max(0, Math.min(optScrollY - wheel * 34, maxOptScroll()));
+				setCam.scroll.y = optScrollY;
+			}
+			else if (mx >= RIGHT_X && my >= SET_WY - 6 && my < SET_WY + 46 && curOptSel() != null && !capturing)
+			{
+				adjustOpt(curOptSel(), wheel > 0 ? 1 : -1);
+			}
+			else if (mx >= RIGHT_X && my > SET_DESC_Y && my < 720 - 40 && setDescMax > 0)
+			{
+				setDescScrollY -= wheel * 40;
+				applySetDescScroll();
+			}
+		}
+
+		// 左侧选项行：按下 → 拖动滚动 / 松开 = 选中
+		if (justPressed && mx < LEFT_W && my >= OPT_TOP && my < 720 - FOOT_H)
+		{
+			optDragging = true;
+			optDragBase = optScrollY;
+			optDragY = my;
+			optMoved = false;
+		}
+		if (optDragging && pressedNow)
+		{
+			if (Math.abs(my - optDragY) > 8) optMoved = true;
+			if (optMoved)
+			{
+				optScrollY = Math.max(0, Math.min(optDragBase - (my - optDragY), maxOptScroll()));
+				setCam.scroll.y = optScrollY;
+			}
+		}
+		if (optDragging && justReleased)
+		{
+			if (!optMoved)
+			{
+				var hit = optRowAt(my);
+				if (hit >= 0) selectOpt(hit);
+			}
+			optDragging = false;
+		}
+
+		// 滚动条：拖动滑块 / 点轨道跳转
+		if (sThumb != null && sThumb.visible)
+		{
+			var trackTop = sTrack.y;
+			var trackH = sTrack.height;
+			var maxScroll = Math.max(1, maxOptScroll());
+			var overThumb = (mx >= sThumb.x - 4 && mx <= sThumb.x + SB_W + 4 && my >= sThumb.y && my <= sThumb.y + sThumbH);
+			if (justPressed && overThumb)
+			{
+				sDrag = true;
+				sDragOfs = my - sThumb.y;
+			}
+			else if (justPressed && mx >= sTrack.x - 6 && mx <= sTrack.x + SB_W + 6 && my >= trackTop && my <= trackTop + trackH)
+			{
+				optScrollY = ((my - trackTop - sThumbH / 2) / Math.max(1, trackH - sThumbH)) * maxScroll;
+				optScrollY = Math.max(0, Math.min(optScrollY, maxScroll));
+				setCam.scroll.y = optScrollY;
+			}
+			if (sDrag)
+			{
+				if (!pressedNow) sDrag = false;
+				else
+				{
+					var frac = (my - sDragOfs - trackTop) / Math.max(1, trackH - sThumbH);
+					optScrollY = Math.max(0, Math.min(1, frac)) * maxScroll;
+					setCam.scroll.y = optScrollY;
+				}
+			}
+		}
+
+		// 描述区：按住拖动滚动
+		if (setDescDragging)
+		{
+			if (!pressedNow) setDescDragging = false;
+			else
+			{
+				setDescScrollY += (setDescDragY - my);
+				setDescDragY = my;
+				applySetDescScroll();
+			}
+		}
+		else if (justPressed && mx >= RIGHT_X + 20 && my > SET_DESC_Y && my < 720 - 40 && setDescMax > 0)
+		{
+			setDescDragging = true;
+			setDescDragY = my;
+		}
+	}
+
+	function settingsKeys(elapsed:Float)
+	{
+		// keybind 抓键：按任意键写入，Esc 取消
+		if (capturing)
+		{
+			var k:FlxKey = FlxG.keys.firstJustPressed();
+			if (k != FlxKey.NONE)
+			{
+				capturing = false;
+				var o = curOptSel();
+				if (o != null && o.type == 'keybind' && k != FlxKey.ESCAPE)
+				{
+					o.keys.keyboard = Std.string(k);
+					o.value = o.keys.keyboard;
+					saveMap.set(o.saveKey, o.keys);
+					refreshOptRows();
+				}
+				updateKeyText();
+			}
+			return;
+		}
+
+		if (controls.BACK)
+		{
+			exitSettings();
+			return;
+		}
+		if (controls.UI_UP_P) stepOptSel(-1);
+		else if (controls.UI_DOWN_P) stepOptSel(1);
+		else if (controls.UI_LEFT_P)
+		{
+			if (curOptSel() != null) adjustOpt(curOptSel(), -1);
+		}
+		else if (controls.UI_RIGHT_P)
+		{
+			if (curOptSel() != null) adjustOpt(curOptSel(), 1);
+		}
+		else if (controls.ACCEPT)
+		{
+			var o = curOptSel();
+			if (o != null)
+			{
+				if (o.type == 'keybind') startCapture();
+				else adjustOpt(o, 1);
+			}
+		}
 	}
 
 	function openModsFolder()
@@ -1144,8 +2325,15 @@ class ModsMenuState extends MusicBeatState
 		{
 			try FileSystem.createDirectory(modFolder) catch (e:Dynamic) { trace('create mods dir failed: $e'); }
 		}
+		#if mobile
+		// ★ Android 上没有 explorer.exe / xdg-open：CoolUtil.openFolder 只在 Windows/Linux 生效，
+		//   在手机上调用是个**静默空操作**（logcat 里只会留下 `explorer.exe \storage\...` 一行），
+		//   用户点了"打开 mods 文件夹"就会觉得按钮坏了。这里改成把路径提示出来。
+		showToast(ModsMenuState.fmt(Language.get('toastFolder', 'mods'), 'path', modFolder));
+		#else
 		CoolUtil.openFolder(modFolder);
 		showToast(modFolder);
+		#end
 	}
 
 	/** 退出：有改动 → 弹确认并整局重启；否则回主菜单 / 选歌（原版语义） */
@@ -1211,7 +2399,6 @@ class ModsMenuState extends MusicBeatState
 	function showToast(msg:String)
 	{
 		toastTxt.text = msg;
-		toastTxt.updateHitbox();
 		var w = Std.int(Math.max(120, toastTxt.width + 32));
 		toastBg.makeGraphic(w, 32, FlxColor.TRANSPARENT);
 		FlxSpriteUtil.drawRoundRect(toastBg, 0, 0, w, 32, 16, 16, 0xF208090D);
@@ -1229,11 +2416,53 @@ class ModsMenuState extends MusicBeatState
 	function updateEmptyStateVisibility()
 	{
 		var empty = (modsList.all.length < 1);
+		emptyMode = empty;
+		// ★ 空状态把常规界面（标签栏 / 底部三按钮 / 右栏详情 / 工具条）整片收起来，
+		//   只留空状态卡片 + 顶部窗口条 —— 否则 60% 透明的遮罩下面会透出"一堆多余按钮"，
+		//   而且那些按钮点了也没意义（它们都需要先选中某个模组）。
+		setNormalUiVisible(!empty);
 		for (s in emptyGfx) s.visible = empty;
 		if (emptyEgg != null && emptyEgg.text.length < 1) emptyEgg.visible = false;
 		emptyTitle.visible = emptyBody.visible = emptyScan.visible = empty;
 		emptyFolderBtn.setVisible(empty);
 		emptyExitBtn.setVisible(empty);
+		layoutEmptyButtons();
+	}
+
+	/** 空状态两个按钮：正文下方居中排成一行（原型 #empty .row，间距 10）
+	 *  ★ 老代码建完按钮后从没定位过，一直停在 (0,0) 互相重叠 —— 点一下会同时触发两个。 */
+	function layoutEmptyButtons()
+	{
+		if (emptyFolderBtn == null || emptyExitBtn == null) return;
+		var gap:Float = 10;
+		var total:Float = emptyFolderBtn.w + gap + emptyExitBtn.w;
+		var x0:Float = 640 - total / 2;
+		emptyFolderBtn.setPos(x0, 470);
+		emptyExitBtn.setPos(x0 + emptyFolderBtn.w + gap, 470);
+	}
+
+	/** 常规界面（无模组时整体隐藏） */
+	function setNormalUiVisible(v:Bool)
+	{
+		// 结构性元素：空状态收起、有模组时展开
+		var arr:Array<FlxSprite> = [listBg, listDiv, tabLine, tabBottom, footTop, detailBg, detailLine, dIcon, dName, dMetaTxt, dDescLabel,
+			dDesc, footNote];
+		for (s in arr)
+			if (s != null) s.visible = v;
+		// 这几个的显隐是按内容算的（refreshDetail / refreshList 负责）：只在收起时强制隐藏
+		if (!v)
+		{
+			for (s in [dBadgeBg, dBadgeTxt, restartHint, filterEmptyTxt])
+				if (s != null) s.visible = false;
+		}
+		if (tabOn != null) tabOn.setVisible(v);
+		if (tabOff != null) tabOff.setVisible(v);
+		if (dToggle != null) dToggle.setVisible(v);
+		if (footReload != null) footReload.setVisible(v);
+		if (footEnableAll != null) footEnableAll.setVisible(v);
+		if (footDisableAll != null) footDisableAll.setVisible(v);
+		for (b in tools)
+			b.setVisible(v);
 	}
 
 	/** 写 modsList.txt（与原版 saveTxt 完全一致） */
@@ -1278,37 +2507,61 @@ class ModsMenuState extends MusicBeatState
 				}
 			}
 		}
+		else if (settingsMode)
+		{
+			// 模组设置视图：输入全部让给设置 UI
+			if (setReady)
+			{
+				settingsMouse(elapsed);
+				settingsKeys(elapsed);
+				if (tog != null) tog.updateHover();
+			}
+		}
 		else
 		{
 			handleMouse(elapsed);
 			handleKeys(elapsed);
 		}
 
-		// 列表行：走马灯 + 选中态
-		for (r in rows) if (r.anyVisible()) r.updateVisual(elapsed);
-		refreshScrollbar();
+		if (!settingsMode)
+		{
+			// 列表行：走马灯 + 选中态
+			for (r in rows) if (r.anyVisible()) r.updateVisual(elapsed);
+			refreshScrollbar();
+		}
+		else
+		{
+			hidePressHint(); // 设置视图里工具提示绝不允许残留
+			updateSetScrollbar();
+		}
 
 		// 自绘控件的悬停/点击（统一走 viewX/viewY 判定）
 		for (b in allButtons) b.updateHover();
-		if (tabOn != null) tabOn.updateHover();
-		if (tabOff != null) tabOff.updateHover();
-		for (i in 0...tools.length)
+		if (!settingsMode)
 		{
-			tools[i].setFocus(zone == 1 && i == toolSel); // 工具条焦点指示（键盘/手柄用）
-			tools[i].updateHover();
-		}
-		if (dToggle != null) dToggle.updateHover();
-
-		// 悬停工具按钮 → 提示栏显示它的名字
-		if (modsList.all.length > 0 && dirty < 1)
-		{
+			if (tabOn != null) tabOn.updateHover();
+			if (tabOff != null) tabOff.updateHover();
 			for (i in 0...tools.length)
 			{
-				if (tools[i].hovered)
+				tools[i].setFocus(zone == 1 && i == toolSel); // 工具条焦点指示（键盘/手柄用）
+				tools[i].updateHover();
+			}
+			if (dToggle != null) dToggle.updateHover();
+
+			// 悬停工具按钮 → 提示栏显示它的名字
+			if (modsList.all.length > 0)
+			{
+				var tip:String = '';
+				for (i in 0...tools.length)
 				{
-					hintTxt.text = Language.get(tools[i].labelKey, 'mods');
-					break;
+					if (tools[i].hovered)
+					{
+						tip = Language.get(tools[i].labelKey, 'mods');
+						break;
+					}
 				}
+				if (tip.length > 0) showToolTip(tip);
+				else if (pressIdx < 0) hidePressHint();
 			}
 		}
 
@@ -1330,11 +2583,13 @@ class ModsMenuState extends MusicBeatState
 		}
 
 		// 鼠标一动就退出控制器模式（原版行为）
-		if (!ClientPrefs.data.needMobileControl && (Math.abs(FlxG.mouse.deltaX) > 10 || Math.abs(FlxG.mouse.deltaY) > 10))
-		{
-			controls.controllerMode = false;
-			if (!FlxG.mouse.visible) FlxG.mouse.visible = true;
-		}
+		// ★ 桌面端不再用 needMobileControl 卡住光标：本界面本来就是鼠标/触摸驱动的，
+		//   而引擎默认把光标藏起来（needMobileControl 默认 true），否则桌面上连悬停高亮都没有。
+		var mouseMoved:Bool = (FlxG.mouse != null) && (Math.abs(FlxG.mouse.deltaX) > 4 || Math.abs(FlxG.mouse.deltaY) > 4);
+		if (mouseMoved) controls.controllerMode = false;
+		#if !mobile
+		if (mouseMoved && FlxG.mouse != null && !FlxG.mouse.visible) FlxG.mouse.visible = true;
+		#end
 
 		super.update(elapsed);
 	}
@@ -1342,32 +2597,37 @@ class ModsMenuState extends MusicBeatState
 	// ── 鼠标 ──
 	function handleMouse(elapsed:Float)
 	{
-		var mx:Float = FlxG.mouse.viewX;
-		var my:Float = FlxG.mouse.viewY;
+		// ★ 统一走指针层：手机用触点、桌面用鼠标，且不再要求 mouse.visible
+		var mx:Float = ModsMenuState.pointerX();
+		var my:Float = ModsMenuState.pointerY();
+		var wheel:Int = ModsMenuState.pointerWheel();
+		var justPressed:Bool = ModsMenuState.pointerJustPressed();
+		var pressedNow:Bool = ModsMenuState.pointerPressed();
+		var justReleased:Bool = ModsMenuState.pointerJustReleased();
 
-		if (FlxG.mouse.wheel != 0)
-			dbg('wheel=' + FlxG.mouse.wheel + ' at(' + Std.int(mx) + ',' + Std.int(my) + ') overList=' + (mx < LEFT_W && my >= LIST_TOP && my < LIST_TOP + LIST_H));
-		if (FlxG.mouse.justPressed)
+		if (wheel != 0)
+			dbg('wheel=' + wheel + ' at(' + Std.int(mx) + ',' + Std.int(my) + ') overList=' + (mx < LEFT_W && my >= LIST_TOP && my < LIST_TOP + LIST_H));
+		if (justPressed)
 			dbg('press at(' + Std.int(mx) + ',' + Std.int(my) + ') listHit=' + (mx < LEFT_W && my >= LIST_TOP && my < LIST_TOP + LIST_H ? rowAtScreen(my) : -1));
 
-		// 滚轮：列表 / 描述区
-		if (FlxG.mouse.wheel != 0)
+		// 滚轮：列表 / 描述区（移动端没有滚轮，wheel 恒为 0）
+		if (wheel != 0)
 		{
 			if (mx < LEFT_W && my >= LIST_TOP && my < LIST_TOP + LIST_H)
 			{
-				scrollY -= FlxG.mouse.wheel * 34;
+				scrollY -= wheel * 34;
 				scrollY = Math.max(0, Math.min(scrollY, Math.max(0, listContentHeight() - LIST_H)));
 				listCam.scroll.y = scrollY;
 			}
 			else if (mx >= RIGHT_X && my > BAR_H + 170 && my < 720 - 50 && descMaxScroll > 0)
 			{
-				descScrollY -= FlxG.mouse.wheel * 40;
+				descScrollY -= wheel * 40;
 				applyDescScroll();
 			}
 		}
 
 		// 搜索框：点框内聚焦、点外面失焦
-		if (FlxG.mouse.justPressed)
+		if (justPressed)
 		{
 			var insideSearch = (mx >= searchBg.x - 6 && mx <= searchBg.x + 196 + 6 && my >= 2 && my <= 34);
 			if (insideSearch) PsychUIInputText.focusOn = searchBox;
@@ -1380,7 +2640,7 @@ class ModsMenuState extends MusicBeatState
 		var inList = (!overSb && mx < LEFT_W && my >= LIST_TOP && my < LIST_TOP + LIST_H);
 		var hit = inList ? rowAtScreen(my) : -1;
 
-		if (FlxG.mouse.justPressed && hit >= 0)
+		if (justPressed && hit >= 0)
 		{
 			pressIdx = hit;
 			pressTimer = 0;
@@ -1395,7 +2655,7 @@ class ModsMenuState extends MusicBeatState
 			scrollDragMouseY = my;
 		}
 
-		if (pressIdx >= 0 && FlxG.mouse.pressed)
+		if (pressIdx >= 0 && pressedNow)
 		{
 			var dx = Math.abs(mx - pressMouseX);
 			var dy = Math.abs(my - pressMouseY);
@@ -1465,7 +2725,7 @@ class ModsMenuState extends MusicBeatState
 			}
 		}
 
-		if (FlxG.mouse.justReleased && pressIdx >= 0)
+		if (justReleased && pressIdx >= 0)
 		{
 			dropLine.visible = false;
 			hidePressHint();
@@ -1503,13 +2763,13 @@ class ModsMenuState extends MusicBeatState
 			var trackH = sbTrack.height;
 			var maxScroll = Math.max(1, listContentHeight() - LIST_H);
 			var overThumb = (mx >= sbThumb.x - 4 && mx <= sbThumb.x + SB_W + 4 && my >= sbThumb.y && my <= sbThumb.y + sbThumbH);
-			if (FlxG.mouse.justPressed && overThumb)
+			if (justPressed && overThumb)
 			{
 				sbDrag = true;
 				sbDragOfs = my - sbThumb.y;
 				dbg('sbDrag start y=' + Std.int(my) + ' thumbY=' + Std.int(sbThumb.y) + ' thumbH=' + Std.int(sbThumbH));
 			}
-			else if (FlxG.mouse.justPressed && mx >= sbTrack.x - 6 && mx <= sbTrack.x + SB_W + 6 && my >= trackTop && my <= trackTop + trackH)
+			else if (justPressed && mx >= sbTrack.x - 6 && mx <= sbTrack.x + SB_W + 6 && my >= trackTop && my <= trackTop + trackH)
 			{
 				scrollY = ((my - trackTop - sbThumbH / 2) / Math.max(1, trackH - sbThumbH)) * maxScroll;
 				scrollY = Math.max(0, Math.min(scrollY, maxScroll));
@@ -1519,7 +2779,7 @@ class ModsMenuState extends MusicBeatState
 			}
 			if (sbDrag)
 			{
-				if (!FlxG.mouse.pressed)
+				if (!pressedNow)
 				{
 					sbDrag = false;
 					dbg('sbDrag end scrollY=' + Std.int(scrollY));
@@ -1537,7 +2797,7 @@ class ModsMenuState extends MusicBeatState
 		// 描述区：按住拖动滚动
 		if (descDragging)
 		{
-			if (!FlxG.mouse.pressed) descDragging = false;
+			if (!pressedNow) descDragging = false;
 			else
 			{
 				descScrollY += (descDragY - my);
@@ -1545,7 +2805,7 @@ class ModsMenuState extends MusicBeatState
 				applyDescScroll();
 			}
 		}
-		else if (FlxG.mouse.justPressed && mx >= RIGHT_X + 20 && my > BAR_H + 170 && my < 720 - 50 && descMaxScroll > 0)
+		else if (justPressed && mx >= RIGHT_X + 20 && my > BAR_H + 170 && my < 720 - 50 && descMaxScroll > 0)
 		{
 			descDragging = true;
 			descDragY = my;
@@ -1673,6 +2933,94 @@ class ModsMenuState extends MusicBeatState
 		return (v < 10) ? '0' + v : '' + v;
 	}
 
+	// 文字超采样倍率：字号与 fieldWidth 同乘 1.5 光栅化，精灵整体缩回 1/1.5
+	// （参照编辑器 hi-res"1920 光栅再等比缩小"的思路，但只作用于单个文字精灵，
+	//  不碰 frame.sourceSize/tileMatrix —— 那条路（FlxText.renderScale）实测有重影 bug）
+	public static inline var TXT_SS:Float = 1.5;
+
+	/**
+	 * 代替 setFormat：光栅 1.5 倍再由精灵缩回，视觉布局完全不变、文字清晰。
+	 * ★ 会把 fieldWidth(>0) 也乘 TXT_SS —— 因此只允许对每个文字调用一次；
+	 *   fieldWidth=0（自适应宽）的文字重复调用是安全的（dName 缩字号那两处）。
+	 */
+	public static function fmtSharp(t:FlxText, size:Int, color:FlxColor, ?align:FlxTextAlign = null):FlxText
+	{
+		FlxText.uiSizeScale = TXT_SS; // 让 set_size 内部按 1.5x 光栅
+		t.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), size, color, align);
+		FlxText.uiSizeScale = 1.0;
+		// ★ 只有"固定宽"文字才乘倍率。autoSize（fieldWidth=0）的文字千万不能碰：
+		//   它的 fieldWidth getter 返回实测内容宽，一乘倍率就会把自适应锁死成小固定宽，
+		//   之后一换长文本就逐字竖排（dName/footNote 竖排血案）。
+		if (!t.autoSize && t.fieldWidth > 0) t.fieldWidth = Std.int(t.fieldWidth * TXT_SS);
+		t.scale.set(1 / TXT_SS, 1 / TXT_SS);
+		t.origin.set(0, 0); // ★ 缩放锚点回到左上角（默认中心锚会把文字推偏）
+		t.offset.set(0, 0);
+		return t;
+	}
+
+	/**
+	 * 把超采样文字的光栅位图取出来（1.5x 分辨率，不做降采样）。
+	 * 用途：凡是要裁剪/滚动的文字（走马灯/描述区），CPU blit 在 1.5x 位图上摘窗口，
+	 * 显示精灵以 scale=1/TXT_SS 缩回 —— GPU 采样 1:1 物理像素，保持锐利。
+	 */
+	public static function rasterizeBitmap(t:FlxText):BitmapData
+	{
+		var w:Int = Std.int(Math.max(1, t.width)); // 先读宽高强制 regen（get_pixels 不触发 regen！）
+		var h:Int = Std.int(Math.max(1, t.height));
+		return t.pixels;
+	}
+
+	/** 把 content 的可见段摘进固定窗口位图（走马灯/描述滚动 = 纯 CPU blit，零渲染歧义） */
+	public static function blitWindow(bd:BitmapData, content:BitmapData, sx:Int, winW:Int, winH:Int):Void
+	{
+		bd.fillRect(bd.rect, 0);
+		if (content == null || sx < 0 || sx >= content.width) return;
+		var w:Int = Std.int(Math.min(winW, content.width - sx));
+		var h:Int = Std.int(Math.min(winH, content.height));
+		if (w <= 0 || h <= 0) return;
+		scratchRect.setTo(sx, 0, w, h);
+		scratchPoint.setTo(0, 0);
+		bd.copyPixels(content, scratchRect, scratchPoint);
+	}
+
+	/** 无缝循环版：uv 窗口越过内容尾部时从头部续接（内容位图尾部已留 48px 间隔） */
+	public static function blitWindowLoop(bd:BitmapData, content:BitmapData, sx:Int, winW:Int, winH:Int):Void
+	{
+		bd.fillRect(bd.rect, 0);
+		if (content == null || content.width <= 0) return;
+		var loopW:Int = content.width;
+		sx = ((sx % loopW) + loopW) % loopW;
+		var h:Int = Std.int(Math.min(winH, content.height));
+		if (h <= 0) return;
+		var dstX:Int = 0;
+		var remaining:Int = winW;
+		while (remaining > 0)
+		{
+			var w:Int = Std.int(Math.min(remaining, loopW - sx));
+			scratchRect.setTo(sx, 0, w, h);
+			scratchPoint.setTo(dstX, 0);
+			bd.copyPixels(content, scratchRect, scratchPoint);
+			dstX += w;
+			remaining -= w;
+			sx = 0;
+		}
+	}
+
+	/** 内容位图尾部补 48px 透明间隔（循环衔接处的视觉分隔） */
+	public static function padMarqueeBitmap(src:BitmapData):BitmapData
+	{
+		var bd:BitmapData = new BitmapData(src.width + Std.int(MARQ_GAP * TXT_SS), src.height, true, 0);
+		scratchPoint.setTo(0, 0);
+		bd.copyPixels(src, src.rect, scratchPoint);
+		return bd;
+	}
+
+	/** 给已 fmtSharp 的文字设置"逻辑"fieldWidth（内部自动乘倍率） */
+	public static function sharpFieldW(t:FlxText, logicalW:Float):Void
+	{
+		t.fieldWidth = Std.int(logicalW * TXT_SS);
+	}
+
 	public static function fmt(s:String, key:String, value:String):String
 	{
 		return s.split('{' + key + '}').join(value);
@@ -1713,15 +3061,15 @@ class ModRow
 	var bg:FlxSprite;
 	var bar:FlxSprite;
 	var icon:FlxSprite;
-	var nameTxt:FlxText;
-	var folderTxt:FlxText;
+	// 名称/文件夹：固定窗口位图精灵 + 完整内容位图（走马灯 = CPU blit，零渲染歧义）
+	var nameTxt:FlxSprite;
+	var folderTxt:FlxSprite;
+	var nameContent:BitmapData;
+	var folderContent:BitmapData;
 	var badgeTxt:FlxText;
-	var nameClip:FlxRect;
-	var folderClip:FlxRect;
-	var nameCycle:Float = 0;
-	var folderCycle:Float = 0;
-	var nameDist:Float = 0;
-	var folderDist:Float = 0;
+
+	var nameLoopW:Float = 0; // 循环周长 = 内容位图宽（含尾部间隔）；0 = 不滚动
+	var folderLoopW:Float = 0;
 	var nameTime:Float = 0;
 	var folderTime:Float = 0;
 	var colW:Float = 0;
@@ -1795,7 +3143,8 @@ class ModRow
 		}
 
 		// ── 精灵 ──
-		bg = new FlxSprite(0, 0).makeGraphic(Std.int(rowW), ModsMenuState.ROW_H, ModsMenuState.C_ROW_BG);
+		bg = new FlxSprite(0, 0).makeGraphic(Std.int(rowW), ModsMenuState.ROW_H, 0xFFFFFFFF);
+		bg.alpha = ModsMenuState.ROW_BG_A;
 
 		icon = new FlxSprite(12, 8);
 		if (iconGraphic != null) icon.loadGraphic(iconGraphic, true, 150, 150);
@@ -1816,16 +3165,31 @@ class ModRow
 		folderBaseX = 64;
 		nameOne = this.name;
 		folderOne = folder;
-		nameTxt = new FlxText(nameBaseX, 11, 0, this.name, 13);
-		nameTxt.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 13, ModsMenuState.C_TEXT);
-		nameTxt.wordWrap = false;
+		// 先用 SharpText 光栅化（1.5x），再降采样成 1:1 位图精灵：
+		// 走马灯的 clipRect 数学回到久经考验的原版语义，文字清晰度不变
+		var nameGen = new SharpText(0, 0, 0, this.name, 13);
+		ModsMenuState.fmtSharp(nameGen, 13, ModsMenuState.C_TEXT);
+		nameContent = ModsMenuState.padMarqueeBitmap(ModsMenuState.rasterizeBitmap(nameGen));
+		// 窗口位图也是 1.5x：CPU blit 无重采样，精灵 2/3 缩回 → GPU 采样 1:1 物理像素
+		// ★ 高度 = 内容光栅全高（写死 18*1.5=27 会裁掉字形下半 → "文字只显示一半"）
+		nameTxt = new FlxSprite(nameBaseX, 11).makeGraphic(Std.int(colW * ModsMenuState.TXT_SS), nameContent.height, FlxColor.TRANSPARENT, true);
+		nameTxt.scale.set(1 / ModsMenuState.TXT_SS, 1 / ModsMenuState.TXT_SS);
+		nameTxt.origin.set(0, 0);
+		nameTxt.offset.set(0, 0);
+		nameGen.destroy();
 
-		folderTxt = new FlxText(folderBaseX, 32, 0, folder, 11);
-		folderTxt.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 11, ModsMenuState.C_HINT);
-		folderTxt.wordWrap = false;
+		var folderGen = new SharpText(0, 0, 0, folder, 11);
+		ModsMenuState.fmtSharp(folderGen, 11, ModsMenuState.C_HINT);
+		folderContent = ModsMenuState.padMarqueeBitmap(ModsMenuState.rasterizeBitmap(folderGen));
+		folderTxt = new FlxSprite(folderBaseX, 32).makeGraphic(Std.int(colW * ModsMenuState.TXT_SS), folderContent.height, FlxColor.TRANSPARENT, true);
+		folderTxt.scale.set(1 / ModsMenuState.TXT_SS, 1 / ModsMenuState.TXT_SS);
+		folderTxt.origin.set(0, 0);
+		folderTxt.offset.set(0, 0);
+		folderGen.destroy();
+		refreshMarqueeViews();
 
-		badgeTxt = new FlxText(rowW - 160, 20, 148, '', 10);
-		badgeTxt.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 10, ModsMenuState.C_DIM, RIGHT);
+		badgeTxt = new SharpText(rowW - 160, 20, 148, '', 10);
+		ModsMenuState.fmtSharp(badgeTxt, 10, ModsMenuState.C_DIM, RIGHT);
 
 		bar = new FlxSprite(rowW - 3, 10).makeGraphic(3, ModsMenuState.ROW_H - 20, ModsMenuState.C_DANGER, true);
 
@@ -1834,73 +3198,54 @@ class ModRow
 		holdSpr.origin.set(0, 0); // ★ 归零 origin，否则 scale.x 会绕中心把进度条推到左边去
 		holdSpr.visible = false;
 
-		nameClip = new FlxRect(0, 0, colW, 18);
-		folderClip = new FlxRect(0, 0, colW, 14);
-		buildMarquee(nameTxt, true);
-		buildMarquee(folderTxt, false);
+		buildMarquee(nameContent, nameTxt, true);
+		buildMarquee(folderContent, folderTxt, false);
 
 		sprites = [bg, bar, icon, nameTxt, folderTxt, badgeTxt, holdSpr];
 		setEnabledFlag(true);
 	}
 
 	/**
-	 * 走马灯（单向、无断层版）：
-	 *   文案只有一份，裁剪窗从左往右扫过它（dist = 文本宽 - 列宽），滑到底停一下再瞬间回到起点。
-	 *   ——为什么不用"两份文案无缝循环"：那样窗口扫过拼接处时，行里会同时出现
-	 *     "名字的尾巴 + 一大段空白 + 名字的开头"（例如 "…i Fu DEMO      Shit night…"），
-	 *     静态看就像文字断成两截（用户报的"走马灯出现新问题"就是这个）。
-	 *   单份 + 到头重来则任何时刻都是连续文字，且依然只往一个方向移动。
-	 *
-	 * ★ Flixel 的 clipRect 不是"屏幕上的窗口"：FlxFrame.clipTo() 会把 frame.offset
-	 *   设成裁剪矩形的原点，FlxCamera.copyPixels() 又按 destPoint + frame.offset 绘制，
-	 *   于是整块文字会跟着 clip.x 一起右移。所以必须同时把文本左移 clip.x，
-	 *   窗口才能固定在 [baseX, baseX+colW]。
+	 * 走马灯（无缝循环版）：内容位图尾部带 48px 透明间隔，恒速左移、越尾从头续接。
+	 * 单位约定：content / 窗口位图全部是光栅分辨率（×TXT_SS），colW / textW 是逻辑值；
+	 * blit 的 sx/winW/winH 一律光栅单位，速度乘 TXT_SS 抵消倍率。
 	 */
-	function buildMarquee(txt:FlxText, isName:Bool)
+	function buildMarquee(content:BitmapData, spr:FlxSprite, isName:Bool)
 	{
-		txt.wordWrap = false;
-		txt.clipRect = null;
-		var baseX = isName ? nameBaseX : folderBaseX;
-		txt.x = baseX;
-		var one = isName ? nameOne : folderOne;
-		txt.text = one;
-		var singleW = txt.width;
-		var clip = isName ? nameClip : folderClip;
-		clip.x = 0;
+		// ★ 单位铁律：content.width 是光栅（×TXT_SS），colW 是逻辑。
+		//   判定"放不放得下"必须先换算回逻辑，否则比实际宽 1.5 倍 →
+		//   大量放得下的名字被误判成放不下、强制走马灯。
+		var textW:Float = (content.width - ModsMenuState.MARQ_GAP * ModsMenuState.TXT_SS) / ModsMenuState.TXT_SS;
 
-		if (!ModsMenuState.marqueeEnabled)
+		if (!ModsMenuState.marqueeEnabled || textW <= colW)
 		{
-			// 关掉走马灯：超出就按列宽裁断
-			if (isName) nameCycle = 0; else folderCycle = 0;
-			txt.clipRect = (singleW > colW) ? clip : null;
-			return;
-		}
-		if (singleW <= colW)
-		{
-			// 放得下就不动、不裁
-			if (isName) nameCycle = 0; else folderCycle = 0;
+			// 放得下（或关了走马灯）：窗口里铺左端即可，不滚动
+			if (isName) nameLoopW = 0; else folderLoopW = 0;
+			ModsMenuState.blitWindow(spr.pixels, content, 0, Std.int(colW * ModsMenuState.TXT_SS), content.height);
 			return;
 		}
 
-		var dist = singleW - colW;
-		var cycle = ModsMenuState.MARQ_HOLD + dist / ModsMenuState.MARQ_SPEED + ModsMenuState.MARQ_END_HOLD + 0.02;
+		var loopW:Float = content.width; // 无缝循环周长（光栅单位）
 		if (isName)
 		{
-			nameDist = dist;
-			nameCycle = cycle;
+			nameLoopW = loopW;
 			nameTime = 0;
-			nameTxt.clipRect = clip;
 		}
 		else
 		{
-			folderDist = dist;
-			folderCycle = cycle;
+			folderLoopW = loopW;
 			folderTime = 0;
-			folderTxt.clipRect = clip;
 		}
-		ModsMenuState.dbg('marquee[' + folder + '] ' + (isName ? 'name' : 'folder') + ' one=' + Std.int(singleW)
-			+ ' colW=' + Std.int(colW) + ' dist=' + Std.int(dist) + ' cycle=' + Math.round(cycle * 100) / 100
-			+ ' -> 窗口固定 ' + Std.int(baseX) + '..' + Std.int(baseX + colW) + '（单份无断层）');
+		ModsMenuState.blitWindowLoop(spr.pixels, content, 0, Std.int(colW * ModsMenuState.TXT_SS), content.height);
+		ModsMenuState.dbg('marquee[' + folder + '] ' + (isName ? 'name' : 'folder') + ' textW=' + Std.int(textW)
+			+ ' colW=' + Std.int(colW) + ' loopW=' + Std.int(loopW) + ' -> 无缝循环');
+	}
+
+	/** 把内容位图的左端铺进两个窗口（构造后/走马灯未激活时） */
+	public function refreshMarqueeViews()
+	{
+		ModsMenuState.blitWindow(nameTxt.pixels, nameContent, 0, Std.int(colW * ModsMenuState.TXT_SS), nameContent.height);
+		ModsMenuState.blitWindow(folderTxt.pixels, folderContent, 0, Std.int(colW * ModsMenuState.TXT_SS), folderContent.height);
 	}
 
 	/** 被拖拽时整行跟手（dy = 光标相对按下点的位移） */
@@ -1972,7 +3317,10 @@ class ModRow
 
 	public function setSelected(v:Bool)
 	{
-		bg.color = v ? ModsMenuState.C_ROW_SEL : ModsMenuState.C_ROW_BG;
+		// ★ 必须改 alpha 而不是 color：底图是 0x08FFFFFF（位图自带 alpha 0x08），
+		//   而 FlxSprite.color 只乘 RGB、改不了位图 alpha —— 老写法选中态根本看不出来。
+		bg.color = FlxColor.WHITE;
+		bg.alpha = v ? ModsMenuState.ROW_SEL_A : ModsMenuState.ROW_BG_A;
 	}
 
 	/** 启用/禁用态的全部视觉（原版：图标染红 + 名称变灰；新版另加右侧红条与徽章） */
@@ -1994,35 +3342,18 @@ class ModRow
 	/** 每帧：走马灯相位（单向；到尾停一下瞬间回到起点，中途永远是连续文字） */
 	public function updateVisual(elapsed:Float)
 	{
-		if (nameCycle > 0)
+		if (nameLoopW > 0)
 		{
 			nameTime += elapsed;
-			var t = nameTime % nameCycle;
-			var travel = nameDist / ModsMenuState.MARQ_SPEED;
-			var x:Float = 0;
-			if (t > ModsMenuState.MARQ_HOLD)
-			{
-				var t2 = t - ModsMenuState.MARQ_HOLD;
-				x = (t2 < travel) ? (t2 * ModsMenuState.MARQ_SPEED) : nameDist;
-			}
-			nameClip.x = x;
-			nameTxt.clipRect = nameClip;
-			nameTxt.x = nameBaseX - x; // ★ 抵消 clipRect 带来的整体右移
+			// 全程光栅单位：x 与 loopW 同单位；速度 ×TXT_SS 抵消光栅倍率（视觉仍 = MARQ_SPEED 逻辑px/s）
+			var x:Int = Std.int((nameTime * ModsMenuState.MARQ_SPEED * ModsMenuState.TXT_SS) % nameLoopW);
+			ModsMenuState.blitWindowLoop(nameTxt.pixels, nameContent, x, Std.int(colW * ModsMenuState.TXT_SS), nameContent.height);
 		}
-		if (folderCycle > 0)
+		if (folderLoopW > 0)
 		{
 			folderTime += elapsed;
-			var t3 = folderTime % folderCycle;
-			var travel2 = folderDist / ModsMenuState.MARQ_SPEED;
-			var x2:Float = 0;
-			if (t3 > ModsMenuState.MARQ_HOLD)
-			{
-				var t4 = t3 - ModsMenuState.MARQ_HOLD;
-				x2 = (t4 < travel2) ? (t4 * ModsMenuState.MARQ_SPEED) : folderDist;
-			}
-			folderClip.x = x2;
-			folderTxt.clipRect = folderClip;
-			folderTxt.x = folderBaseX - x2; // ★ 同上
+			var x2:Int = Std.int((folderTime * ModsMenuState.MARQ_SPEED * ModsMenuState.TXT_SS) % folderLoopW);
+			ModsMenuState.blitWindowLoop(folderTxt.pixels, folderContent, x2, Std.int(colW * ModsMenuState.TXT_SS), folderContent.height);
 		}
 	}
 }
@@ -2077,6 +3408,17 @@ class BarButton
 		}
 	}
 
+	/** 顶栏重排用：整体挪到新位置（提示文案与按钮组互换后按钮组靠右） */
+	public function setPosXY(nx:Float, ny:Float)
+	{
+		x = nx;
+		y = ny;
+		bg.x = nx;
+		bg.y = ny;
+		icon.x = nx + 2;
+		icon.y = ny + 2;
+	}
+
 	/** 工具条区域焦点（键盘/手柄选中）*/
 	public function setFocus(v:Bool):Void
 	{
@@ -2086,21 +3428,28 @@ class BarButton
 		icon.color = (v || hovered) ? FlxColor.WHITE : ModsMenuState.C_DIM;
 	}
 
+	/** 无模组时整条工具条一起隐藏 */
+	public function setVisible(v:Bool):Void
+	{
+		bg.visible = v;
+		icon.visible = v;
+	}
+
 	public var focused:Bool = false;
 
 	public function updateHover()
 	{
-		var m = FlxG.mouse;
-		var over = FlxG.mouse.visible && (m.viewX >= x && m.viewX < x + 26 && m.viewY >= y && m.viewY < y + 26);
+		if (!bg.visible) return; // 空状态工具条整条隐藏时不许再响应点击
+		var over = ModsMenuState.pointerOver(x, y, 26, 26);
 		if (over != hovered)
 		{
 			hovered = over;
 			bg.alpha = over ? 0.16 : 0;
 			icon.color = over ? FlxColor.WHITE : ModsMenuState.C_DIM;
 		}
-		if (hovered && FlxG.mouse.justPressed)
+		if (hovered && ModsMenuState.pointerJustPressed())
 		{
-			ModsMenuState.dbg('  -> click [tool:' + labelKey + '] at(' + Std.int(m.viewX) + ',' + Std.int(m.viewY) + ')');
+			ModsMenuState.dbg('  -> click [tool:' + labelKey + '] at(' + Std.int(ModsMenuState.pointerX()) + ',' + Std.int(ModsMenuState.pointerY()) + ')');
 			onClick();
 		}
 	}
@@ -2145,13 +3494,13 @@ class TabButton
 		// 状态圆点：8x8 圆角 = 圆形
 		dot = FlxSpriteUtil.drawRoundRect(new FlxSprite(x, y).makeGraphic(8, 8, FlxColor.TRANSPARENT, true), 0, 0, 8, 8, 4, 4, dotColor);
 
-		label = new FlxText(x, y, 0, Language.get(labelKey, 'mods'), 13);
-		label.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 13, ModsMenuState.C_TEXT);
+		label = new SharpText(x, y, 0, Language.get(labelKey, 'mods'), 13);
+		ModsMenuState.fmtSharp(label, 13, ModsMenuState.C_TEXT);
 
 		// 数字胶囊（原型 .tab .n）
 		countBg = FlxSpriteUtil.drawRoundRect(new FlxSprite(x, y).makeGraphic(26, 17, FlxColor.TRANSPARENT, true), 0, 0, 26, 17, 8, 8, 0x1AFFFFFF);
-		countTxt = new FlxText(x, y, 26, '0', 11);
-		countTxt.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 11, ModsMenuState.C_DIM, CENTER);
+		countTxt = new SharpText(x, y, 26, '0', 11);
+		ModsMenuState.fmtSharp(countTxt, 11, ModsMenuState.C_DIM, CENTER);
 
 		sprites = [bg, dot, label, countBg, countTxt];
 		layout();
@@ -2211,18 +3560,29 @@ class TabButton
 		for (s in sprites) s.visible = v;
 	}
 
+	/** 供设置视图淡出/淡入标签用（含全部内部元素） */
+	public function contentSprites():Array<FlxSprite>
+	{
+		return sprites;
+	}
+
+	/** 按当前 active/hovered 状态还原本征 alpha（设置视图退场时用，避免和补间打架） */
+	public function restoreVisual()
+	{
+		applyVisual();
+	}
+
 	public function updateHover()
 	{
 		if (!bg.visible) return;
-		var m = FlxG.mouse;
-		var over = FlxG.mouse.visible && (m.viewX >= x && m.viewX < x + w && m.viewY >= y && m.viewY < y + h);
+		var over = ModsMenuState.pointerOver(x, y, w, h);
 		if (over != hovered)
 		{
 			hovered = over;
 			label.color = over ? ModsMenuState.C_ACCENT : ModsMenuState.C_TEXT;
 			applyVisual();
 		}
-		if (over && FlxG.mouse.justPressed)
+		if (over && ModsMenuState.pointerJustPressed())
 		{
 			ModsMenuState.dbg('  -> click [' + dbgName + '] rect=(' + Std.int(x) + ',' + Std.int(y) + ',' + w + ',' + h + ')');
 			onClick();
@@ -2272,8 +3632,8 @@ class FlatButton
 		this.y = y;
 		this.onClick = onClick;
 		bg = new FlxSprite(x, y);
-		txt = new FlxText(x, y + 6, 120, text, 12);
-		txt.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 12, ModsMenuState.C_TEXT, CENTER);
+		txt = new SharpText(x, y + 6, 120, text, 12);
+		ModsMenuState.fmtSharp(txt, 12, ModsMenuState.C_TEXT, CENTER);
 		redrawBg();
 		applyBg();
 	}
@@ -2295,7 +3655,8 @@ class FlatButton
 		redrawBg();
 		txt.x = x;
 		txt.y = y + (h - txt.height) / 2;
-		txt.fieldWidth = w;
+		// txt 是 fmtSharp 过的（fieldWidth 已乘倍率），这里也要按逻辑宽换算
+		txt.fieldWidth = Std.int(w * ModsMenuState.TXT_SS);
 		applyBg();
 	}
 
@@ -2310,6 +3671,16 @@ class FlatButton
 	{
 		txt.text = s;
 		txt.y = y + (h - txt.height) / 2;
+	}
+
+	/** 同时挪 x/y（空状态两个按钮要摆到正文下方居中） */
+	public function setPos(nx:Float, ny:Float)
+	{
+		x = nx;
+		y = ny;
+		bg.setPosition(nx, ny);
+		txt.x = nx;
+		txt.y = ny + (h - txt.height) / 2;
 	}
 
 	public function setActive(v:Bool)
@@ -2353,15 +3724,14 @@ class FlatButton
 	public function updateHover()
 	{
 		if (!bg.visible) return;
-		var m = FlxG.mouse;
-		var over = FlxG.mouse.visible && (m.viewX >= x && m.viewX < x + w && m.viewY >= y && m.viewY < y + h);
+		var over = ModsMenuState.pointerOver(x, y, w, h);
 		if (over != hovered)
 		{
 			hovered = over;
 			txt.color = over ? ModsMenuState.C_ACCENT : ModsMenuState.C_TEXT;
 			applyBg();
 		}
-		if (over && enabled && FlxG.mouse.justPressed)
+		if (over && enabled && ModsMenuState.pointerJustPressed())
 		{
 			ModsMenuState.dbg('  -> click [' + dbgName + '] rect=(' + Std.int(x) + ',' + Std.int(y) + ',' + Std.int(w) + ',' + Std.int(h) + ')');
 			onClick();
@@ -2414,10 +3784,10 @@ class SwitchButton
 		track = new Rect(x, y, TRACK_W, TRACK_H, round, round, COL_ON, 0.8);
 		knob = new Rect(x + KNOB_PAD, y + KNOB_PAD_Y, TRACK_W / 2 - KNOB_PAD * 2, TRACK_H - KNOB_PAD_Y * 2, round, round, FlxColor.WHITE, 0.8);
 
-		txt = new FlxText(x, y, 0, Language.get('enabledLabel', 'mods'), 14);
-		txt.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 14, 0xFF7DE3A6);
-		hint = new FlxText(x, y, 0, Language.get('toggleHint', 'mods'), 11);
-		hint.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 11, ModsMenuState.C_HINT);
+		txt = new SharpText(x, y, 0, Language.get('enabledLabel', 'mods'), 14);
+		ModsMenuState.fmtSharp(txt, 14, 0xFF7DE3A6);
+		hint = new SharpText(x, y, 0, Language.get('toggleHint', 'mods'), 11);
+		ModsMenuState.fmtSharp(hint, 11, ModsMenuState.C_HINT);
 
 		layout();
 		setState(true, true);
@@ -2447,10 +3817,25 @@ class SwitchButton
 		}
 	}
 
+	/** 供设置视图把整个详情页"整体上滚"用（记录 y / 落回都走 ModsMenuState.detailSavedY） */
+	public function contentSprites():Array<FlxSprite>
+	{
+		return cast [track, knob, txt, hint];
+	}
+
 	/** 右对齐用：左边界（详情标题据此决定可用宽度） */
 	public function left():Float
 	{
 		return x;
+	}
+
+	/** 无模组时一起隐藏 */
+	public function setVisible(v:Bool):Void
+	{
+		track.visible = v;
+		knob.visible = v;
+		txt.visible = v;
+		hint.visible = v;
 	}
 
 	public function setRight(rx:Float)
@@ -2487,21 +3872,151 @@ class SwitchButton
 
 	public function updateHover()
 	{
-		var m = FlxG.mouse;
-		var over = FlxG.mouse.visible && (m.viewX >= x && m.viewX < x + w && m.viewY >= y && m.viewY < y + h);
+		if (!track.visible) return; // 空状态整块隐藏时不许再响应点击
+		var over = ModsMenuState.pointerOver(x, y, w, h);
 		if (over != hovered)
 		{
 			hovered = over;
 			txt.color = over ? ModsMenuState.C_ACCENT : (state ? 0xFF7DE3A6 : 0xFFF79A9A);
 		}
-		if (over && FlxG.mouse.justPressed)
+		if (over && ModsMenuState.pointerJustPressed())
 		{
-			ModsMenuState.dbg('  -> click [detail:toggle] at(' + Std.int(m.viewX) + ',' + Std.int(m.viewY) + ')');
+			ModsMenuState.dbg('  -> click [detail:toggle] at(' + Std.int(ModsMenuState.pointerX()) + ',' + Std.int(ModsMenuState.pointerY()) + ')');
 			onClick();
 		}
 		// 每帧朝目标色插值（复刻 BoolButton.updateBgColor；悬停时整体亮一点）
 		var target:FlxColor = state ? COL_ON : COL_OFF;
 		if (hovered) target = FlxColor.interpolate(target, FlxColor.WHITE, 0.18);
+		curCol = FlxColor.interpolate(curCol, target, 0.2);
+		track.color = curCol;
+	}
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// 超采样文字：每次位图重建（makeGraphic → resetHelpers → centerOrigin）都会把
+// origin 拽回中心，缩放锚点随之漂移（文字/按钮文字整体右下偏移）。
+// 这里在每次 regen 后强制归零，保证 fmtSharp 的"1.5x 光栅 + 缩回"锚定左上角。
+// ══════════════════════════════════════════════════════════════════════
+class SharpText extends FlxText
+{
+	override function regenGraphic():Void
+	{
+		super.regenGraphic();
+		origin.set(0, 0);
+		offset.set(0, 0);
+	}
+
+	public function new(X:Float = 0, Y:Float = 0, FieldWidth:Float = 0, ?Text:String, Size:Int = 8, EmbeddedFont:Bool = true)
+	{
+		super(X, Y, FieldWidth, Text, Size, EmbeddedFont);
+	}
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// 模组设置项（内嵌视图的运行时记录）
+//   不复用 options.base.OptionBase：那套 getValue/setValue 绑死 ClientPrefs.data，
+//   模组设置要读写的是 FlxG.save.data.modSettings[folder]，值语义自己管。
+// ══════════════════════════════════════════════════════════════════════
+class SettOpt
+{
+	public var saveKey:String;
+	public var name:String = '';
+	public var desc:String = '';
+	public var type:String = 'bool'; // bool / int / float / percent / string / keybind
+	public var options:Array<String> = null; // string 型的候选值
+	public var value:Dynamic = null; // 当前值
+	public var def:Dynamic = null; // 默认值（settings.json 的 value 字段）
+	public var format:String = '%v'; // 显示格式（%v = 当前值，%d = 默认值）
+	public var min:Dynamic = null;
+	public var max:Dynamic = null;
+	public var step:Float = 1;
+	public var scrollSpeed:Float = 1;
+	public var decimals:Int = 0;
+	public var curIdx:Int = 0; // string 型当前候选下标
+	public var keys:{keyboard:String, gamepad:String} = null; // keybind 型
+	public var isHeader:Bool = false; // 分组标题行（Toolbox 的单值 string 项）
+	public var rowVisible:Bool = true; // 设置视图搜索过滤
+	public var uiY:Float = 0; // 在选项列表中的世界 y（setCam）
+	// UI（懒建，随 buildSettingsOptions 重建）
+	public var rowBg:FlxSprite = null;
+	public var nameTxt:FlxText = null;
+	public var valTxt:FlxText = null;
+
+	public function new() {}
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// 设置视图的 bool 开关：SwitchButton 的紧凑版（无状态文字/提示，纯轨道+滑块），
+// 尺寸/颜色/动画节奏与其一致，避免"详情开关和设置开关长得不一样"。
+// ══════════════════════════════════════════════════════════════════════
+class SettToggle
+{
+	static inline var COL_OFF:FlxColor = 0xFF6363;
+	static inline var COL_ON:FlxColor = 0x63FF75;
+	static inline var TRACK_W:Float = 88;
+	static inline var TRACK_H:Float = 30;
+
+	var x:Float;
+	var y:Float;
+	var track:Rect;
+	var knob:Rect;
+	var onClick:Void->Void;
+	var state:Bool = false;
+	var hovered:Bool = false;
+	var curCol:FlxColor = COL_OFF;
+	var knobTween:FlxTween = null;
+
+	public function new(x:Float, y:Float, onClick:Void->Void)
+	{
+		this.x = x;
+		this.y = y;
+		this.onClick = onClick;
+
+		var round:Float = TRACK_W / 20;
+		track = new Rect(x, y, TRACK_W, TRACK_H, round, round, COL_ON, 0.8);
+		knob = new Rect(x + 2, y + 3, TRACK_W / 2 - 4, TRACK_H - 6, round, round, FlxColor.WHITE, 0.8);
+		setState(false, true);
+	}
+
+	public function addTo(state0:ModsMenuState, cam:FlxCamera)
+	{
+		for (s in [track, knob])
+		{
+			s.cameras = [cam];
+			s.scrollFactor.set();
+			state0.add(s);
+		}
+	}
+
+	public function setVisible(v:Bool)
+	{
+		track.visible = v;
+		knob.visible = v;
+	}
+
+	public function setState(v:Bool, instant:Bool = false)
+	{
+		state = v;
+		var targetX:Float = v ? (x + TRACK_W / 2 + 1) : (x + 2);
+		if (instant)
+		{
+			knob.x = targetX;
+			curCol = v ? COL_ON : COL_OFF;
+		}
+		else
+		{
+			if (knobTween != null) knobTween.cancel();
+			knobTween = FlxTween.tween(knob, {x: targetX}, 0.2, {ease: FlxEase.quadOut});
+		}
+	}
+
+	public function updateHover()
+	{
+		if (!track.visible) return;
+		var over = ModsMenuState.pointerOver(x, y, TRACK_W, TRACK_H);
+		if (over && ModsMenuState.pointerJustPressed()) onClick();
+		var target:FlxColor = state ? COL_ON : COL_OFF;
+		if (over) target = FlxColor.interpolate(target, FlxColor.WHITE, 0.18);
 		curCol = FlxColor.interpolate(curCol, target, 0.2);
 		track.color = curCol;
 	}

@@ -244,6 +244,13 @@ class CharterEventScreenNew extends MusicBeatSubstate {
 	@:noCompletion var __ignoreLastClick:Bool = false;
 	var sinner:Float = 0;
 	override public function update(elapsed:Float) {
+		#if mobile
+		if (controls.BACK) {
+			quit();
+			return;
+		}
+		#end
+
 		var mousepoint = FlxG.mouse.getPositionInCameraView(cam);
 		boundWindow();
 

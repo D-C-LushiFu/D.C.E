@@ -61,7 +61,7 @@ item_prev_event => 上一个
 item_next_event => 下一个
 
 # ===== 项：音符菜单 =====
-item_sustain_len => 持续长度
+item_sustain_len => 持续时长 (ms)
 item_strum_time => 击打时间 (ms)
 item_note_type => 音符类型
 
@@ -126,9 +126,9 @@ label_song_title => 歌曲名
 label_speed => 速度
 label_mania => 键数
 label_stage => 舞台
-label_player1 => 对手
+label_player1 => 玩家
 label_gf => 女友
-label_player2 => 玩家
+label_player2 => 对手
 
 # ===== 帮助菜单标题标签 =====
 label_help_nav => 导航操作
@@ -171,7 +171,7 @@ desc_add_event => 在当前播放头（那条竖红线）的位置插入一个�
 desc_del_event => 删除当前已经选中的事件。删了就没了，不能撤销，删之前先「保存」一次。
 desc_prev_event => 把选中条从当前事件往前跳到时间更小的那一个。
 desc_next_event => 把选中条从当前事件往后跳到时间更大的那一个。
-desc_sustain_len => 当前音符的持续长度（1 等于一小节中的一个标准拍长）。0 就相当于普通短音符，0.5 是半拍长音。
+desc_sustain_len => 当前音符的延音时长，单位为毫秒。占几拍由当前 BPM 决定：一拍为 60000 ÷ BPM 毫秒；0 为普通短音符。
 desc_strum_time => 音符的击打时间（毫秒），即这个音符应该被玩家按下的精确时刻，从歌曲开头 0ms 起算。
 desc_note_type => 音符特殊类型：None = 普通，Alt Animation = 替身动画，Hey! = 播放配音，Hurt Note = 击中丢血，GF Sing = 让女友唱一声，No Animation = 不出动画。
 desc_must_hit => 开启时本小节由玩家（BF）击打；关闭时由对手击打。每一个 Section 只能选一种，别乱混。
@@ -253,7 +253,7 @@ label_note_splash => 音符溅射:
 label_event_type => 事件类型:
 label_value1 => 值 1:
 label_value2 => 值 2:
-label_sustain_len => 持续长度:
+label_sustain_len => 持续时长 (ms):
 label_strum_time => 击打时间:
 label_note_type => 音符类型:
 label_beats => 当前小节节拍:
@@ -265,9 +265,9 @@ label_song_bpm => BPM:
 label_song_speed => 速度:
 label_song_mania => 键数:
 label_stage => 舞台:
-label_player1 => 对手:
+label_player1 => 玩家:
 label_gf => 女友:
-label_player2 => 玩家:
+label_player2 => 对手:
 
 # ===== 确认弹窗（破坏性操作） =====
 prompt_paste_section => 把剪贴板内容粘贴到当前小节？\n这会覆盖当前小节。
@@ -276,3 +276,27 @@ prompt_swap_section => 把当前小节里玩家音符和对手音符对调？
 prompt_copy_beat => 复制目标节拍并覆盖当前小节？
 prompt_duet_notes => 平衡本小节两侧音符？\n把音符多的一侧复制到少的一侧。
 prompt_mirror_notes => 镜像本小节的所有音符？
+item_history => 历史记录
+desc_history => 查看并跳转到编谱器的编辑历史
+item_redo => 重做上一步
+desc_redo => 重做最近撤销的编辑
+history_title => 编辑历史
+history_undo => 撤销  Ctrl+Z
+history_redo => 重做  Ctrl+Y
+history_opened_chart => 打开谱面
+history_add_item => 添加音符或事件
+history_delete_item => 删除音符或事件
+history_edit_chart => 编辑谱面数据
+history_apply_note_skin => 应用音符类型
+history_paste_section => 粘贴小节
+history_clear_section => 清空小节
+history_swap_sides => 交换音符双方
+history_copy_section => 复制上一小节
+history_copy_beat => 复制节拍
+history_duet => 平衡双方音符
+history_mirror => 镜像音符
+history_clear_events => 清空事件
+history_clear_notes => 清空音符
+history_change_sustain => 修改持续音长度
+history_load_events => 载入事件
+history_load_autosave => 载入自动保存

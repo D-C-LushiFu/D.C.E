@@ -147,7 +147,7 @@
 <body>
 
 <header>
-  <div class="app"><span class="dot" id="connDot"></span> 移动端 Editor 按键编辑器 <span style="color:var(--dim);font-weight:400;font-size:13px">(外部窗口 — 连接 NovaFlare 内嵌服务后读取/保存当前 Editor)</span></div>
+  <div class="app"><span class="dot" id="connDot"></span> 移动端 Editor 按键编辑器 <span style="color:var(--dim);font-weight:400;font-size:13px">(外部窗口 — 连接 D.C.E. 内嵌服务后读取/保存当前 Editor)</span></div>
   <div class="sep"></div>
   <label>当前 Editor</label>
   <select id="edSel"></select>
@@ -180,7 +180,7 @@
         <span class="v" id="zoomV">100%</span>
       </div>
       <div class="grp">
-        <label title="用该 Editor 的真实界面截图作为摆放背景（游戏从 FuckYouNFEMobile/bg/ 读取）"><input type="checkbox" id="bgOn" checked> 背景</label>
+        <label title="用该 Editor 的真实界面截图作为摆放背景（游戏从 FuckYouDCEMobile/bg/ 读取）"><input type="checkbox" id="bgOn" checked> 背景</label>
         <input type="range" id="bgAlpha" min="10" max="100" value="55" title="背景不透明度">
         <span class="v" id="bgAlphaV">55%</span>
       </div>
@@ -224,7 +224,7 @@
 </main>
 
 <footer>
-  <span>保存目录：<span class="path" id="footFolder">FuckYouNFEMobile/</span></span>
+  <span>保存目录：<span class="path" id="footFolder">FuckYouDCEMobile/</span></span>
   <span>文件名：<span class="path" id="footFile"></span></span>
   <span class="msg" id="footStatus">点「保存」写入 JSON；游戏内约 1 秒自动热重载生效</span>
 </footer>
@@ -1186,9 +1186,9 @@ document.getElementById("btnCopyFrom").onclick = async ()=>{
 
 function refreshHead(){
   document.getElementById("fileHint").textContent = "→ " + curEditor + "NewFuckingButtonMobile.json";
-  document.getElementById("footFile").textContent = (knownFolder||"FuckYouNFEMobile/") + curEditor + "NewFuckingButtonMobile.json";
+  document.getElementById("footFile").textContent = (knownFolder||"FuckYouDCEMobile/") + curEditor + "NewFuckingButtonMobile.json";
   const ff = document.getElementById("footFolder");
-  if(ff) ff.textContent = knownFolder || "FuckYouNFEMobile/";
+  if(ff) ff.textContent = knownFolder || "FuckYouDCEMobile/";
 }
 function setFoot(msg, cls){
   const f = document.getElementById("footStatus");
@@ -1220,7 +1220,7 @@ function closeModal(){ document.getElementById("modal").classList.remove("show")
 function copyJson(){ navigator.clipboard && navigator.clipboard.writeText(document.getElementById("jsonOut").textContent); closeModal(); }
 document.getElementById("modal").addEventListener("mousedown", (ev)=>{ if(ev.target.id==="modal") closeModal(); });
 
-/* ==================== NovaFlare 引擎 API 接线 ==================== */
+/* ==================== D.C.E. 引擎 API 接线 ==================== */
 let apiConnected = false;
 let knownFolder = null;
 

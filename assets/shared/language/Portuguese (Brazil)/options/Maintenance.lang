@@ -3,6 +3,8 @@ Maintenance => Manutenção
 developerMode => Modo Desenvolvedor
 deepDebug => Depuração Profunda
 devConScale => Tamanho do Console
+luaErrorOverlay => Aviso de Erro Lua
+hscriptErrorOverlay => Aviso de Erro HScript
 
 oldHscriptVersion => Versão Antiga do Hscript
 

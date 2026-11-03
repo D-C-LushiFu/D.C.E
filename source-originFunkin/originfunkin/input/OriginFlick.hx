@@ -4,8 +4,8 @@ import flixel.math.FlxPoint;
 
 /**
  * Small compatibility implementation of the momentum object exposed by the
- * FunkinCrew Flixel fork. It is only injected into NF's touch manager on
- * mobile builds and does not replace NovaFlare's selected Flixel library.
+ * FunkinCrew Flixel fork. It is only injected into D.C.E.'s touch manager on
+ * mobile builds and does not replace D.C.E.'s selected Flixel library.
  */
 class OriginFlick
 {

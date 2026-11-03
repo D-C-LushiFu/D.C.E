@@ -1,0 +1,187 @@
+{
+	"events": [
+		[
+			0,
+			[
+				[
+					"Focus Camera",
+					"boyfriend",
+					"0,0,0,CLASSIC",
+					0,
+					"camera"
+				],
+				[
+					"Zoom Camera",
+					"1.1",
+					"2,linear,direct",
+					0,
+					"camera"
+				],
+				[
+					"Zoom Camera",
+					"1.1",
+					"2,linear,direct",
+					0,
+					"camera"
+				],
+				[
+					"Zoom Camera",
+					"1.1",
+					"2,linear,direct",
+					0,
+					"camera"
+				],
+				[
+					"Zoom Camera",
+					"1.1",
+					"2,linear,direct",
+					0,
+					"camera"
+				],
+				[
+					"Zoom Camera",
+					"1.1",
+					"2,linear,direct",
+					0,
+					"camera"
+				],
+				[
+					"Zoom Camera",
+					"1.1",
+					"2,linear,direct",
+					0,
+					"camera"
+				],
+				[
+					"Zoom Camera",
+					"1.1",
+					"2,linear,direct",
+					0,
+					"camera"
+				]
+			]
+		],
+		[
+			9600,
+			[
+				[
+					"Focus Camera",
+					"dad",
+					"0,0,0,CLASSIC",
+					0,
+					"camera"
+				]
+			]
+		],
+		[
+			14400,
+			[
+				[
+					"Focus Camera",
+					"boyfriend",
+					"0,0,0,CLASSIC",
+					0,
+					"camera"
+				]
+			]
+		],
+		[
+			19200,
+			[
+				[
+					"Focus Camera",
+					"dad",
+					"0,0,0,CLASSIC",
+					0,
+					"camera"
+				]
+			]
+		],
+		[
+			24000,
+			[
+				[
+					"Focus Camera",
+					"boyfriend",
+					"0,0,0,CLASSIC",
+					0,
+					"camera"
+				]
+			]
+		],
+		[
+			28800,
+			[
+				[
+					"Focus Camera",
+					"dad",
+					"0,0,0,CLASSIC",
+					0,
+					"camera"
+				]
+			]
+		],
+		[
+			33600,
+			[
+				[
+					"Focus Camera",
+					"boyfriend",
+					"0,0,0,CLASSIC",
+					0,
+					"camera"
+				]
+			]
+		],
+		[
+			38400,
+			[
+				[
+					"Focus Camera",
+					"dad",
+					"0,0,0,CLASSIC",
+					0,
+					"camera"
+				]
+			]
+		],
+		[
+			43200,
+			[
+				[
+					"Focus Camera",
+					"boyfriend",
+					"0,0,0,CLASSIC",
+					0,
+					"camera"
+				]
+			]
+		],
+		[
+			48000,
+			[
+				[
+					"Focus Camera",
+					"dad",
+					"0,0,0,CLASSIC",
+					0,
+					"camera"
+				]
+			]
+		],
+		[
+			50400,
+			[
+				[
+					"Focus Camera",
+					"boyfriend",
+					"0,0,0,CLASSIC",
+					0,
+					"camera"
+				]
+			]
+		]
+	],
+	"format": "psych_cam_v1",
+	"initialized": true
+}

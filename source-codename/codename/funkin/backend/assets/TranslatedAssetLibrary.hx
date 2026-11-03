@@ -168,7 +168,8 @@ class TranslatedAssetLibrary extends AssetLibrary implements IModsAssetLibrary {
 
 	public override function exists(id:String, type:String):Bool
 	{
-		for(lib in ModsFolder.getLoadedModsLibs(true)) if(lib is AssetLibrary && cast(lib, AssetLibrary).exists(formatPath(lib.prefix, id), type)) return true;
-		return false;
+		if (!(forLibrary is AssetLibrary)) return false;
+		var lib:AssetLibrary = cast forLibrary;
+		return lib.exists(formatPath(forLibrary.prefix, id), type);
 	}
 }

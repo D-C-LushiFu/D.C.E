@@ -70,3 +70,14 @@ desc_help_anims => Previous/next expression: W / S
 desc_help_replay => Replay current line text: SPACE
 desc_help_f1 => Open this help menu: F1
 desc_help_exit => Exit editor: ESC (confirms when unsaved changes exist)
+
+# ===== Exit confirmation popup (overrides the shared keys in the editors group) =====
+confirm_unsaved_title => Exit Dialogue Editor
+confirm_unsaved_message => This dialogue has unsaved changes. Those lines will be lost if you exit. Discard them and exit?
+
+item_duplicate_line => Duplicate line
+desc_duplicate_line => Copy this line and all its properties below it
+item_move_line_up => Move line up
+desc_move_line_up => Move the current dialogue line earlier
+item_move_line_down => Move line down
+desc_move_line_down => Move the current dialogue line later

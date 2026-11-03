@@ -1,6 +1,7 @@
 package states.freeplayState.objects.song;
 
 import games.objects.HealthIcon;
+import games.backend.Highscore;
 import flixel.graphics.FlxGraphic;
 import lime._internal.graphics.ImageDataUtil;
 import lime.graphics.Image as LimeImage;
@@ -9,7 +10,7 @@ import lime.math.Vector2;
 
 class SongRect extends FlxSpriteGroup {
 
-    static public final fixWidth:Int = 560;
+    static public final fixWidth:Int = 500;
     static public final fixHeight:Int = #if mobile 80 #else 70 #end;
 
     public var id:Int = 0;
@@ -26,6 +27,8 @@ class SongRect extends FlxSpriteGroup {
     public var haveDiffDis:Bool = false;
     public var _songCharter:Array<String>;
     private var _songColor:FlxColor;
+
+    public function getSongColor():FlxColor return _songColor;
 
     public var diffRectGroup:FlxSpriteGroup;
 
@@ -44,13 +47,22 @@ class SongRect extends FlxSpriteGroup {
     private var icon:HealthIcon;
     private var songName:FlxText;
     private var musican:FlxText;
+    private var highScoreLabel:FlxText;
+    private var highScoreText:FlxText;
+    private var lastMetaDifficulty:Int = -99;
     private var selectLight:Rect;
 
-    public function new(songNameSt:String, songIcon:String, songMusican:String, songCharter:Array<String>, songColor:Array<Int>) {
+    public function new(songNameSt:String, songIcon:String, songMusican:String, songCharter:Array<String>, songColor:Array<Int>, modelOnly:Bool = false) {
         super(0, 0);
 
         this.songNameSt = songNameSt;
         this.songMusican = songMusican;
+        if (modelOnly) {
+            _songCharter = songCharter;
+            _songColor = FlxColor.fromRGB(songColor[0], songColor[1], songColor[2]);
+            bgPath = PreThreadLoad.bgPathCheck(Mods.currentModDirectory, 'data/${songNameSt}/bg');
+            diffRectGroup = new FlxSpriteGroup(); add(diffRectGroup); return;
+        }
         
         diffRectGroup = new FlxSpriteGroup();
         add(diffRectGroup);
@@ -118,13 +130,21 @@ class SongRect extends FlxSpriteGroup {
 		songName.x += bg.height / 2 - icon.height / 2 + icon.width * 1.1;
 		add(songName);
 
-        musican = new FlxText(0, 0, 0, songMusican, 20);
-		musican.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(selectShow.height * 0.2), 0xFFFFFFFF, LEFT, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
+        musican = new FlxText(0, 0, 290, songMusican, 20);
+        musican.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 14, 0xFFD0D2DA, LEFT, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
         musican.borderStyle = NONE;
 		musican.antialiasing = ClientPrefs.data.antialiasing;
 		musican.x += bg.height / 2 - icon.height / 2 + icon.width * 1.1;
-		musican.y += songName.textField.textHeight;
-		add(musican);
+        musican.y += songName.textField.textHeight;
+        add(musican);
+
+        highScoreLabel = new FlxText(368, 7, 112, '最高分', 12);
+        highScoreLabel.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 12, 0xFFD0D2DA, RIGHT);
+        highScoreLabel.borderStyle = NONE; highScoreLabel.antialiasing = ClientPrefs.data.antialiasing; add(highScoreLabel);
+        highScoreText = new FlxText(355, 23, 125, '—', 19);
+        highScoreText.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 19, 0xFFFFFFFF, RIGHT);
+        highScoreText.borderStyle = NONE; highScoreText.antialiasing = ClientPrefs.data.antialiasing; add(highScoreText);
+        refreshRowMetadata();
 
         selectLight = new Rect(0, 0, Std.int(selectShow.width + 50), Std.int(selectShow.height), fixHeight / 4, fixHeight / 4, 0xFFFFFF, 0);
         selectLight.antialiasing = ClientPrefs.data.antialiasing;
@@ -185,7 +205,8 @@ class SongRect extends FlxSpriteGroup {
      */
     public static function createBackgroundImages(file:String, viewportWidth:Int, viewportHeight:Int):{
         background:LimeImage,
-        thumbnail:LimeImage
+        thumbnail:LimeImage,
+        cover:LimeImage
     } {
         try {
             if (!FileSystem.exists(file))
@@ -209,6 +230,13 @@ class SongRect extends FlxSpriteGroup {
             var thumbnail:LimeImage = coverBackgroundImage(
                 resizedBackground.clone(), fixWidth, fixHeight);
 
+            // Keep one sharp, wide crop for the selected-song showcase. This
+            // is generated from the same decoded image as the blurred stage
+            // background and list thumbnail, so scrolling does not trigger a
+            // second decode on the render thread.
+            var cover:LimeImage = coverBackgroundImage(
+                resizedBackground.clone(), 620, 250);
+
             var backgroundWidth:Int = Std.int(Math.max(1, viewportWidth / 4));
             var backgroundHeight:Int = Std.int(Math.max(1, viewportHeight / 4));
             resizedBackground.resize(backgroundWidth, backgroundHeight);
@@ -229,12 +257,18 @@ class SongRect extends FlxSpriteGroup {
 
             return {
                 background: blurredBackground,
-                thumbnail: thumbnail
+                thumbnail: thumbnail,
+                cover: cover
             };
         } catch (e:Dynamic) {
             trace('FREEPLAY BG: failed to prepare $file because $e');
             return null;
         }
+    }
+
+    public static function createCoverImage(path:String, w:Int, h:Int):LimeImage {
+        try { return coverBackgroundImage(LimeImage.fromFile(path), w, h); }
+        catch (e:Dynamic) { trace('FREEPLAY COVER: $e'); return null; }
     }
 
     static function coverBackgroundImage(source:LimeImage, width:Int, height:Int):LimeImage {
@@ -273,6 +307,7 @@ class SongRect extends FlxSpriteGroup {
     public var onFocus(default, set):Bool = true; //是当前这个歌曲被选择
     override function update(elapsed:Float)
 	{
+        if (lastMetaDifficulty != FreeplayState.curDifficulty) refreshRowMetadata();
         if (FreeplayState.curSelected != this.id) onFocus = false;
         else {
             if (diffAdded) {
@@ -310,6 +345,17 @@ class SongRect extends FlxSpriteGroup {
         }
 	}
 
+    function refreshRowMetadata():Void {
+        var diff:Int = Std.int(Math.max(0, FreeplayState.curDifficulty));
+        lastMetaDifficulty = FreeplayState.curDifficulty;
+        var mapper:String = 'N/A';
+        if (_songCharter != null && diff < _songCharter.length && _songCharter[diff] != null)
+            mapper = _songCharter[diff];
+        musican.text = '曲师 ${songMusican}　·　谱师 ${mapper}';
+        var score:Int = Highscore.getScore(Paths.formatToSongPath(songNameSt), diff);
+        highScoreText.text = score > 0 ? StringTools.lpad(Std.string(score), '0', 7) : '—';
+    }
+
     public function beatHit() {
         light.alpha = 1;
         if (diffRectGroup.members[FreeplayState.curDifficulty] != null) {
@@ -327,13 +373,14 @@ class SongRect extends FlxSpriteGroup {
 
         Difficulty.loadFromWeek();
         FreeplayState.curDifficulty = 0;
+        FreeplayState.instance.buildHybridDifficultyButtons();
 
         FlxTimer.wait(0.001, () -> {
             if (exists && FreeplayState.instance != null && openRect == this
                 && requestId == openRectRequestId)
                 createDiff(imme);
         });
-        FreeplayState.instance.songsMove.tweenData = FlxG.height * 0.5 - SongRect.fixHeight * 0.5 - FreeplayState.instance.getEffectiveId(FreeplayState.curSelected) * SongRect.fixHeight * FreeplayState.instance.rectInter - (FreeplayState.curDifficulty+1) * DiffRect.fixHeight * 1.05;
+        FreeplayState.instance.songsMove.tweenData = FlxG.height * 0.5 - SongRect.fixHeight * 0.5 - FreeplayState.instance.getEffectiveId(FreeplayState.curSelected) * SongRect.fixHeight * FreeplayState.instance.rectInter - (FreeplayState.curDifficulty+1) * DiffRect.fixHeight * 1.05 - 55;
         FreeplayState.instance.initSongsData();
     }
 	
@@ -371,7 +418,9 @@ class SongRect extends FlxSpriteGroup {
                 var chart:String = _songCharter[diff];
                 if (_songCharter[diff] == null)
                     chart = _songCharter[0];
-                var rect = new DiffRect(this, Difficulty.list[diff], _songColor, chart);
+                var diffColors:Array<FlxColor> = [0xFF67E69C, 0xFFFFD75E, 0xFFFF4248];
+                var fixedColor:FlxColor = diffColors[Std.int(Math.min(diff, diffColors.length - 1))];
+                var rect = new DiffRect(this, Difficulty.list[diff], fixedColor, chart);
                 diffRectGroup.add(rect);
                 rect.id = diff;
                 rect.startTarY = bg.height + fixHeight / 10 + diff * DiffRect.fixHeight * 1.05;
@@ -475,7 +524,9 @@ class SongRect extends FlxSpriteGroup {
         if (Math.abs(searchOffset - searchTar) > 1) searchOffset = FlxMath.lerp(searchTar, searchOffset, Math.exp(-FreeplayState.instance.songsMove.saveElapsed * FreeplayState.instance.songsMove.lerpSmooth));
         else searchOffset = searchTar;
         
-        realX = FlxG.width - this.selectShow.width + 80 + moveX + chooseX + diffX + searchOffset;
+        // Anchor the track rail on the left while retaining the slight
+        // horizontal drift that gives the rows their Phigros diagonal stack.
+        realX = 90 + moveX * 0.1 + chooseX + diffX + searchOffset;
         diffCalcX();
     }
 

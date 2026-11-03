@@ -181,9 +181,9 @@ class ConsoleToggleButton extends Sprite {
 			return;
 		}
 
-		// 默认右上角
-		x = Lib.current.stage.stageWidth - WIDTH - 14;
-		y = 14;
+		// 默认右上角（hotfix：移动端留出圆角/刘海安全距离）
+		x = Lib.current.stage.stageWidth - WIDTH - #if mobile 50 #else 14 #end;
+		y = #if mobile 50 #else 14 #end;
 	}
 
 	private static function savePrefs():Void {

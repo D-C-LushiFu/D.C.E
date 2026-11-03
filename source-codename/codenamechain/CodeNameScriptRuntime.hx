@@ -13,14 +13,18 @@ class CodeNameScriptRuntime
 	static final retainedClasses:Array<Class<Dynamic>> = [
 		cast hxvlc.flixel.FlxVideo,
 		cast FlxTextFormatRange,
+		cast flixel.addons.util.FlxSimplex,
+		cast flixel.tweens.FlxTweenType_HSC,
 		cast flixel.text.FlxTextAlign_HSC,
-		cast codename.funkin.backend.utils.CoolSfx_HSC
+		cast flixel.input.keyboard.FlxKey_HSC,
+		cast flixel.input.gamepad.FlxGamepadInputID_HSC,
+		cast openfl.ui.MouseCursor_HSC,
+		cast codename.funkin.backend.utils.CoolSfx_HSC,
+		cast codename.funkin.backend.scripting.events.sprite.PlayAnimContext_HSC
 	];
 
 	public static function init():Void
 	{
-		// Reading the registry makes the class roots reachable without constructing
-		// them or changing NovaFlare's normal runtime behavior.
 		if (retainedClasses.length == 0)
 			throw "CodeName script runtime registry was not generated";
 	}

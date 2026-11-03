@@ -362,16 +362,27 @@ class Controls extends FlxActionSet
 		return input.device == GAMEPAD && (deviceID == FlxInputDeviceID.ALL || input.deviceID == deviceID);
 	}
 
+	/** Whether the on-screen controls are enabled at a usable opacity. */
+	@:controlsMacroIgnore
+	public var touchC(get, never):Bool;
+
+	@:noCompletion
+	private inline function get_touchC():Bool
+		return #if TOUCH_CONTROLS codename.funkin.options.Options.touchPadAlpha >= 0.1 #else false #end;
+
 	@:nullSafety(Off)
 	public inline function getJustPressed(name:String) {
-		return ControlsUtil.getJustPressed(this, name);
+		return ControlsUtil.getJustPressed(this, name)
+			#if mobile || codename.mobile.CodeNameMobileInput.checkName(name, JUST_PRESSED) #end;
 	}
 	@:nullSafety(Off)
 	public inline function getJustReleased(name:String) {
-		return ControlsUtil.getJustReleased(this, name);
+		return ControlsUtil.getJustReleased(this, name)
+			#if mobile || codename.mobile.CodeNameMobileInput.checkName(name, JUST_RELEASED) #end;
 	}
 	@:nullSafety(Off)
 	public inline function getPressed(name:String) {
-		return ControlsUtil.getPressed(this, name);
+		return ControlsUtil.getPressed(this, name)
+			#if mobile || codename.mobile.CodeNameMobileInput.checkName(name, PRESSED) #end;
 	}
 }

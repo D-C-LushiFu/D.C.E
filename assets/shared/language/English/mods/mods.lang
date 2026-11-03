@@ -1,4 +1,4 @@
-# Mods menu (new UI) language keys
+﻿# Mods menu (new UI) language keys
 # Key names match the L dictionary in the NewModsMenuState.htm prototype
 title => Mods
 subtitle => MODS
@@ -13,12 +13,13 @@ statOff => off
 # Window chrome bar
 hintBar => Wheel scrolls the list · Hold 1s to reorder · ↑↓ select · ←→ zone · Enter confirm · Esc back
 hintBarShort => Wheel scroll · Hold 1s to reorder · Enter confirm
+toastFolder => Mods folder: {path} (open it with a file manager on mobile)
 pressHold => Keep holding 1s to reorder
 pressDrag => Release to drop · drag to an edge to auto-scroll
-openFolder => Open mods folder
-openFolderShort => Open folder
+openFolder => Open external mods
+openFolderShort => Open external mods
 search => Search mods…
-exitList => Exit mod list
+exitList => Exit
 exitListShort => Exit
 winMin => Minimize
 winMax => Maximize / Restore
@@ -76,3 +77,13 @@ srcFreeplay => From: Freeplay
 filterNone => Nothing in this tab
 searchNone => No mod matches "{q}"
 marqueeMode => Marquee: {mode}
+
+# Embedded mod settings view
+setBack => Back
+setBindTip => Keyboard {kb} · Gamepad {gp}
+setBindReset => Rebind
+setBindPrompt => Press any key, Esc to cancel…
+setNoneMod => This mod has no settings
+searchSettings => Search settings…
+setExitSettings => Exit mod settings
+setExitNoSave => Exit without saving

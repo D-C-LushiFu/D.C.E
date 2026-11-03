@@ -2,8 +2,6 @@ package states.freeplayState.objects.down;
 
 import flixel.input.keyboard.FlxKey;
 
-import states.mainMenuState.MainMenuState;
-
 class BackButton extends FlxSpriteGroup {
     var pressRect:Rect;
     var disRect:SkewRoundRect;
@@ -27,8 +25,8 @@ class BackButton extends FlxSpriteGroup {
         disRect.color = normalColor;
         add(disRect);
 
-        text = new FlxText(0, 0, 0, 'Back');
-        text.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 24, 0xFFFFFFFF, CENTER, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
+        text = new FlxText(0, 0, 0, '返回主菜单');
+        text.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 22, 0xFFFFFFFF, CENTER, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
         text.borderStyle = NONE;
 		text.antialiasing = ClientPrefs.data.antialiasing;
         add(text);
@@ -74,12 +72,6 @@ class BackButton extends FlxSpriteGroup {
     }
 
     function back2Mainmenu() {
-        FreeplayState.instance.stopAll = true;
-        Mods.loadTopMod();
-        BackendThread.run(() -> {
-            FreeplayState.destroyFreeplayVocals();
-            FlxG.sound.playMusic(Paths.music('freakyMenu'), 0);
-        });
-        MusicBeatState.switchState(new MainMenuState());
+        FreeplayState.instance.returnPhiMenu();
     }
 }

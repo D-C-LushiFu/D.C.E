@@ -566,13 +566,13 @@ class TitleState extends MusicBeatState
 					FlxG.sound.music.fadeIn(4, 0, 0.7);
 				case 2:
 					#if PSYCH_WATERMARKS
-				        createCoolText(['NovaFlare Engine by'], 40);
+				        createCoolText(['D.C.E. by'], 40);
 				        #else
 				        createCoolText(['ninjamuffin99', 'phantomArcade', 'kawaisprite', 'evilsk8er']);
 				        #end
 			        case 4:
 				        #if PSYCH_WATERMARKS
-				        addMoreText('Beihu', 40);
+				        addMoreText('D.C.Fantasy Land', 40);
 				        #else
 				        addMoreText('present');
 				        #end

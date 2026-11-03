@@ -9,6 +9,8 @@ noteColorSwap => Usar coloração HSV como o psych antigo para as notas
 NotesSubState => Configuração de cor das notas
 NotesSubStateLegacy => Configuração HSV das notas
 
+KeyboardViewerSubState => Abre o editor de feedback do teclado: cores por tecla, barras, transparência, cores das estatísticas, layout e cores das notas da música
+
 Splash => Splash
 
 showSplash => Mostrar ao acertar incrível/maravilhoso

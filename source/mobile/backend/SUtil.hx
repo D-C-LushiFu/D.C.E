@@ -14,16 +14,32 @@ import android.os.Build.VERSION_CODES as AndroidVersionCode;
  */
 class SUtil
 {
+	public static inline var STORAGE_CONTAINER:String = 'D.C.Fantasy Land';
+	public static inline var DEFAULT_STORAGE_FOLDER:String = 'Different Creatingness Engine';
+	public static inline var VERSIONED_STORAGE_FOLDER:String = 'Different Creatingness Engine - 1.2';
+
+	public static function normalizeStorageFolder(folder:String):String
+	{
+		return folder == VERSIONED_STORAGE_FOLDER ? VERSIONED_STORAGE_FOLDER : DEFAULT_STORAGE_FOLDER;
+	}
+
+	#if android
+	public static function getStorageConfigPath():String
+	{
+		return AndroidEnvironment.getExternalStorageDirectory() + '/' + STORAGE_CONTAINER + '/.dce_storage_config';
+	}
+	#end
+
 	#if sys
 	public static function getStorageDirectory(type:StorageType = EXTERNAL, ?folderOverride:String = null):String
 	{
 		var daPath:String = '';
 		#if android
-			var folderName:String = (folderOverride != null) ? folderOverride : lime.app.Application.current.meta.get("file");
+			var folderName:String = normalizeStorageFolder(folderOverride);
 		switch (type)
 		{
 			case EXTERNAL:
-				daPath = AndroidEnvironment.getExternalStorageDirectory() + '/.' + folderName;
+				daPath = AndroidEnvironment.getExternalStorageDirectory() + '/' + STORAGE_CONTAINER + '/' + folderName;
 		}
 		#elseif ios
 		daPath = LimeSystem.documentsDirectory;
@@ -80,8 +96,20 @@ class SUtil
 	}
 
 	#if android
+	public static function hasStoragePermission():Bool
+	{
+		if (AndroidVersion.SDK_INT >= AndroidVersionCode.R)
+			return AndroidEnvironment.isExternalStorageManager();
+		var granted = AndroidPermissions.getGrantedPermissions();
+		return granted.contains('android.permission.READ_EXTERNAL_STORAGE')
+			&& granted.contains('android.permission.WRITE_EXTERNAL_STORAGE');
+	}
+
 	public static function doPermissionsShit():Void
 	{
+		// Settings and permission dialogs are asynchronous. Main waits for the
+		// grant before touching external storage or constructing the game.
+		if (hasStoragePermission()) return;
 		if (AndroidVersion.SDK_INT >= AndroidVersionCode.R) // Android 11 (API 30) and above
 		{
 			if (!AndroidEnvironment.isExternalStorageManager())
@@ -96,29 +124,6 @@ class SUtil
 			}
 		}
 
-		if ((AndroidVersion.SDK_INT >= AndroidVersionCode.R
-			&& !AndroidEnvironment.isExternalStorageManager())
-			|| (AndroidVersion.SDK_INT < AndroidVersionCode.R
-				&& (!AndroidPermissions.getGrantedPermissions().contains('android.permission.READ_EXTERNAL_STORAGE')
-					|| !AndroidPermissions.getGrantedPermissions().contains('android.permission.WRITE_EXTERNAL_STORAGE'))))
-			showPopUp('If you accepted the permissions you are all good!' + '\nIf you didn\'t then expect a crash' + '\nPress OK to see what happens',
-				'Notice!');
-
-		try
-		{
-			if (!FileSystem.exists(SUtil.getStorageDirectory()))
-				FileSystem.createDirectory(SUtil.getStorageDirectory());
-		}
-		catch (e:Dynamic)
-		{
-			showPopUp("Please create folder to\n"
-				+ #if EXTERNAL "/storage/emulated/0/."
-				+ lime.app.Application.current.meta.get('file') #elseif MEDIA "/storage/emulated/0/Android/media/"
-				+ lime.app.Application.current.meta.get('packageName') #else SUtil.getStorageDirectory() #end
-				+ "\nPress OK to close the game",
-				"Error!");
-			LimeSystem.exit(1);
-		}
 	}
 	#end
 
@@ -132,7 +137,11 @@ class SUtil
 			'(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lorg/haxe/lime/HaxeObject;Ljava/lang/String;Lorg/haxe/lime/HaxeObject;)V')(title,
 				message, 'OK', null, null, null);
 		#else
-		FlxG.stage.window.alert(message, title);
+		var application = lime.app.Application.current;
+		if (application != null && application.window != null)
+			application.window.alert(message, title);
+		else
+			Sys.println('$title\n$message');
 		#end
 	}
 	#end

@@ -1,10 +1,10 @@
 # Embed Windows-configured mobile Editor key JSON files as a Haxe constant class.
-# Source: export/legacy-gc/windows/bin/FuckYouNFEMobile/<EditorId>NewFuckingButtonMobile.json
+# Source: export/legacy-gc/windows/bin/FuckYouDCEMobile/<EditorId>NewFuckingButtonMobile.json
 # Output: source/mobile/objects/EditorMobileKeyDefaults.hx
 # Usage: pwsh -File tools/gen-editor-key-defaults.ps1
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$srcDir = Join-Path $root 'export\legacy-gc\windows\bin\FuckYouNFEMobile'
+$srcDir = Join-Path $root 'export\legacy-gc\windows\bin\FuckYouDCEMobile'
 $outPath = Join-Path $root 'source\mobile\objects\EditorMobileKeyDefaults.hx'
 
 $files = Get-ChildItem $srcDir -Filter '*NewFuckingButtonMobile.json' -File |

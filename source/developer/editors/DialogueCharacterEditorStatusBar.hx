@@ -19,7 +19,9 @@ class DialogueCharacterEditorStatusBar extends FlxSpriteGroup
 	static final TEXT_DIM:FlxColor = 0xFF86909C;  // 提示文字（标签部分）
 	static final TEXT_VAL:FlxColor = 0xFFC9CDD4;  // 次级文字（值部分）
 
-	public static final HEIGHT:Int = 25;
+	public static var HEIGHT(get, never):Int;
+	static function get_HEIGHT():Int return EditorInputStyle.si(25);
+	static function set_HEIGHT(v:Int):Int return v;
 
 	var bg:FlxSprite;
 	var rootLabel:FlxText;
@@ -43,7 +45,7 @@ class DialogueCharacterEditorStatusBar extends FlxSpriteGroup
 		topLine.y = 0;
 		add(topLine);
 
-		rootLabel = new FlxText(10, 4, FlxG.width - 20, '', 13);
+		rootLabel = new EditorText(EditorInputStyle.sv(10), EditorInputStyle.sv(4), FlxG.width - EditorInputStyle.sv(20), '', 13);
 		rootLabel.setFormat(Paths.font(DialogueCharacterEditorMenuBar.langFont()), 13, TEXT_VAL, LEFT);
 		add(rootLabel);
 

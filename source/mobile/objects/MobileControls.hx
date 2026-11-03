@@ -209,10 +209,19 @@ class MobileControls extends FlxTypedSpriteGroup<FlxMobileInputManager>
 		else
 			data = ClientPrefs.defaultData;
 
-		buttonsColors.push(data.arrowRGB[0][0]);
-		buttonsColors.push(data.arrowRGB[1][0]);
-		buttonsColors.push(data.arrowRGB[2][0]);
-		buttonsColors.push(data.arrowRGB[3][0]);
+		// ★ 防御：配色表可能少于 4 项（老存档 / 模组只提供部分配色）—— 旧代码直接
+		//   `data.arrowRGB[3][0]` 会越界读到 null 继而 NPE。
+		var tbl:Array<Array<FlxColor>> = data.arrowRGB;
+		for (i in 0...4)
+		{
+			var row:Array<FlxColor> = null;
+			if (tbl != null && tbl.length > 0)
+			{
+				var idx:Int = (i < tbl.length) ? i : tbl.length - 1;
+				row = tbl[idx];
+			}
+			buttonsColors.push((row != null && row.length > 0) ? row[0] : 0xFFFFFFFF);
+		}
 		if (mode == 3)
 		{
 			virtualPad.buttonLeft2.color = buttonsColors[0];

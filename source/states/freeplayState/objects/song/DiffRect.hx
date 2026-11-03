@@ -176,7 +176,7 @@ class DiffRect extends FlxSpriteGroup {
         FreeplayState.curDifficulty = this.id;
         follow.diffFouceUpdate();
         FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
-        FreeplayState.instance.songsMove.tweenData = FlxG.height * 0.5 - SongRect.fixHeight * 0.5 - FreeplayState.instance.getEffectiveId(FreeplayState.curSelected) * SongRect.fixHeight * FreeplayState.instance.rectInter - (FreeplayState.curDifficulty+1) * DiffRect.fixHeight * 1.05;
+        FreeplayState.instance.songsMove.tweenData = FlxG.height * 0.5 - SongRect.fixHeight * 0.5 - FreeplayState.instance.getEffectiveId(FreeplayState.curSelected) * SongRect.fixHeight * FreeplayState.instance.rectInter - (FreeplayState.curDifficulty+1) * DiffRect.fixHeight * 1.05 - 55;
     }
 
     ////////////////////////////////////////////////////////////////////////////////////
@@ -192,7 +192,7 @@ class DiffRect extends FlxSpriteGroup {
         if (Math.abs(chooseX - chooseTar) > 0.01) chooseX = FlxMath.lerp(chooseTar, chooseX, Math.exp(-FreeplayState.instance.songsMove.saveElapsed * FreeplayState.instance.songsMove.lerpSmooth));
         else chooseX = chooseTar;
         
-        realX = FlxG.width - fixWidth * 0.85 + startX + chooseX + follow.searchOffset;
+        realX = 90 + startX * 0.08 + chooseX + follow.searchOffset;
     }
 
     public var realY:Float = 0;

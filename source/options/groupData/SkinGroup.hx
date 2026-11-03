@@ -46,6 +46,17 @@ class SkinGroup extends OptionCata
 		var option:Option = new Option(this, 'NotesSubStateLegacy', STATE);
 		option.onChange = function() { changeState(7); };
 		addOption(option);
+
+		/////--KeyBoard--\\\\\
+		// 键盘反馈（KeyboardViewer）的完整设置入口。
+		// ★ 不再在这里摊开成几条下拉框：那个界面要放十来个键的颜色 + 长条参数 + 透明度 +
+		//   统计配色 + 布局，还会把分类撑到滚动、跟旁边的「颜色设置」大按钮风格不搭。
+		//   现在只留一个入口按钮，点进去是专门的编辑界面（左 10K 实时预览 + 右分组编辑 +
+		//   色轮/色板/HEX 取色），支持多选键位批量改色与「跟随曲目音符配色」。
+
+		var option:Option = new Option(this, 'KeyboardViewerSubState', STATE);
+		option.onChange = function() { changeState(9); };
+		addOption(option);
 		
 		/////--Splash--\\\\\
 

@@ -218,6 +218,7 @@ class FreeplayState extends MusicBeatState
 	 * If it should play the song automatically.
 	 */
 	public var autoplayShouldPlay:Bool = true;
+	private var autoplayRequestId:Int = 0;
 	#end
 
 	private var TEXT_FREEPLAY_SCORE = TU.getRaw("freeplay.score");
@@ -237,7 +238,8 @@ class FreeplayState extends MusicBeatState
 			lerpScore = intendedScore;
 
 		if (canSelect) {
-			changeSelection((controls.UP_P ? -1 : 0) + (controls.DOWN_P ? 1 : 0) - FlxG.mouse.wheel);
+			var scroll = controls.touchC ? 0 : FlxG.mouse.wheel;
+			changeSelection((controls.UP_P ? -1 : 0) + (controls.DOWN_P ? 1 : 0) - scroll);
 			changeDiff((controls.LEFT_P ? -1 : 0) + (controls.RIGHT_P ? 1 : 0));
 			changeCoopMode((controls.CHANGE_MODE ? 1 : 0)); // TODO: make this configurable
 			// putting it before so that its actually smooth
@@ -260,29 +262,46 @@ class FreeplayState extends MusicBeatState
 		autoplayElapsed += elapsed;
 		if (!disableAutoPlay && !songInstPlaying && (autoplayElapsed > timeUntilAutoplay)) {
 			if (curPlayingInst != (curPlayingInst = Paths.inst(curSong.name, curDifficulties[curDifficulty], curSong.instSuffix))) {
+				final previewRequestId = autoplayRequestId;
+				final previewPath = curPlayingInst;
+				final previewBpm = curSong.bpm;
+				final previewBeatsPerMeasure = curSong.beatsPerMeasure;
+				final previewStepsPerBeat = curSong.stepsPerBeat;
 				var streamed = false;
-				/*if (Options.streamedMusic) {
-					var sound = Assets.getMusic(curPlayingInst, true, false);
+				if (Options.streamedMusic) {
+					// Current OpenFL exposes the two-argument API. Keeping this branch
+					// active is especially important on mobile: getSound() fully loads
+					// the preview and can otherwise race PlayState opening the same Inst.
+					var sound = Assets.getMusic(previewPath, true);
 					streamed = sound != null;
 
-					if (streamed && autoplayShouldPlay) {
+					if (streamed && autoplayShouldPlay && previewRequestId == autoplayRequestId && curPlayingInst == previewPath) {
 						FlxG.sound.playMusic(sound, 0);
-						Conductor.changeBPM(curSong.bpm, curSong.beatsPerMeasure, curSong.stepsPerBeat);
+						Conductor.changeBPM(previewBpm, previewBeatsPerMeasure, previewStepsPerBeat);
 					}
-				}*/
+				}
 
 				if (!streamed) {
 					var huh:Void->Void = function() {
-						var soundPath = curPlayingInst;
+						if (!autoplayShouldPlay || previewRequestId != autoplayRequestId || curPlayingInst != previewPath)
+							return;
 						var sound = null;
-						if (Assets.exists(soundPath, SOUND) || Assets.exists(soundPath, MUSIC))
-							sound = Assets.getSound(soundPath);
+						if (Assets.exists(previewPath, SOUND) || Assets.exists(previewPath, MUSIC))
+							sound = Assets.getSound(previewPath);
 						else
-							FlxG.log.error('Could not find a Sound asset with an ID of \'$soundPath\'.');
+							FlxG.log.error('Could not find a Sound asset with an ID of \'$previewPath\'.');
 
-						if (sound != null && autoplayShouldPlay) {
-							FlxG.sound.playMusic(sound, 0);
-							Conductor.changeBPM(curSong.bpm, curSong.beatsPerMeasure, curSong.stepsPerBeat);
+						if (sound != null) {
+							var playPreview = function() {
+								if (!autoplayShouldPlay || previewRequestId != autoplayRequestId || curPlayingInst != previewPath || FlxG.state != this)
+									return;
+								FlxG.sound.playMusic(sound, 0);
+								Conductor.changeBPM(previewBpm, previewBeatsPerMeasure, previewStepsPerBeat);
+							};
+							if (!disableAsyncLoading)
+								haxe.MainLoop.runInMainThread(playPreview);
+							else
+								playPreview();
 						}
 					}
 					if (!disableAsyncLoading) Main.execAsync(huh);
@@ -290,13 +309,17 @@ class FreeplayState extends MusicBeatState
 				}
 			}
 			songInstPlaying = true;
-			if (disableAsyncLoading/* && !Options.streamedMusic*/) dontPlaySongThisFrame = true;
+			if (disableAsyncLoading && !Options.streamedMusic) dontPlaySongThisFrame = true;
 		}
 		#end
 
 
 		if (controls.BACK)
 		{
+			#if PRELOAD_ALL
+			autoplayRequestId++;
+			autoplayShouldPlay = false;
+			#end
 			CoolUtil.playMenuSFX(CANCEL, 0.7);
 			FlxG.switchState(new MainMenuState());
 		}
@@ -339,6 +362,7 @@ class FreeplayState extends MusicBeatState
 		if (event.cancelled) return;
 
 		#if PRELOAD_ALL
+		autoplayRequestId++;
 		autoplayShouldPlay = false;
 		#end
 
@@ -373,14 +397,17 @@ class FreeplayState extends MusicBeatState
 		}
 
 		var prevSong = curSong;
+		var prevDifficulty = curDifficulty;
 		curDifficulty = event.value;
 		updateCurSong();
 		updateScore();
 
 		#if PRELOAD_ALL
-		if (curSong != prevSong) {
+		if (curSong != prevSong || curDifficulty != prevDifficulty) {
+			autoplayRequestId++;
 			autoplayElapsed = 0;
 			songInstPlaying = false;
+			curPlayingInst = null;
 		}
 		#end
 
@@ -430,6 +457,10 @@ class FreeplayState extends MusicBeatState
 		updateScore();
 
 		var coopBinds = [CoolUtil.keyToString(Options.P1_CHANGE_MODE[0]), CoolUtil.keyToString(Options.P2_CHANGE_MODE[0])].filter(x -> x != "---");
+		#if TOUCH_CONTROLS
+		if (controls.touchC)
+			coopBinds = [codename.mobile.CodeNameMobileInput.getID(CHANGE_MODE).toString()];
+		#end
 		if (coopBinds.length == 2 && coopBinds[1] == coopBinds[0]) coopBinds.pop();
 		else if (coopBinds.length == 0) coopBinds.push("---");
 
@@ -467,8 +498,10 @@ class FreeplayState extends MusicBeatState
 		changeDiff(0, true);
 
 		#if PRELOAD_ALL
+		autoplayRequestId++;
 		autoplayElapsed = 0;
 		songInstPlaying = false;
+		curPlayingInst = null;
 		#end
 
 		coopText.visible = curSong.coopAllowed || curSong.opponentModeAllowed;

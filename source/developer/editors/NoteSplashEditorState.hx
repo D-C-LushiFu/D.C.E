@@ -21,7 +21,7 @@ import flixel.text.FlxText;
 
 @:access(games.objects.NoteSplash)
 /**
- * Note Splash 编辑器（NovaFlare 新版 UI）：
+ * Note Splash 编辑器（D.C.E. 新版 UI）：
  *  - Adobe 风格顶栏菜单（NoteSplashEditorMenuBar）+ 底部状态栏 + EditorChromeUI 窗口栏
  *  - 4 音符预览/溅射预览保留；动画/属性/染色参数收进菜单（原生 FlxUI 控件只作数据源）
  */
@@ -83,9 +83,38 @@ class NoteSplashEditorState extends MusicBeatState
 	var holdingArrowsElapsed:Float = 0;
 	var copiedOffset:Array<Float> = [0, 0];
 	var transitioning:Bool = false;
+	var savingDocument:Bool = false;
+
+	public var documentHistory:EditorDocumentHistory;
+	 override public function editorMobileModalOpen():Bool
+		return super.editorMobileModalOpen() || (menuBar != null && menuBar.activeMenu >= 0);
+
+	function historyRead():String return EditorDocumentHistory.jsonSnapshot(Json.parse(Json.stringify({image: imageSkin, config: config})));
+	function historyRestore(snapshot:String):Void
+	{
+		var data:Dynamic = Json.parse(snapshot);
+		if (imageSkin != data.image)
+		{
+			w_image.text = data.image;
+			reloadImage();
+		}
+		var animations:Map<String, NoteSplashAnim> = new Map();
+		for (name in Reflect.fields(data.config.animations)) animations.set(name, cast Reflect.field(data.config.animations, name));
+		data.config.animations = animations;
+		config = data.config;
+		curAnim = null;
+		refreshWidgetsFromConfig();
+		parseRGB();
+		if (splash != null) splash.config = config;
+		if (previewSplash != null) previewSplash.config = config;
+		splashPreview();
+	}
 
 	override function create()
 	{
+		// ★ 十三轮：编辑器统一走高分辨率设计（文字 1:1 光栅化 = 清晰）；
+		//   离开时由 EditorInputStyle 的 stateSwitched 钩子自动还原 1280×720。
+		EditorInputStyle.enterHiRes();
 		if (imageSkin == null)
 			imageSkin = NoteSplash.defaultNoteSplash + NoteSplash.getSplashSkinPostfix();
 
@@ -106,6 +135,11 @@ class NoteSplashEditorState extends MusicBeatState
 		#end
 
 		var bg:FlxSprite = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
+		// ★ 十三轮：设计分辨率可能大于资源尺寸(1286×730) → 拉伸铺满整屏
+		bg.setGraphicSize(Std.int(FlxG.width), Std.int(FlxG.height));
+		bg.updateHitbox();
+		bg.origin.set(0, 0);
+		bg.offset.set(0, 0);
 		bg.scrollFactor.set();
 		bg.color = 0xFF505050;
 		bg.cameras = [camGame];
@@ -117,6 +151,9 @@ class NoteSplashEditorState extends MusicBeatState
 			babyArrow.x = (FlxG.width - Note.swagWidth * 4) / 2 + i * Note.swagWidth;
 			babyArrow.screenCenter(Y);
 			babyArrow.ID = i;
+			// ★ 构造器不会自动播放动画（游戏里是 postAddedToGroup() 负责），这里必须显式播一次：
+			//   否则 animation.curAnim 一直为 null，update() 里读 curAnim.name 会直接空指针。
+			babyArrow.playAnim('static');
 			strums.add(babyArrow);
 		}
 		add(strums);
@@ -131,7 +168,7 @@ class NoteSplashEditorState extends MusicBeatState
 			config = splash.config;
 
 		// UI 提示文本（HUD 相机，顶栏下方）
-		errorText = new FlxText();
+		errorText = new EditorText();
 		errorText.setFormat(null, 16, FlxColor.RED);
 		errorText.text = "ERROR!";
 		errorText.y = FlxG.height - errorText.height;
@@ -140,7 +177,7 @@ class NoteSplashEditorState extends MusicBeatState
 		errorText.scrollFactor.set();
 		add(errorText);
 
-		curText = new FlxText();
+		curText = new EditorText();
 		curText.setFormat(null, 16, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		curText.text = 'Copied Offsets: [0, 0]\nCurrent Animation: NONE';
 		curText.y = FlxG.height - curText.height - 26;
@@ -178,6 +215,10 @@ class NoteSplashEditorState extends MusicBeatState
 
 		refreshWidgetsFromConfig();
 		super.create();
+		documentHistory = new EditorDocumentHistory(historyRead, historyRestore, () -> EditorDocumentHistory.inputFocused([w_image, w_anim_name, w_prefix, w_indices], menuBar), camHUD);
+		documentHistory.onSave = saveSplash;
+		add(documentHistory);
+
 	}
 
 	// ============ 顶栏菜单 ============
@@ -320,12 +361,101 @@ class NoteSplashEditorState extends MusicBeatState
 				refreshRGBWidgets();
 			case 'save':
 				saveSplash();
+			case 'load_json':
+				documentHistory.confirmDiscard(loadConfigJson);
 			case 'exit':
 				exitEditor();
 		}
 	}
 
+	function loadConfigJson():Void
+	{
+		#if sys
+		if (_file != null) return;
+		_file = new FileReference();
+		_file.addEventListener(Event.SELECT, onConfigSelected);
+		_file.addEventListener(Event.CANCEL, onConfigCancelled);
+		_file.addEventListener(IOErrorEvent.IO_ERROR, onConfigCancelled);
+		_file.browse([new FileFilter('Note Splash JSON', '*.json')]);
+		#end
+	}
+
+	function onConfigCancelled(event:Dynamic):Void
+	{
+		if (_file == null) return;
+		_file.removeEventListener(Event.SELECT, onConfigSelected);
+		_file.removeEventListener(Event.CANCEL, onConfigCancelled);
+		_file.removeEventListener(IOErrorEvent.IO_ERROR, onConfigCancelled);
+		_file = null;
+	}
+
+	function onConfigSelected(event:Dynamic):Void
+	{
+		#if sys
+		var path:String = @:privateAccess _file.__path;
+		onConfigCancelled(null);
+		try
+		{
+			var raw:Dynamic = EditorInputValidation.parseJsonObject(File.getContent(path));
+			if (raw == null || raw.animations == null || Type.typeof(raw.animations) != TObject
+				|| !EditorInputValidation.finiteNumber(raw.scale) || raw.scale <= 0 || raw.scale > 10)
+				throw 'Invalid splash configuration';
+			var imported = NoteSplash.createConfig();
+			imported.scale = raw.scale;
+			imported.allowRGB = raw.allowRGB == true;
+			imported.allowPixel = raw.allowPixel == true;
+			if (raw.rgb != null)
+			{
+				if (!Std.isOfType(raw.rgb, Array) || raw.rgb.length != 3) throw 'Invalid RGB channels';
+				for (channel in (cast raw.rgb:Array<Dynamic>))
+					if (channel != null)
+						for (component in ['r', 'g', 'b'])
+						{
+							var value:Dynamic = Reflect.field(channel, component);
+							if (value != null && (!EditorInputValidation.finiteNumber(value)
+								|| value < 0 || value > 255 || value != Math.floor(value))) throw 'Invalid RGB value';
+						}
+				imported.rgb = raw.rgb;
+			}
+			for (name in Reflect.fields(raw.animations))
+			{
+				var anim:Dynamic = Reflect.field(raw.animations, name);
+				if (anim == null || !Std.isOfType(anim.prefix, String) || !EditorInputValidation.numberPair(anim.offsets)
+					|| !EditorInputValidation.numberPair(anim.fps) || anim.fps[0] < 1 || anim.fps[1] < anim.fps[0] || anim.fps[1] > 240
+					|| !EditorInputValidation.finiteNumber(anim.noteData) || anim.noteData < 0 || anim.noteData != Math.floor(anim.noteData))
+					throw 'Invalid animation: $name';
+				var indices:Array<Int> = [];
+				if (anim.indices != null)
+				{
+					if (!Std.isOfType(anim.indices, Array)) throw 'Invalid frame indices: $name';
+					for (frame in (cast anim.indices:Array<Dynamic>))
+					{
+						if (!EditorInputValidation.finiteNumber(frame) || frame < 0 || frame != Math.floor(frame)) throw 'Invalid frame index';
+						indices.push(Std.int(frame));
+					}
+				}
+				imported.animations.set(name, {name: name, prefix: anim.prefix, noteData: Std.int(anim.noteData),
+					indices: indices, offsets: [anim.offsets[0], anim.offsets[1]], fps: [Std.int(anim.fps[0]), Std.int(anim.fps[1])]});
+			}
+			documentHistory.capture();
+			config = imported;
+			curAnim = null;
+			refreshWidgetsFromConfig();
+			parseRGB();
+			if (splash != null) splash.config = config;
+			if (previewSplash != null) previewSplash.config = config;
+			documentHistory.capture(general.backend.language.Language.get('history_imported', 'editors'));
+		}
+		catch (error:Dynamic) showResourceError('Could not import JSON: ' + error);
+		#end
+	}
+
 	function exitEditor():Void
+	{
+		documentHistory.confirmDiscard(exitAfterConfirmation);
+	}
+
+	function exitAfterConfirmation():Void
 	{
 		MusicBeatState.switchState(new MasterEditorMenu());
 		FlxG.sound.playMusic(Paths.music('freakyMenu'));
@@ -358,14 +488,11 @@ class NoteSplashEditorState extends MusicBeatState
 		var name:String = w_anim_name.text.trim();
 		if (name.length < 1) return;
 
-		var indices:Array<Int> = [];
-		if (w_indices.text.split(',').length > 1)
+		var indices:Array<Int> = EditorInputValidation.frameIndices(w_indices.text);
+		if (indices == null)
 		{
-			for (i in w_indices.text.split(','))
-			{
-				var index:Null<Int> = Std.parseInt(i);
-				if (!Math.isNaN(index) && index != null) indices.push(index);
-			}
+			showResourceError('Frame indices must be non-negative integers separated by commas');
+			return;
 		}
 
 		var offsets:Array<Float> = [0, 0];
@@ -395,41 +522,58 @@ class NoteSplashEditorState extends MusicBeatState
 	// ============ 皮肤重载 ============
 	function reloadImage():Void
 	{
-		imageSkin = w_image.text.trim();
-		if (imageSkin.length < 1) return;
-
-		errorText.color = FlxColor.RED;
-		FlxTween.cancelTweensOf(errorText);
-
-		var image = Paths.image(imageSkin);
-		if (image == null)
+		var candidate:String = EditorInputValidation.splashPath(w_image.text);
+		if (candidate == null)
 		{
-			errorText.text = 'ERROR! Couldn\'t find $imageSkin.png';
-			errorText.alpha = 1;
+			showResourceError('Invalid splash image path');
 			return;
 		}
-		else
+		if (!Paths.fileExists('images/$candidate.png', IMAGE) || !Paths.fileExists('images/$candidate.xml', TEXT))
 		{
-			errorText.color = FlxColor.GREEN;
-			errorText.alpha = 1;
-			errorText.text = 'Succesfully loaded $imageSkin.png';
+			showResourceError('Could not find splash image/atlas: $candidate');
+			return;
 		}
 
-		NoteSplash.configs.clear();
+		var replacement:NoteSplash = null;
+		try
+		{
+			NoteSplash.configs.remove('images/$candidate');
+			replacement = new NoteSplash(0, 0, candidate);
+			replacement.inEditor = true;
+			if (replacement.texture != candidate) throw 'Splash atlas could not be loaded';
+		}
+		catch (error:Dynamic)
+		{
+			if (replacement != null) replacement.destroy();
+			showResourceError('Could not load splash: $candidate');
+			return;
+		}
 
-		FlxTween.tween(errorText, {alpha: 0}, 1, {startDelay: 1, onComplete: (twn) -> {
-			errorText.color = FlxColor.RED;
-		}});
-
-		splash.loadSplash(imageSkin);
-		splash.alpha = 0.0001;
-
-		if (splash.config != null) config = splash.config;
-		else config = NoteSplash.createConfig();
-
+		// Keep the current skin and previews intact until the replacement is ready.
+		splashes.forEach(function(old:NoteSplash) { old.destroy(); });
+		splashes.clear();
+		previewSplash = null;
+		splash = replacement;
+		splash.alpha = 0;
+		splashes.add(splash);
+		imageSkin = candidate;
+		config = splash.config != null ? splash.config : NoteSplash.createConfig();
 		curAnim = null;
 		refreshWidgetsFromConfig();
 		parseRGB();
+		FlxTween.cancelTweensOf(errorText);
+		errorText.color = FlxColor.GREEN;
+		errorText.text = 'Loaded $imageSkin';
+		errorText.alpha = 1;
+		FlxTween.tween(errorText, {alpha: 0}, 1, {startDelay: 1});
+	}
+
+	function showResourceError(message:String):Void
+	{
+		FlxTween.cancelTweensOf(errorText);
+		errorText.color = FlxColor.RED;
+		errorText.text = message;
+		errorText.alpha = 1;
 	}
 
 	// ============ RGB 染色 ============
@@ -568,6 +712,9 @@ class NoteSplashEditorState extends MusicBeatState
 			}
 			else if (sender == w_r || sender == w_g || sender == w_b)
 			{
+				// ★ w_target 可能尚未创建（控件构造顺序 / 移动端裁剪 UI 时）——
+				//   旧代码直接 selectedLabel 会空指针崩溃。
+				if (w_target == null) return;
 				var target:Array<Int> = switch (w_target.selectedLabel)
 				{
 					case 'Red': redShader;
@@ -584,7 +731,7 @@ class NoteSplashEditorState extends MusicBeatState
 		{
 			if (sender == w_image)
 			{
-				imageSkin = w_image.text;
+				// Resource name is committed only after reloadImage succeeds.
 			}
 			else if (curAnim != null && config != null && config.animations.exists(curAnim))
 			{
@@ -610,13 +757,8 @@ class NoteSplashEditorState extends MusicBeatState
 				}
 				else if (sender == w_indices)
 				{
-					var idx:Array<Int> = [];
-					if (w_indices.text.trim().length > 0)
-						for (p in w_indices.text.split(','))
-						{
-							var v:Null<Int> = Std.parseInt(p.trim());
-							if (v != null) idx.push(v);
-						}
+					var idx:Array<Int> = EditorInputValidation.frameIndices(w_indices.text);
+					if (idx == null) return;
 					i.indices = idx;
 					config.animations.set(curAnim, i);
 				}
@@ -625,6 +767,20 @@ class NoteSplashEditorState extends MusicBeatState
 	}
 
 	// ============ 预览 ============
+	/**
+	 * ★ 预览专用对象，只创建一次、后续反复复用。
+	 *
+	 * 旧实现在 playStrumAnim() 里 `new NoteSplash(...)`：而 update() 中只要按住方向键，
+	 * `changedOffset` 每帧都会置 true → splashPreview() 每帧都会调到这里 →
+	 * **每秒新建 60 个 NoteSplash**，而每个 NoteSplash 都自带一个 PixelSplashShader
+	 * （FlxShader 实例）。FlxTypedGroup.add() 只回收 null 槽位、不回收已 kill 的成员，
+	 * 这些对象既不会被销毁也不会被复用 —— 于是按住方向键几秒钟就能堆出成百上千个
+	 * shader 实例。本工程 NotesSubState 里已经写明了这种「shader 实例无限增长」的后果：
+	 * GL 的当前着色器/uniform 状态被冲垮，画面出现"伽马值减少"式发黑、逐轨染色错误的
+	 * 现象，最终耗尽资源崩溃。这与「溅射调试里偶发 note 渲染错误 + 崩溃」完全吻合。
+	 */
+	var previewSplash:NoteSplash;
+
 	function splashPreview():Void
 	{
 		if (config != null && config.animations.get(curAnim) != null)
@@ -637,17 +793,31 @@ class NoteSplashEditorState extends MusicBeatState
 
 	function playStrumAnim(?name:String, noteData:Int)
 	{
-		var splash:NoteSplash = new NoteSplash(0, 0, imageSkin);
+		if (noteData < 0) noteData = 0;
+
+		var splash:NoteSplash = previewSplash;
+		if (splash == null)
+		{
+			splash = new NoteSplash(0, 0, imageSkin);
+			splash.inEditor = true;
+			splashes.add(splash);
+			previewSplash = splash;
+		}
+
 		splash.inEditor = true;
 		splash.config = config;
-		if (noteData < 0) noteData = 0;
 
 		if (name != null && splash.animation.exists(name))
 		{
-			splash.babyArrow = strums.members[noteData % 4];
+			splash.revive();
+
+			// ★ 越界兜底：noteData 由面板上的步进器决定（0..999），取模后必须再夹一次
+			var strumIndex:Int = noteData % 4;
+			if (strumIndex < 0 || strumIndex >= strums.members.length) strumIndex = 0;
+			splash.babyArrow = strums.members[strumIndex];
+
 			splash.spawnSplashNote(0, 0, noteData, null, false);
 			splash.alpha = 1;
-			splashes.add(splash);
 		}
 		else
 		{
@@ -660,10 +830,13 @@ class NoteSplashEditorState extends MusicBeatState
 
 	override function update(elapsed:Float)
 	{
+		if (documentHistory != null && documentHistory.blocksInput()) { super.update(elapsed); return; }
 		super.update(elapsed);
 		if (transitioning) return;
 
-		errorText.x = FlxG.width - errorText.width - 5;
+		if (errorText.fieldWidth != FlxG.width - 10) errorText.fieldWidth = FlxG.width - 10;
+		errorText.x = 5;
+		errorText.y = FlxG.height - errorText.height - 5;
 
 		// 状态栏刷新
 		if (menuBar != null && menuBar.statusBar != null)
@@ -692,6 +865,8 @@ class NoteSplashEditorState extends MusicBeatState
 		}
 		catch (e:Dynamic) {}
 
+		typing = typing || (menuBar != null && menuBar.isInputOverlayActive());
+		ClientPrefs.toggleVolumeKeys(!typing);
 		if (typing) return;
 
 		if (config != null && config.animations != null && curAnim != null && curAnim.length > 0
@@ -755,7 +930,7 @@ class NoteSplashEditorState extends MusicBeatState
 		if (controls.BACK || FlxG.keys.justPressed.ESCAPE) exitEditor();
 
 		// 鼠标点音符触发溅射
-		if (FlxG.mouse.overlaps(strums))
+		if (!mobile.objects.EditorMobileKeys.pointerOverButton() && FlxG.mouse.overlaps(strums))
 		{
 			strums.forEach(function(strum:StrumNote)
 			{
@@ -763,18 +938,27 @@ class NoteSplashEditorState extends MusicBeatState
 				{
 					if (!FlxG.mouse.justPressed)
 					{
-						if (strum.animation.curAnim.name != 'pressed' && strum.animation.curAnim.name != 'confirm')
+						// ★ curAnim 可能为 null（构造器不会自动播动画，且皮肤缺 'static' 时
+						//   playAnim 也不会建出动画）—— 旧代码直接 .name 就是空指针崩溃。
+						var curName:String = (strum.animation.curAnim != null) ? strum.animation.curAnim.name : null;
+						if (curName != 'pressed' && curName != 'confirm')
 							strum.playAnim('pressed');
 					}
 					else
 					{
 						strum.playAnim('confirm', true);
-						var splash:NoteSplash = new NoteSplash(0, 0, imageSkin);
+
+						// ★ 用 recycle 复用已死亡的对象，而不是每次 new：
+						//   FlxTypedGroup.add 只回收 null 槽位，反复点击会让 group 与
+						//   shader 实例无上限增长（同 playStrumAnim 的说明）。
+						var splash:NoteSplash = splashes.recycle(NoteSplash, () -> new NoteSplash(0, 0, imageSkin));
+						if (splash == null) return;
+
 						splash.inEditor = true;
 						splash.config = config;
 						splash.babyArrow = strum;
 						splash.spawnSplashNote(0, 0, strum.ID % 4);
-						splashes.add(splash);
+						splash.alpha = 1;
 					}
 				}
 				else strum.playAnim('static');
@@ -811,7 +995,10 @@ class NoteSplashEditorState extends MusicBeatState
 	var _file:FileReference;
 	function onSaveComplete(_):Void
 	{
-		_file.removeEventListener(Event.COMPLETE, onSaveComplete);
+		var history = documentHistory;
+		if (history != null && savingDocument) history.markSaved();
+		savingDocument = false;
+		_file.removeEventListener(#if desktop Event.SELECT #else Event.COMPLETE #end, onSaveComplete);
 		_file.removeEventListener(Event.CANCEL, onSaveCancel);
 		_file.removeEventListener(IOErrorEvent.IO_ERROR, onSaveError);
 		_file = null;
@@ -820,7 +1007,8 @@ class NoteSplashEditorState extends MusicBeatState
 
 	function onSaveCancel(_):Void
 	{
-		_file.removeEventListener(Event.COMPLETE, onSaveComplete);
+		savingDocument = false;
+		_file.removeEventListener(#if desktop Event.SELECT #else Event.COMPLETE #end, onSaveComplete);
 		_file.removeEventListener(Event.CANCEL, onSaveCancel);
 		_file.removeEventListener(IOErrorEvent.IO_ERROR, onSaveError);
 		_file = null;
@@ -828,7 +1016,8 @@ class NoteSplashEditorState extends MusicBeatState
 
 	function onSaveError(_):Void
 	{
-		_file.removeEventListener(Event.COMPLETE, onSaveComplete);
+		savingDocument = false;
+		_file.removeEventListener(#if desktop Event.SELECT #else Event.COMPLETE #end, onSaveComplete);
 		_file.removeEventListener(Event.CANCEL, onSaveCancel);
 		_file.removeEventListener(IOErrorEvent.IO_ERROR, onSaveError);
 		_file = null;
@@ -837,15 +1026,18 @@ class NoteSplashEditorState extends MusicBeatState
 
 	function saveSplash()
 	{
-		imageSkin = w_image.text;
+		if (_file != null) return;
+		savingDocument = true;
+		var history = documentHistory;
+		if (history != null) history.prepareSave();
 		var data:String = Json.stringify(config, "\t");
 		if (data.length > 0)
 		{
 			_file = new FileReference();
-			_file.addEventListener(Event.COMPLETE, onSaveComplete);
+			_file.addEventListener(#if desktop Event.SELECT #else Event.COMPLETE #end, onSaveComplete);
 			_file.addEventListener(Event.CANCEL, onSaveCancel);
 			_file.addEventListener(IOErrorEvent.IO_ERROR, onSaveError);
-			_file.save(data, imageSkin + ".json");
+			_file.save(data, imageSkin.split('/').pop() + ".json");
 		}
 	}
 
@@ -880,7 +1072,7 @@ class NoteSplashEditorState extends MusicBeatState
 
 			var conf = parseTxt(txt);
 			_file = new FileReference();
-			_file.addEventListener(Event.COMPLETE, onSaveComplete);
+			_file.addEventListener(#if desktop Event.SELECT #else Event.COMPLETE #end, onSaveComplete);
 			_file.addEventListener(Event.CANCEL, onSaveCancel);
 			_file.addEventListener(IOErrorEvent.IO_ERROR, onSaveError);
 			_file.save(Json.stringify(conf, "\t"), file);
@@ -954,7 +1146,7 @@ class NoteSplashEditorState extends MusicBeatState
 			}
 		}
 
-		// NovaFlare: keep the same per-lane layout the runtime engine uses for legacy txts
+		// D.C.E.: keep the same per-lane layout the runtime engine uses for legacy txts
 		if (offsets.length < 1)
 			offsets = [[0, 0]];
 

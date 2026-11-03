@@ -105,6 +105,72 @@ class Paths
 		Cache.currentTrackedFrames = [];
 		Cache.currentTrackedAnims = [];
 		#if !html5 openfl.Assets.cache.clear("songs"); #end
+
+		// ★ 真正动手回收：上面只是把"当前状态没在用的图"标成 persist=false / destroyOnNoUse=true，
+		//   而真正把它们从 FlxG.bitmap 缓存里摘掉的动作是 clearUnused()——引擎此前从没调用过它，
+		//   于是"打开界面就涨、退出界面不回落"（编辑器/其它界面里 makeGraphic(..., true) 出来的
+		//   唯一图、以及已销毁精灵留下的图都会滞留在缓存里）。
+		//   安全性：clearUnused() 只清 useCount<=0 且 !persist 的图，还在被精灵使用的图不受影响。
+		try
+		{
+			if (FlxG.bitmap != null) FlxG.bitmap.clearUnused();
+		}
+		catch (e:Dynamic) {}
+
+		// ★ 同样地，把全局音轨表里"已经停止、且不是常驻音轨"的 FlxSound 收掉。
+		//   实测（2026-10-01）：跑完一首 BPM-2021 回到主菜单后 `FlxG.sound.list` 里仍有
+		//   **8 条多余音轨**（2 → 10），每条都持有解码后的音频缓冲（几十 MB 级）；
+		//   引擎只在少数地方手动 release（inst / vocals / opponentVocals），
+		//   短音效（倒计时 intro*/hitsound/missnote）靠 flixel 自动回收，漏掉一条就永久留着。
+		//   安全性：只清 playing == false 且 persist == false 的，正在播放的和常驻音轨
+		//   （FlxG.sound.music）一律不动。
+		try
+		{
+			clearStoppedSounds();
+		}
+		catch (e:Dynamic) {}
+	}
+
+	/**
+	 * 清掉全局音轨表里"已停止且非常驻"的 FlxSound，返回释放条数。
+	 * 见 clearStoredMemory() 里的说明。
+	 */
+	public static function clearStoppedSounds():Int
+	{
+		var removed:Int = 0;
+		try
+		{
+			if (FlxG.sound == null || FlxG.sound.list == null) return 0;
+			var members = FlxG.sound.list.members;
+			if (members == null) return 0;
+
+			// 先收集再删（边遍历边 remove 会打乱索引）
+			var toKill:Array<flixel.sound.FlxSound> = [];
+			for (i in 0...members.length)
+			{
+				var s = members[i];
+				if (s == null) continue;
+				if (s == FlxG.sound.music) continue; // 全局常驻音轨不动
+				var playing:Bool = false;
+				var persist:Bool = false;
+				try playing = s.playing catch (e:Dynamic) {}
+				try persist = s.persist catch (e:Dynamic) {}
+				if (playing || persist) continue;
+				toKill.push(s);
+			}
+			for (s in toKill)
+			{
+				try
+				{
+					FlxG.sound.list.remove(s);
+					s.destroy();
+					removed++;
+				}
+				catch (e:Dynamic) {}
+			}
+		}
+		catch (e:Dynamic) {}
+		return removed;
 	}
 
 	/// haya I love you for the base cache dump I took to the max
@@ -128,7 +194,7 @@ class Paths
 		}
 
 		// Ordinary page transitions only release caches. A forced full cycle can
-		// still have a short remark pause, so let NovaGC's allocation/promotion
+		// still have a short remark pause, so let D.C.GC's allocation/promotion
 		// policy schedule it unless a caller explicitly requests memory pressure
 		// relief. This prevents every menu switch from creating a GC hitch.
 		if (requestMajorGc)
@@ -154,7 +220,7 @@ class Paths
 
 	/**
 	 * Resolves a relative path below a known root without changing the logical
-	 * asset ID. Non-Windows filesystems preserve filename case, while Psych/NF
+	 * asset ID. Non-Windows filesystems preserve filename case, while Psych/D.C.E.
 	 * chart IDs are deliberately normalized to lowercase.
 	 */
 	static function resolveCaseInsensitiveChild(root:String, relativePath:String):Null<String>

@@ -76,6 +76,13 @@ class FlxAnimate extends FlxSprite
 	public var applyStageMatrix(default, set):Bool = false;
 
 	/**
+	 * Whether to apply the Texture Atlas stage matrix after the regular
+	 * FlxSprite transform. `true` preserves the FNF 0.8.4/legacy ordering;
+	 * Codename API 3 explicitly switches this off for the current ordering.
+	 */
+	public var postStageMatrixApply:Bool = true;
+
+	/**
 	 * Whether to render the colored background rectangle found in Adobe Animate.
 	 * Only available for Texture Atlases exported using BetterTextureAtlas.
 	 * @see https://github.com/Dot-Stuff/BetterTextureAtlas
@@ -272,7 +279,15 @@ class FlxAnimate extends FlxSprite
 
 		if (doStageMatrix)
 		{
-			matrix.translate(timeline._bounds.x, timeline._bounds.y);
+			if (postStageMatrixApply)
+			{
+				matrix.translate(timeline._bounds.x, timeline._bounds.y);
+			}
+			else
+			{
+				matrix.concat(library.matrix);
+				matrix.translate(timeline._bounds.x * library.matrix.a, timeline._bounds.y * library.matrix.d);
+			}
 		}
 
 		matrix.translate(-origin.x, -origin.y);
@@ -305,7 +320,7 @@ class FlxAnimate extends FlxSprite
 			matrix.concat(_skewMatrix);
 		}
 
-		if (doStageMatrix) // TODO: add some way to customize the order of this thing
+		if (doStageMatrix && postStageMatrixApply)
 		{
 			matrix.concat(library.matrix);
 		}

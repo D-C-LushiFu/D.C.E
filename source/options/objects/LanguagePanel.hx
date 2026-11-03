@@ -2,6 +2,7 @@ package options.objects;
 
 import flixel.graphics.FlxGraphic;
 import options.FontFallback;
+import states.freeplayState.objects.PhiPanel;
 
 /**
  * 语言面板：**左侧一列「国旗 + 母语名」，右侧一段该语言的示例文本**。
@@ -40,7 +41,7 @@ class LanguagePanel extends FlxSpriteGroup
 	public var langs:Array<String> = [];
 	var cards:Array<LangCard> = [];
 
-	var previewBg:Rect;
+	var previewBg:PhiPanel;
 	var previewTitle:FlxText;
 	var previewText:FlxText;
 
@@ -49,6 +50,8 @@ class LanguagePanel extends FlxSpriteGroup
 
 	var lastW:Float = -1;
 	var lastH:Float = -1;
+	var lastX:Float = Math.NaN;
+	var lastY:Float = Math.NaN;
 
 	/** 中文原文 —— 任何语言包没写 `langPreview` 时的兜底 */
 	public static inline var FALLBACK_PREVIEW:String =
@@ -65,7 +68,8 @@ class LanguagePanel extends FlxSpriteGroup
 
 	function build():Void
 	{
-		previewBg = new Rect(0, 0, 10, 10, 10, 10, 0xFFFFFF, 0.045);
+		previewBg = new PhiPanel(0, 0, 10, 10, 0xFFFFFF);
+		previewBg.alpha = 0.045;
 		add(previewBg);
 
 		previewTitle = new FlxText(0, 0, 0, '', 20);
@@ -114,6 +118,8 @@ class LanguagePanel extends FlxSpriteGroup
 
 		lastW = -1;
 		lastH = -1;
+		lastX = Math.NaN;
+		lastY = Math.NaN;
 		refresh();
 	}
 
@@ -130,9 +136,12 @@ class LanguagePanel extends FlxSpriteGroup
 	public function layoutTo(w:Float, h:Float):Bool
 	{
 		if (w <= 8 || h <= 8) return false;
-		if (Math.abs(w - lastW) < 0.5 && Math.abs(h - lastH) < 0.5) return false;
+		if (Math.abs(w - lastW) < 0.5 && Math.abs(h - lastH) < 0.5
+			&& Math.abs(x - lastX) < 0.5 && Math.abs(y - lastY) < 0.5) return false;
 		lastW = w;
 		lastH = h;
+		lastX = x;
+		lastY = y;
 
 		var ox:Float = x;
 		var oy:Float = y;
@@ -222,6 +231,8 @@ class LanguagePanel extends FlxSpriteGroup
 		// 换过字体/换过文本 → 上一帧量的尺寸失效，强制重排一次
 		lastW = -1;
 		lastH = -1;
+		lastX = Math.NaN;
+		lastY = Math.NaN;
 	}
 
 	/** 某个语言的示例文本：读它自己 `main/main.lang` 里的 `langPreview`，没有就用中文原文 */
@@ -272,9 +283,10 @@ class LangCard extends FlxSpriteGroup
 
 	public var dir:String;
 
-	var bg:Rect;
+	var bg:PhiPanel;
 	var spec:Rect;
 	var flag:FlxSprite;
+	var flagAvailable:Bool = false;
 	var nameText:FlxText;
 
 	var follow:LanguagePanel;
@@ -287,7 +299,8 @@ class LangCard extends FlxSpriteGroup
 		this.dir = dir;
 		this.follow = follow;
 
-		bg = new Rect(0, 0, 10, 10, 10, 10, 0xFFFFFF, 0.05);
+		bg = new PhiPanel(0, 0, 10, 10, 0xFFFFFF);
+		bg.alpha = 0.05;
 		add(bg);
 
 		// 选中强调条：贴在卡片左边（和侧边栏 NaviMember 的 specRect 同一套语言）
@@ -299,13 +312,16 @@ class LangCard extends FlxSpriteGroup
 		var g:FlxGraphic = null;
 		try
 		{
-			g = Paths.image('menuExtendHide/option/nation/' + dir);
+			// The Haxe test language uses a visual placeholder, never a player-facing flag.
+			if (dir != OptionsState.TEST_LANG_DIR)
+				g = Paths.image('menuExtendHide/option/nation/' + dir);
 		}
 		catch (e:Dynamic) {}
-		if (g != null) flag.loadGraphic(g);
+		if (g != null) { flag.loadGraphic(g); flagAvailable = true; }
 		flag.antialiasing = ClientPrefs.data.antialiasing;
 		add(flag);
-		flag.visible = (g != null);
+		// Keep large source artwork hidden until scaled and positioned by layoutTo().
+		flag.visible = false;
 
 		nameText = new FlxText(0, 0, 0, OptionsState.instance.getLanguageLabel(dir), 14);
 		nameText.setFormat(Paths.font(OptionsState.instance.getLanguageFont(dir) + '.ttf'), 14, FlxColor.WHITE, CENTER);
@@ -345,13 +361,14 @@ class LangCard extends FlxSpriteGroup
 		var flagH:Float = Math.max(6, h - pad * 2 - nameH - h * 0.08);
 		var flagW:Float = w * 0.74;
 
-		if (flag.visible)
+		if (flagAvailable)
 		{
 			var sc:Float = Math.min(flagW / flag.frameWidth, flagH / flag.frameHeight);
 			flag.scale.set(sc, sc);
 			flag.updateHitbox();
 			flag.x = ox + (w - flag.width) / 2;
 			flag.y = oy + pad;
+			flag.visible = true;
 		}
 
 		nameText.x = ox + (w - nameText.textField.textWidth) / 2;

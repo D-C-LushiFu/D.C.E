@@ -29,11 +29,11 @@ class StringRect extends FlxSpriteGroup{
         bg.antialiasing = ClientPrefs.data.antialiasing;
         add(bg);
 
-        disText = new FlxText(0, 0, 0, 'Tap to choose', Std.int(bg.width / 20 / 2));
-		disText.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(bg.height / 2), 0xffffff, LEFT, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
+        disText = new FlxText(0, 0, bg.width, 'Tap to choose', Std.int(bg.width / 20 / 2));
+		disText.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(bg.height / 2), 0xffffff, CENTER, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
         disText.antialiasing = ClientPrefs.data.antialiasing;
 		disText.borderStyle = NONE;
-		disText.x += bg.mainRound;
+		disText.x = 0;
 		disText.alpha = 0.3;
         disText.y += (bg.height - disText.height) / 2;
 		add(disText);
@@ -111,6 +111,9 @@ class StringRect extends FlxSpriteGroup{
         for (tween in alphaTween) {
             tween.cancel();
         }
+
+        if (!isOpend)
+            OptionsState.instance.closeOtherStringSelects(follow);
 
         if (!follow.follow.peerCheck(follow)) return;
 
@@ -202,8 +205,8 @@ class StringRect extends FlxSpriteGroup{
         isOpend = false;
 
         if (wasOpen && follow.select != null)
-            // 把展开时占走的版面还回去（会重算分类总高 —— 时间给到最小，等价于立即）
-            follow.follow.optionAdjust(follow, -1 * (follow.select.bg.height + follow.inter), 0.001);
+            // Do not leave category height or row-offset tweens behind on a switch.
+            follow.follow.resetDropdownLayout();
     }
 
     private function createButton(size:Float, color:Int) {

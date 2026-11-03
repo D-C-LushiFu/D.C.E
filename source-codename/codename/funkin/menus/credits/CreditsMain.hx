@@ -25,7 +25,7 @@ class CreditsMain extends TreeMenu {
 		var first = new TreeMenuScreen('credits.name', 'credits.madePossible');
 		addMenu(first);
 
-		for (i in codename.funkin.backend.assets.ModsFolder.getLoadedMods()) {
+		for (i in codename.funkin.backend.assets.ModsFolder.getLoadedMods(true, true)) {
 			var xmlPath = Paths.xml('config/credits/LIB_$i');
 
 			if (Paths.assetsTree.existsSpecific(xmlPath, "TEXT")) {

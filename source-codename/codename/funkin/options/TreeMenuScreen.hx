@@ -6,6 +6,7 @@ import codename.funkin.backend.system.Controls;
 import codename.funkin.backend.TurboControls;
 import codename.funkin.options.TreeMenu.ITreeOption;
 import codename.funkin.options.TreeMenu.ITreeFloatOption;
+import codename.funkin.options.TreeMenu.ITreeHorizontalOption;
 import codename.funkin.options.type.OptionType;
 import codename.funkin.options.type.Separator;
 
@@ -17,11 +18,14 @@ class TreeMenuScreen extends FlxSpriteGroup {
 
 	public var parent:TreeMenu;
 	public var transitioning:Bool = false;
-	public var inputEnabled:Bool = false;
+	public var inputEnabled(default, set):Bool = false;
 	public var curSelected:Int = 0;
 
 	public var name:String;
 	public var desc:String;
+	#if TOUCH_CONTROLS
+	var mobilePadLease:codename.mobile.MobilePadLease;
+	#end
 	/**
 	 * The prefix to add to the translations ids.
 	**/
@@ -50,8 +54,8 @@ class TreeMenuScreen extends FlxSpriteGroup {
 	public var controls(get, never):Controls;
 	inline function get_controls():Controls return PlayerSettings.solo.controls;
 
-	var leftTurboControl:TurboControls = new TurboControls([Control.LEFT], 0.2, 1 / 48);
-	var rightTurboControl:TurboControls = new TurboControls([Control.RIGHT], 0.2, 1 / 48);
+	var leftTurboControl:TurboControls = new TurboControls([Control.LEFT], null, 0.2, 1 / 48);
+	var rightTurboControl:TurboControls = new TurboControls([Control.RIGHT], null, 0.2, 1 / 48);
 	var upTurboControl:TurboControls = new TurboControls([Control.UP]);
 	var downTurboControl:TurboControls = new TurboControls([Control.DOWN]);
 	var turboBasics:Array<TurboBasic>;
@@ -59,14 +63,33 @@ class TreeMenuScreen extends FlxSpriteGroup {
 	var curOption:ITreeOption;
 	var curFloatOption:ITreeFloatOption;
 	var __firstFrame:Bool = true;
+	var __acceptInputLocked:Bool = false;
+	var __backInputLocked:Bool = false;
 
-	public function new(name:String, desc:String, prefix:String = "", ?objects:Array<FlxSprite>) {
+	function set_inputEnabled(value:Bool):Bool
+	{
+		// When a child menu closes, its parent becomes active during the same
+		// press. Preserve that held-input state so A/B cannot leak through into
+		// the newly active menu, even if its touch pad is recreated.
+		if (value && !inputEnabled) {
+			__acceptInputLocked = controls.ACCEPT_HOLD;
+			__backInputLocked = controls.BACK_HOLD;
+		}
+		return inputEnabled = value;
+	}
+
+	public function new(name:String, desc:String, prefix:String = "", ?objects:Array<FlxSprite>, ?temporaryPadLayout:Array<String>) {
 		super();
 		this.prefix = prefix;
 		rawName = name;
 		rawDesc = desc;
 
 		turboBasics = [leftTurboControl, rightTurboControl, upTurboControl, downTurboControl];
+
+		#if TOUCH_CONTROLS
+		mobilePadLease = codename.mobile.MobilePadLease.replaceForScreen(
+			Std.downcast(FlxG.state, MusicBeatState), temporaryPadLayout);
+		#end
 
 		if (objects != null) for (object in objects) add(object);
 	}
@@ -87,6 +110,9 @@ class TreeMenuScreen extends FlxSpriteGroup {
 				(curOption = cast members[curSelected]).selected = true;
 				if (curOption is ITreeFloatOption) curFloatOption = cast curOption;
 			}
+			#if TOUCH_CONTROLS
+			refreshMobileControls();
+			#end
 			updateItems(true);
 			return;
 		}
@@ -94,19 +120,35 @@ class TreeMenuScreen extends FlxSpriteGroup {
 		if (inputEnabled) {
 			for (basic in turboBasics) basic.update(elapsed);
 
-			var change = (upTurboControl.activated ? -1 : 0) + (downTurboControl.activated ? 1 : 0) - FlxG.mouse.wheel, mouseControl = false;
-			if (FlxG.mouse.justPressed) {
-				for (i in CoolUtil.maxInt(curSelected - 3, 0)...CoolUtil.minInt(curSelected + 4, length))
-					if (i != curSelected && members[i] != null && mouseOverlaps(members[i])) {
-						change = i - curSelected;
-						mouseControl = true;
-						break;
-					}
+			var change = (upTurboControl.activated ? -1 : 0) + (downTurboControl.activated ? 1 : 0);
+			var mouseControl = false;
+			if (!controls.touchC) {
+				change -= FlxG.mouse.wheel;
+				if (FlxG.mouse.justPressed) {
+					for (i in CoolUtil.maxInt(curSelected - 3, 0)...CoolUtil.minInt(curSelected + 4, length))
+						if (i != curSelected && members[i] != null && mouseOverlaps(members[i])) {
+							change = i - curSelected;
+							mouseControl = true;
+							break;
+						}
+				}
 			}
 			changeSelection(change);
 
+			var acceptPressed = controls.ACCEPT && !__acceptInputLocked;
+			var backPressed = controls.BACK && !__backInputLocked;
+			__acceptInputLocked = controls.ACCEPT_HOLD;
+			__backInputLocked = controls.BACK_HOLD;
+			var pointerAccept = false;
+			var pointerBack = false;
+			if (!controls.touchC) {
+				pointerAccept = length > 0 && curOption != null && !mouseControl
+					&& FlxG.mouse.justPressed && mouseOverlaps(members[curSelected]);
+				pointerBack = FlxG.mouse.justPressedRight && Main.timeSinceFocus > 0.3;
+			}
+
 			if (length > 0 && curOption != null) {
-				if (controls.ACCEPT || (!mouseControl && FlxG.mouse.justPressed && mouseOverlaps(members[curSelected]))) curOption.select();
+				if (acceptPressed || pointerAccept) curOption.select();
 				if (curFloatOption != null) {
 					if (controls.LEFT) curFloatOption.changeValue(-elapsed);
 					if (controls.RIGHT) curFloatOption.changeValue(elapsed);
@@ -117,9 +159,12 @@ class TreeMenuScreen extends FlxSpriteGroup {
 				}
 			}
 
-			if (controls.BACK || (FlxG.mouse.justPressedRight && Main.timeSinceFocus > 0.3)) close();
+			if (backPressed || pointerBack) close();
 		}
 
+		#if TOUCH_CONTROLS
+		refreshMobileControls();
+		#end
 		updateItems();
 	}
 
@@ -155,6 +200,10 @@ class TreeMenuScreen extends FlxSpriteGroup {
 		else parent.removeMenu(this);
 
 		CoolUtil.playMenuSFX(CANCEL).persist = true;
+
+		#if TOUCH_CONTROLS
+		if (mobilePadLease != null) mobilePadLease.release();
+		#end
 	}
 
 	public function changeSelection(change:Int, force:Bool = false) {
@@ -174,6 +223,9 @@ class TreeMenuScreen extends FlxSpriteGroup {
 			curOption = null;
 			curFloatOption = null;
 		}
+		#if TOUCH_CONTROLS
+		refreshMobileControls();
+		#end
 		updateMenuDesc();
 
 		CoolUtil.playMenuSFX(SCROLL);
@@ -183,10 +235,30 @@ class TreeMenuScreen extends FlxSpriteGroup {
 		if (parent != null) parent.updateDesc(customTxt);
 	}
 
+	#if TOUCH_CONTROLS
+	/** Show horizontal buttons only while the selected option can use them. */
+	public function refreshMobileControls():Void {
+		if (parent == null || parent.tree.last() != this) return;
+
+		var state:MusicBeatState = Std.downcast(FlxG.state, MusicBeatState);
+		if (state == null || state.touchPad == null) return;
+
+		var showHorizontal = curOption is ITreeHorizontalOption
+			&& (!(curOption is OptionType) || !cast(curOption, OptionType).locked);
+		for (button in [state.touchPad.buttonLeft, state.touchPad.buttonRight])
+			if (button != null && state.touchPad.members.contains(button))
+				button.visible = showHorizontal;
+	}
+	#end
+
 	function mouseOverlaps(sprite:FlxSprite):Bool
 		return sprite.overlapsPoint(FlxG.mouse.getPosition(@:privateAccess flixel.input.FlxPointer._cachedPoint), true);
 
 	override function destroy() {
+		#if TOUCH_CONTROLS
+		if (mobilePadLease != null) mobilePadLease.release();
+		mobilePadLease = null;
+		#end
 		super.destroy();
 		for (basic in turboBasics) basic.destroy();
 	}

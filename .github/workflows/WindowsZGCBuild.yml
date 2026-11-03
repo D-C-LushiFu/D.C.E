@@ -13,17 +13,17 @@ concurrency:
 jobs:
   Windows-ZGC:
     runs-on: windows-latest
-    environment: ${{ github.repository == 'NovaFlare-Engine-Concentration/FNF-NovaFlare-Engine' && 'private-build' || 'public-build' }}
+    environment: ${{ github.repository == 'D-C-LushiFu/Different-Creatingness-Engine' && 'private-build' || 'public-build' }}
     timeout-minutes: 180
     env:
       HXCPP_COMPILE_JOBS: 4
-      NOVAGC_HAXE_ARCHIVE_URL: https://github.com/NovaFlare-Engine-haxelib/haxe-novagc/releases/download/novagc-precise-70c1245e/haxe-novagc-windows-x64.zip
-      NOVAGC_HAXE_ARCHIVE_SHA256: f344f1911fccb75b925cf96b0d0468f9b4e967bc8218909d02d4d6f84dc25540
-      NOVAGC_HAXE_SOURCE_COMMIT: 70c1245e4e84a677f3a410c3c8d2648825afdb20
-      NOVAGC_HXCPP_SOURCE_COMMIT: 3bc17aaa5f6fb1f1ce95e8cb8d3aad61dabd3e60
+      DCGC_HAXE_ARCHIVE_URL: https://github.com/NovaFlare-Engine-haxelib/haxe-novagc/releases/download/novagc-precise-70c1245e/haxe-novagc-windows-x64.zip
+      DCGC_HAXE_ARCHIVE_SHA256: f344f1911fccb75b925cf96b0d0468f9b4e967bc8218909d02d4d6f84dc25540
+      DCGC_HAXE_SOURCE_COMMIT: 70c1245e4e84a677f3a410c3c8d2648825afdb20
+      DCGC_HXCPP_SOURCE_COMMIT: 3bc17aaa5f6fb1f1ce95e8cb8d3aad61dabd3e60
 
     steps:
-      - name: Checkout NovaFlare and NovaGC sources
+      - name: Checkout D.C.E. and D.C.GC sources
         uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -35,10 +35,10 @@ jobs:
           $haxeCommit = (git -C toolchains/haxe-novagc rev-parse HEAD).Trim()
           $hxcppCommit = (git -C hxcpp rev-parse HEAD).Trim()
 
-          if ($haxeCommit -ne $env:NOVAGC_HAXE_SOURCE_COMMIT) {
+          if ($haxeCommit -ne $env:DCGC_HAXE_SOURCE_COMMIT) {
             throw "Unexpected haxe-novagc commit: $haxeCommit"
           }
-          if ($hxcppCommit -ne $env:NOVAGC_HXCPP_SOURCE_COMMIT) {
+          if ($hxcppCommit -ne $env:DCGC_HXCPP_SOURCE_COMMIT) {
             throw "Unexpected hxcpp-novagc commit: $hxcppCommit"
           }
 
@@ -118,7 +118,7 @@ jobs:
           Write-Output "NovaGC native dependency probe passed with $compiler"
 
       - name: Restore private GameAnalytics
-        if: github.repository == 'NovaFlare-Engine-Concentration/FNF-NovaFlare-Engine' && github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
+        if: github.repository == 'D-C-LushiFu/Different-Creatingness-Engine' && github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
         shell: pwsh
         env:
           NOVA_GA_IMPL_B64: ${{ secrets.NOVA_GA_IMPL_B64 }}
@@ -148,9 +148,9 @@ jobs:
           $archive = Join-Path $env:RUNNER_TEMP 'haxe-novagc-windows-x64.zip'
           $toolchain = Join-Path $env:GITHUB_WORKSPACE 'toolchains\haxe-novagc'
 
-          Invoke-WebRequest -Uri $env:NOVAGC_HAXE_ARCHIVE_URL -OutFile $archive
+          Invoke-WebRequest -Uri $env:DCGC_HAXE_ARCHIVE_URL -OutFile $archive
           $actualHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actualHash -ne $env:NOVAGC_HAXE_ARCHIVE_SHA256) {
+          if ($actualHash -ne $env:DCGC_HAXE_ARCHIVE_SHA256) {
             throw "NovaGC Haxe archive checksum mismatch: $actualHash"
           }
 
@@ -215,7 +215,7 @@ jobs:
           $header = Get-Content -LiteralPath $headerPath -Raw
           if ($header -notmatch '__novaType' -or
               $header -notmatch 'Runtime::instance\(\)\.allocate\(__novaType\)' -or
-              $header -notmatch 'HX_NOVAGC_WB') {
+              $header -notmatch 'HX_DCGC_WB') {
             throw 'Generated headers are not using the NovaGC precise ABI'
           }
 
@@ -260,7 +260,7 @@ jobs:
         shell: pwsh
         run: |
           $binaryRoot = Join-Path $env:GITHUB_WORKSPACE 'export\release\windows\bin'
-          $archive = Join-Path $env:RUNNER_TEMP 'NovaFlare-Windows-ZGC.zip'
+          $archive = Join-Path $env:RUNNER_TEMP 'DCE-Windows-ZGC.zip'
           if (-not (Test-Path -LiteralPath $binaryRoot -PathType Container)) {
             throw "Windows output directory is missing: $binaryRoot"
           }
@@ -270,7 +270,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-zgc-${{ github.sha }}
-          path: ${{ runner.temp }}\NovaFlare-Windows-ZGC.zip
+          path: ${{ runner.temp }}\DCE-Windows-ZGC.zip
           if-no-files-found: error
           compression-level: 0
           retention-days: 14

@@ -11,6 +11,7 @@ class MasterEditorMenu extends MusicBeatState
 {
 	var options:Array<String> = [
 		'chartEditor',
+		'cameraEditor',
 		'characterEditor',
 		'stageEditor',
 		'weekEditor',
@@ -28,6 +29,9 @@ class MasterEditorMenu extends MusicBeatState
 
 	override function create()
 	{
+		// ★ 十三轮：编辑器统一走高分辨率设计（文字 1:1 光栅化 = 清晰）；
+		//   离开时由 EditorInputStyle 的 stateSwitched 钩子自动还原 1280×720。
+		EditorInputStyle.enterHiRes();
 		FlxG.camera.bgColor = FlxColor.BLACK;
 		#if DISCORD_ALLOWED
 		// Updating Discord Rich Presence
@@ -35,6 +39,11 @@ class MasterEditorMenu extends MusicBeatState
 		#end
 
 		var bg:FlxSprite = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
+		// ★ 十三轮：设计分辨率可能大于资源尺寸(1286×730) → 拉伸铺满整屏
+		bg.setGraphicSize(Std.int(FlxG.width), Std.int(FlxG.height));
+		bg.updateHitbox();
+		bg.origin.set(0, 0);
+		bg.offset.set(0, 0);
 		bg.scrollFactor.set();
 		bg.color = 0xFF353535;
 		add(bg);
@@ -56,7 +65,7 @@ class MasterEditorMenu extends MusicBeatState
 		textBG.alpha = 0.6;
 		add(textBG);
 
-		directoryTxt = new FlxText(textBG.x, textBG.y + 4, FlxG.width, '', 32);
+		directoryTxt = new EditorText(textBG.x, textBG.y + 4, FlxG.width, '', 32);
 		// ★ vcr.ttf 是拉丁字体，没有中文 glyph，mod 目录名/提示带中文会直接不显示；改用语言适配字体
 		directoryTxt.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 32, FlxColor.WHITE, CENTER);
 		directoryTxt.scrollFactor.set();
@@ -117,6 +126,8 @@ class MasterEditorMenu extends MusicBeatState
 			{
 				case 'chartEditor': // felt it would be cool maybe
 					MusicBeatState.switchState(new ChartingState());
+				case 'cameraEditor':
+					MusicBeatState.switchState(new CameraEditorLaunchState());
 				case 'characterEditor':
 					MusicBeatState.switchState(new CharacterEditorState(Character.DEFAULT_CHARACTER));
 				case 'stageEditor':

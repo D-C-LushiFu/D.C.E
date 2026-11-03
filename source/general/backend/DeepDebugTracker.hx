@@ -203,7 +203,7 @@ class DeepDebugTracker
 		for (entries in snapshot)
 			totalResources += entries.length;
 
-		output.add('NovaFlare Engine Deep Debug Resource Report$lineBreak');
+		output.add('D.C.E. Deep Debug Resource Report$lineBreak');
 		output.add('================================================$lineBreak');
 		output.add('Song: $reportSong$lineBreak');
 		output.add('Mod folder: $reportMod$lineBreak');

@@ -10,7 +10,7 @@ import general.objects.WindowControlBar;
  * DialogueEditor / DialogueCharacterEditor / NoteSplashEditor）。
  *
  * 系统标题栏在这些编辑器里被隐藏（沉浸式），由它在顶栏右上角接管窗口控制：
- *   [退出 Xxx] [图标 NovaFlare Engine] │ - □ ×
+ *   [退出 Xxx] [图标 D.C.E.] │ - □ ×
  *
  * 实际实现与交互逻辑在 `WindowControlBar`（CONSTANT 模式）：
  * 最小化 / 最大化还原 / 关闭、悬停高亮、按住拖动窗口、双击最大化。
@@ -25,7 +25,7 @@ class EditorChromeUI extends WindowControlBar
 	}
 
 	/**
-	 * 在「NovaFlare Engine」标题左侧安装「退出 <编辑器名>」按钮。
+	 * 在「D.C.E.」标题左侧安装「退出 <编辑器名>」按钮。
 	 * 文案自动按当前语言组拼：
 	 *   - 中文：「退出 编谱器」「退出 角色编辑器」……
 	 *   - 英文："Exit Chart Editor" "Exit Character Editor" ……

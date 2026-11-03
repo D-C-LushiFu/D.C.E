@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mods 菜单重做原型 v3 — NewModsMenuState · NovaFlare Engine</title>
+<title>Mods 菜单重做原型 v3 — NewModsMenuState · D.C.E.</title>
 <style>
 /* ══════════════════════════════════════════════════════════════════════════
    字体：与游戏内一致（chillax = 拉丁主字体 / Lang-ZH = 中文）
    ══════════════════════════════════════════════════════════════════════════ */
-@font-face{font-family:'NF-Latin';src:url("assets/fonts/chillax.ttf") format('truetype');font-display:swap}
-@font-face{font-family:'NF-ZH';src:url("assets/fonts/Lang-ZH.ttf") format('truetype');font-display:swap}
+@font-face{font-family:'DCE-Latin';src:url("assets/fonts/chillax.ttf") format('truetype');font-display:swap}
+@font-face{font-family:'DCE-ZH';src:url("assets/fonts/Lang-ZH.ttf") format('truetype');font-display:swap}
 
 /* ══════════════════════════════════════════════════════════════════════════
    设计令牌 —— 与 EngineSet / CharacterEditorMenuBar / 设置界面重做同源
@@ -35,7 +35,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{background:#0B0A11;color:var(--text);
-  font-family:'NF-ZH','NF-Latin','Microsoft YaHei','PingFang SC',system-ui,sans-serif;
+  font-family:'DCE-ZH','DCE-Latin','Microsoft YaHei','PingFang SC',system-ui,sans-serif;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 body{padding:14px 14px 34px;display:flex;flex-direction:column;align-items:center;gap:12px}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
@@ -400,7 +400,7 @@ a{color:var(--accent)}
   <div id="chrome" data-role="chrome">
     <div id="chromeTitle">
       <span class="logo" data-icon="spark" data-size="12"></span>
-      <span class="name">NovaFlare Engine</span>
+      <span class="name">D.C.E.</span>
     </div>
     <span class="csep"></span>
     <div id="screenLabel">
@@ -555,7 +555,7 @@ a{color:var(--accent)}
       <thead><tr><th style="width:30%">元素</th><th style="width:28%">矩形 (x, y, w, h)</th><th>说明</th></tr></thead>
       <tbody>
         <tr><td>自绘窗口条 <code>#chrome</code></td><td><code>0, 0, 1280, 36</code></td><td><code>WindowControlBar.BAR_HEIGHT=36</code></td></tr>
-        <tr><td>　标题块</td><td><code>0, 0, 156, 36</code></td><td>圆角图标 19px + "NovaFlare Engine"</td></tr>
+        <tr><td>　标题块</td><td><code>0, 0, 156, 36</code></td><td>圆角图标 19px + "D.C.E."</td></tr>
         <tr><td>　屏幕名</td><td><code>157, 0, 74, 36</code></td><td>「模组管理」（计数改由左栏标签承担，不占横向空间）</td></tr>
         <tr><td>　9 个工具按钮</td><td><code>232, 5, 310×26</code>（26×26，间距 3，分隔线 1×16）</td><td>置顶/置底/上移/下移 ｜ 上一个/下一个 ｜ 设置/开关/退出</td></tr>
         <tr><td>　拖拽区 <code>#dragZone</code></td><td><code>542, 0, ~113, 36</code></td><td>对应拖窗区；居中放「N 项待重启生效」徽章</td></tr>
@@ -786,7 +786,7 @@ const RAW = [
       desc:'It\'s made by LushiFu and no fucking body can make it together!\n\n这个模组是陆师傅自己做的，并且没有别人和他一起做。\n\n'
          + '图标用的是仓库里那张真实的 150×150 pack.png（内嵌 base64），其余模组用生成的示例精灵条。' }],
 
-  ['NovaFlare-SkinPack', 'NovaFlare 皮肤扩展包',
+  ['D.C.E.-SkinPack', 'D.C.E. 皮肤扩展包',
     { color:[150,181,255], restart:true, frames:4, hue:212, letter:'S', enabled:true, settings:SETTINGS_SKIN,
       desc:'为引擎追加 6 套音符皮肤、3 套判定线样式与 2 套结算界面皮肤，可在「选项 → 皮肤」中切换。\n\n'
          + 'pack.json 声明了 restart = true：改动启用状态后必须重启游戏。' }],

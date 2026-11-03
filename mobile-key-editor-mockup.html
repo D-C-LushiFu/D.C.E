@@ -196,7 +196,7 @@
 </main>
 
 <footer>
-  <span>保存目录：<span class="path">FuckYouNFEMobile/</span></span>
+  <span>保存目录：<span class="path">FuckYouDCEMobile/</span></span>
   <span>文件名：<span class="path" id="footFile"></span></span>
   <span class="msg" id="footStatus">点「保存」写入 JSON；游戏内约 1 秒自动热重载生效</span>
 </footer>
@@ -764,7 +764,7 @@ document.getElementById("btnSave").onclick = save;
 
 function refreshHead(){
   document.getElementById("fileHint").textContent = "→ " + curEditor + "NewFuckingButtonMobile.json";
-  document.getElementById("footFile").textContent = "FuckYouNFEMobile/" + curEditor + "NewFuckingButtonMobile.json";
+  document.getElementById("footFile").textContent = "FuckYouDCEMobile/" + curEditor + "NewFuckingButtonMobile.json";
 }
 function setFoot(msg, cls){
   const f = document.getElementById("footStatus");
@@ -775,7 +775,7 @@ function save(){
   const r = docJson();
   if(r.err){ setFoot("保存失败："+r.err, "err"); return; }
   dirty = false;
-  setFoot("已保存 FuckYouNFEMobile/"+curEditor+"NewFuckingButtonMobile.json ——（原型未接引擎，不真实写盘）","ok");
+  setFoot("已保存 FuckYouDCEMobile/"+curEditor+"NewFuckingButtonMobile.json ——（原型未接引擎，不真实写盘）","ok");
 }
 function closeModal(){ document.getElementById("modal").classList.remove("show"); }
 function copyJson(){ navigator.clipboard && navigator.clipboard.writeText(document.getElementById("jsonOut").textContent); closeModal(); }

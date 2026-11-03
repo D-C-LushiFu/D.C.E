@@ -308,7 +308,7 @@ class PreciseInputManager extends FlxKeyManager<FlxKey, PreciseInputList>
   }
 
   /**
-   * NovaFlare's current Lime does not expose the upstream FNF
+   * D.C.E.'s current Lime does not expose the upstream FNF
    * `onKey*Precise` hooks. OpenFL still delivers the native event immediately,
    * so timestamp it at the same boundary and keep the original dispatch API.
    */

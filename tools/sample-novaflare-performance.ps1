@@ -13,12 +13,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-if (-not ('NovaFlarePerformance.NativeMethods' -as [type])) {
+if (-not ('DCEPerformance.NativeMethods' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
 
-namespace NovaFlarePerformance {
+namespace DCEPerformance {
     public static class NativeMethods {
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern IntPtr OpenProcess(uint access, bool inheritHandle, int processId);
@@ -42,7 +42,7 @@ namespace NovaFlarePerformance {
 
 $process = Get-Process -Id $TargetProcessId
 $baseAddress = $process.MainModule.BaseAddress.ToInt64()
-$handle = [NovaFlarePerformance.NativeMethods]::OpenProcess(0x410, $false, $TargetProcessId)
+$handle = [DCEPerformance.NativeMethods]::OpenProcess(0x410, $false, $TargetProcessId)
 if ($handle -eq [IntPtr]::Zero) {
     throw "OpenProcess failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
 }
@@ -51,7 +51,7 @@ function Read-ProcessBytes([int64]$rva, [int]$count) {
     $buffer = [byte[]]::new($count)
     $bytesRead = [IntPtr]::Zero
     $address = [IntPtr]::new($baseAddress + $rva)
-    if (-not [NovaFlarePerformance.NativeMethods]::ReadProcessMemory(
+    if (-not [DCEPerformance.NativeMethods]::ReadProcessMemory(
         $handle, $address, $buffer, $count, [ref]$bytesRead)) {
         throw "ReadProcessMemory failed at RVA 0x$($rva.ToString('x')): $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
     }
@@ -98,5 +98,5 @@ try {
     } | Format-List
 }
 finally {
-    [void][NovaFlarePerformance.NativeMethods]::CloseHandle($handle)
+    [void][DCEPerformance.NativeMethods]::CloseHandle($handle)
 }

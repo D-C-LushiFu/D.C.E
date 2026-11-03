@@ -14,19 +14,19 @@ import mobile.server.EditorKeyServer;
  *  - 同时把 Controls.mobileC 视为 false，让 Editor 内部走键盘分支 ——
  *    这样自定义按键注入的 FlxG.keys（组合键）能驱动 Editor 的全部操作；
  *  - 在每个 Editor 里挂一个 EditorMobileKeyOverlay：从
- *    FuckYouNFEMobile/<EditorId>NewFuckingButtonMobile.json 读取自定义按键，
+ *    FuckYouDCEMobile/<EditorId>NewFuckingButtonMobile.json 读取自定义按键，
  *    按 x/y/color/click（可组合键）渲染，支持父键 CanSwitch/SwitchNum 切换子键输出；
  *  - 内置本地 HTTP 服务（127.0.0.1:1146）供外部浏览器窗口创建/删除/保存按键，
  *    保存后 Editor 内约 1 秒自动热重载。
  *
  * 目录规则：
- *  - Windows/桌面：运行目录（cwd）下的 FuckYouNFEMobile/
- *  - 移动端：存储根目录（即 .NovaFlare Engine1.2.0 这类点文件夹，Sys.setCwd 后即为 cwd）
- *    下的 FuckYouNFEMobile/
+ *  - Windows/桌面：运行目录（cwd）下的 FuckYouDCEMobile/
+ *  - 移动端：D.C.Fantasy Land/Different Creatingness Engine（Sys.setCwd 后即为 cwd）
+ *    下的 FuckYouDCEMobile/
  */
 class EditorMobileKeys
 {
-	public static inline final FOLDER_NAME:String = 'FuckYouNFEMobile';
+	public static inline final FOLDER_NAME:String = 'FuckYouDCEMobile';
 
 	/** 外部窗口默认打开的 Editor（最近一次进入的 Editor） */
 	public static var lastEditorId(default, null):String = 'ChartEditor';
@@ -39,6 +39,49 @@ class EditorMobileKeys
 	// “从默认键位生成”模板：FlxVirtualPad 涉及渲染资源，必须在主线程预生成后缓存，
 	// HTTP 服务线程只读缓存。
 	static var templateCache:Map<String, String> = new Map();
+	static var inputPlugin:EditorMobileInputPlugin;
+
+	public static function ensureInputPlugin():Void
+	{
+		if (inputPlugin != null) return;
+		inputPlugin = new EditorMobileInputPlugin();
+		FlxG.plugins.add(inputPlugin);
+		FlxG.signals.preStateSwitch.add(function() {
+			if (activeEditorState != null) restoreState(activeEditorState);
+			activeEditorState = null;
+			activeEditorId = null;
+		});
+	}
+
+	public static function usesKeyboardInjection():Bool
+		return isEnabled() && Std.isOfType(FlxG.state, MusicBeatState) && FlxG.state.subState == null && editorIdOf(cast FlxG.state) != null;
+
+	public static function overlayVisible():Bool
+	{
+		return usesKeyboardInjection();
+	}
+
+	public static function pointerOverButton():Bool
+	{
+		if (!Std.isOfType(FlxG.state, MusicBeatState)) return false;
+		var state:MusicBeatState = cast FlxG.state;
+		var overlay = state.editorMobileOverlay;
+		if (overlay == null || !overlay.visible || !overlay.active) return false;
+		var camera = overlay.cameras[0];
+		var point = FlxG.mouse.getViewPosition(camera);
+		var hit = overlay.hitTest(point.x, point.y);
+		point.put();
+		if (hit) return true;
+		for (touch in FlxG.touches.list)
+			if (touch.pressed || touch.justReleased)
+			{
+				var point = touch.getViewPosition(camera);
+				var hit = overlay.hitTest(point.x, point.y);
+				point.put();
+				if (hit) return true;
+			}
+		return false;
+	}
 
 	public static function prepareTemplates():Void
 	{
@@ -68,7 +111,7 @@ class EditorMobileKeys
 
 	// ==================== 目录 / 文件 ====================
 
-	/** FuckYouNFEMobile 文件夹（自动补尾斜杠，统一 '/'） */
+	/** FuckYouDCEMobile 文件夹（自动补尾斜杠，统一 '/'） */
 	public static function getFileDir():String
 	{
 		var base:String = Sys.getCwd();
@@ -284,7 +327,7 @@ class EditorMobileKeys
 		// ★ 编辑器打开子状态（ESC 试玩 / 确认弹窗等）时挂起自定义按键：
 		//   隐藏 overlay + 释放注入键，避免编辑器按键混进试玩界面、
 		//   或按住中的 Ctrl/Shift 组合键残留导致后续网格点击被“消除”
-		if (state.subState != null)
+		if (state.editorMobileModalOpen())
 		{
 			var overlay:EditorMobileKeyOverlay = state.editorMobileOverlay;
 			if (overlay != null)

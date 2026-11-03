@@ -7,7 +7,7 @@ class FunkinGame extends FlxGame {
 	/**
 	 * Compatibility bridge for Codename mods written against its older Flixel
 	 * fork. That fork exposed the pending state instance as `_requestedState`,
-	 * while NovaFlare's current Flixel stores a `NextState` in `_nextState`.
+	 * while D.C.E.'s current Flixel stores a `NextState` in `_nextState`.
 	 */
 	public var _requestedState(get, set):FlxState;
 

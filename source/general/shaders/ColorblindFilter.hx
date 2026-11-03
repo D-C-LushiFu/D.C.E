@@ -16,29 +16,6 @@ class ColorblindFilter
 
 	public static function UpdateColors(?input:Array<BitmapFilter> = null):Void
 	{
-		// An identity ColorMatrixFilter still makes OpenFL render the complete
-		// FlxGame into an intermediate full-screen bitmap on every frame. "None"
-		// must therefore mean no filter at all, not an identity filter; the latter
-		// cost more than two milliseconds per frame on the reference machine.
-		if (ClientPrefs.data.colorblindMode == 'None')
-		{
-			matrix = [
-				1, 0, 0, 0, 0,
-				0, 1, 0, 0, 0,
-				0, 0, 1, 0, 0,
-				0, 0, 0, 1, 0,
-			];
-			if (input == null)
-			{
-				FlxG.game.setFilters([]);
-				// Keep the filter facility enabled so a later gameplay/Lua effect
-				// becomes active as soon as it calls setFilters(). An empty array is
-				// normalized to null by OpenFL and has no render-pass cost.
-				FlxG.game.filtersEnabled = true;
-			}
-			return;
-		}
-
 		var a1:Float = 1;
 		var a2:Float = 0;
 		var a3:Float = 0;
@@ -53,6 +30,16 @@ class ColorblindFilter
 
 		switch (ClientPrefs.data.colorblindMode)
 		{
+			case 'None':
+				a1 = 1;
+				b1 = 0;
+				c1 = 0;
+				a2 = 0;
+				b2 = 1;
+				c2 = 0;
+				a3 = 0;
+				b3 = 0;
+				c3 = 1;
 			case 'Protanopia':
 				a1 = 0.567;
 				b1 = 0.433;

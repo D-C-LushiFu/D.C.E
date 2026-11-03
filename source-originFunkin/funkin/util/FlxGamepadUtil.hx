@@ -28,7 +28,7 @@ class FlxGamepadUtil
   public static function getLimeGamepad(input:FlxGamepad):Null<LimeGamepad>
   {
     #if ORIGIN_FUNKIN_COMPAT
-    // NovaFlare's OpenFL GameInputDevice does not expose getLimeGamepad().
+    // D.C.E.'s OpenFL GameInputDevice does not expose getLimeGamepad().
     // Origin mode uses Flixel's public gamepad state at pre-update instead.
     return null;
     #elseif FLX_GAMEINPUT_API @:privateAccess

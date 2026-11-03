@@ -16,14 +16,12 @@ art/build_x32-officialrelease.bat
 art/build_x64-officialrelease.bat
 art/test_x64-debug-officialrelease.bat
 
-### VS Code
 export/*
 _build/
 artifacts/
 /PerfViewData*.log*
 /toolchains/*
 !/toolchains/haxe-novagc/
-.vscode/*
 .haxelib/
 # .github/
 *.code-workspace
@@ -31,12 +29,6 @@ vs_Community.exe
 # Local history which shouldn't be shared.
 .history
 .ionide
-# ! means a file should be added regardless of it it gets ignored prior.
-# Including to allow others to use already set-up configuration tweaked for the project.
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
 art/build_html.bat
 art/build_html-debug.bat
 
@@ -51,7 +43,6 @@ art/build_html-debug.bat
 /*.txt
 /*.json
 # 本地工具、会话与备份目录
-/.workbuddy/
 /.gradle/
 /_backup/
 /_dsh_tools/
@@ -60,14 +51,4 @@ art/build_html-debug.bat
 /hxcpp/
 /.gitconfig-bypass
 
-### 安装器工程的构建产物（源码 src/ 与 tools/ 仍然入库）
-/NovaFlareEngineInstaller/backup/
-/NovaFlareEngineInstaller/bin/
-/NovaFlareEngineInstaller/dist/
-/NovaFlareEngineInstaller/payload/
-/NovaFlareEngineInstaller/true/
-/NovaFlareEngineInstaller/*.exe
-/NovaFlareEngineInstaller/*.rar
-/NovaFlareEngineInstaller/*.zip
-/NovaFlareEngineInstaller/*.res
 /_crashlogs/

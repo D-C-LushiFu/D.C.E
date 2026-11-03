@@ -24,7 +24,7 @@ beep！
 如果箭头突脸了请不要慌张，关闭预加载。
 我想放假啊啊啊。
 现在立刻马上看看剩余电量。
-debugPrint("NovaFlare Engine崩溃了")
+debugPrint("D.C.E.崩溃了")
 你知道吗？我看你不知道。
 想上厕所立马去上。
 双指手机玩家们多试试四指吧。
@@ -47,10 +47,10 @@ if 1 == 2 then
 你有没有在没有设备的时候幻想自己正在打曲子。
 你玩FNF已经可以孤立很多人了。
 BotPlay，启动！
-别忘记NovaFlare-Engine是基于PE0.7.3的。
+别忘记D.C.E.是基于PE0.7.3的。
 你听说了吗，设置某个选项可以让引擎支持部分0.6.3模组。
 明明设置第一个选项就是调语言的，为什么还是有人问。
-你打开NovaFlare的github的action你就可以看见更新情况。
+你打开D.C.E.的github的action你就可以看见更新情况。
 你知道吗，你拉出来的跟你“之前”吃的是一个东西（一语双关）
 未成年Bug请在家长陪同下出现。（爆一长串bug）
 恭喜你啊被恭喜到了。
@@ -58,9 +58,9 @@ BotPlay，启动！
 让我看看还有什么tags没给你看过。
 Three? Two? One? Go!
 你最好没往mods塞一些奇奇怪怪的模组O_o。
-据说后面有个NovaFlare-Engine的版本将不会基于Haxe。
+据说后面有个D.C.E.的版本将不会基于Haxe。
 砸！瓦鲁多！（暂停游戏）
-你还记得第一次用的NovaFlare-Engine版本吗。
+你还记得第一次用的D.C.E.版本吗。
 你看我你就输了。
 FNF能锻炼你脑袋的多线程。
 有趣的，好玩的，愉悦的，开心的。
@@ -68,9 +68,9 @@ FNF能锻炼你脑袋的多线程。
 还是4k大神。
 让我猜猜，你是不是玩过FNF。
 玩石头剪刀布吧，你先出。
-NovaFlare-Engine在中国有一个QQ群，你进了吗。
+D.C.E.在中国有一个QQ群，你进了吗。
 如果你的设备带不动着色器就把着色器关了吧。
-你知道NovaFlare-Engine诞生的原因吗。
+你知道D.C.E.诞生的原因吗。
 debugPrint("debugPrint("debugPrint("666")")")
 if true then
 GOGOGOGOGOGO

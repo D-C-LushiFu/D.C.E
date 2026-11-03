@@ -38,9 +38,7 @@ class Main extends Sprite
 	public static var verbose:Bool = false;
 
 	public static var scaleMode:FunkinRatioScaleMode;
-	#if !mobile
 	public static var framerateSprite:Framerate;
-	#end
 
 	var gameWidth:Int = 1280; // Width of the game in pixels (might be less / more in actual pixels).
 	var gameHeight:Int = 720; // Height of the game in pixels (might be less / more in actual pixels).
@@ -128,6 +126,13 @@ class Main extends Sprite
 
 		codename.funkin.options.PlayerSettings.init();
 		Options.load();
+		codenamechain.CodeNameOverlaySettings.applyMouseEffects(Options.mouseEffects);
+		#if mobile
+		lime.system.System.allowScreenTimeout = Options.screenTimeOut;
+		#end
+		#if CODENAME_ENGINE_COMPAT
+		codenamechain.CodeNameOverlaySettings.applyWatermarkScale(Options.watermarkScale, false);
+		#end
 
 		FlxG.fixedTimestep = false;
 
@@ -143,7 +148,7 @@ class Main extends Sprite
 		FlxG.signals.postStateSwitch.add(onStateSwitchPost);
 		FlxG.signals.postUpdate.add(onUpdate);
 
-		FlxG.mouse.useSystemCursor = true;
+		FlxG.mouse.useSystemCursor = #if mobile !PlayerSettings.solo.controls.touchC #else true #end;
 		#if DARK_MODE_WINDOW
 		if(codename.funkin.backend.utils.NativeAPI.hasVersion("Windows 10")) codename.funkin.backend.utils.NativeAPI.redrawWindowHeader();
 		#end
@@ -223,12 +228,20 @@ class Main extends Sprite
 		}
 		#end
 
+		// D.C.E.'s GC already schedules collections from allocation pressure.
+		// A forced full collection plus compaction here stalls every CNE screen
+		// transition, especially with large mods on mobile.
+		#if !CODENAME_ENGINE_COMPAT
 		MemoryUtil.clearMajor();
+		#end
 	}
 
 	public static var noCwdFix:Bool = false;
 	public static function fixWorkingDirectory() {
-		#if windows
+		#if (CODENAME_ENGINE_COMPAT && mobile)
+		// D.C.E. already selected and prepared the external runtime folder.
+		return;
+		#elseif windows
 		if (!noCwdFix && !sys.FileSystem.exists('manifest/default.json')) {
 			Sys.setCwd(haxe.io.Path.directory(Sys.programPath()));
 		}

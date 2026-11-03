@@ -109,3 +109,6 @@ desc_help_copy => Ctrl+C 复制当前偏移，Ctrl+V 粘贴，Ctrl+R 归零
 desc_help_fps => 后续每 4 个 Note Data 自动生成下一套动画名
 desc_help_f1 => 打开本帮助菜单：F1
 desc_help_exit => 退出编辑器返回主编辑器菜单：ESC / Back
+
+item_load_json => 导入 JSON 配置
+desc_load_json => 导入并检查已有的溅射配置，保留当前图片资源

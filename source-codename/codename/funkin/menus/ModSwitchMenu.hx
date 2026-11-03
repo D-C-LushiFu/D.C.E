@@ -29,7 +29,10 @@ class ModSwitchMenu extends MusicBeatSubstate {
 		bg.alpha = 0;
 		FlxTween.tween(bg, {alpha: 0.5}, 0.25, {ease: FlxEase.cubeOut});
 
-		mods = ModsFolder.getModsList();
+		mods = ModsFolder.getModsList({
+		    descending: false,
+			mode: CLEAN,
+		});
 		mods.push(null);
 
 		alphabets = new FlxTypedGroup<Alphabet>();
@@ -48,7 +51,8 @@ class ModSwitchMenu extends MusicBeatSubstate {
 	public override function update(elapsed:Float) {
 		super.update(elapsed);
 
-		changeSelection((controls.DOWN_P ? 1 : 0) + (controls.UP_P ? -1 : 0) - FlxG.mouse.wheel);
+		var scroll = controls.touchC ? 0 : FlxG.mouse.wheel;
+		changeSelection((controls.DOWN_P ? 1 : 0) + (controls.UP_P ? -1 : 0) - scroll);
 
 		if (controls.ACCEPT) {
 			ModsFolder.switchMod(mods[curSelected]);

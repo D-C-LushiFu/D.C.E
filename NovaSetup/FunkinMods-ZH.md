@@ -1,6 +1,6 @@
 # Funkin 目录与引擎入口说明
 
-本文说明 NovaFlare Engine 的 `Funkin` 运行目录应放在哪里、OriginFunkin 与 CodeName Engine 的资源和模组如何摆放，以及如何从 NovaFlare Engine 进入对应引擎。
+本文说明 D.C.E. 的 `Funkin` 运行目录应放在哪里、OriginFunkin 与 CodeName Engine 的资源和模组如何摆放，以及如何从 D.C.E. 进入对应引擎。
 
 ## Funkin 目录放在哪里
 ```text
@@ -11,7 +11,7 @@ replays/
 Funkin/ <---这里
 ```
 
-不要把 `Funkin` 放进 NovaFlare 自己的 `assets`、`mods` 或其他子目录。
+不要把 `Funkin` 放进 D.C.E. 自己的 `assets`、`mods` 或其他子目录。
 
 ## 完整目录结构
 
@@ -72,20 +72,20 @@ CodeName Engine 运行时可能自动创建 `.temp`，这是正常的临时目�
 - CodeName 模组放入 `Funkin/CodeName/mods-codename/`。
 - `assets`、`mods-codename`必须同级。
 
-### NovaFlare Engine 自身内容
+### D.C.E. 自身内容
 
-`Funkin` 只存放外部引擎内容。NovaFlare Engine 自己的资源和模组仍使用可执行文件旁边的：
+`Funkin` 只存放外部引擎内容。D.C.E. 自己的资源和模组仍使用可执行文件旁边的：
 
 ```text
 assets/
 mods/
 ```
 
-不要把 NovaFlare 的 `assets` 或 `mods` 移入 `Funkin`。
+不要把 D.C.E. 的 `assets` 或 `mods` 移入 `Funkin`。
 
 ## 游戏内入口
 
-在 NovaFlare Engine 中依次进入：
+在 D.C.E. 中依次进入：
 
 ```text
 设置
@@ -97,10 +97,10 @@ mods/
 
 1. 选择 `Origin Funkin` 或 `CodeName Engine`。
 2. PC 上按确认键进入；手机上可以点击当前显示的引擎介绍图。
-3. NovaFlare Engine 会保存选择并退出。
-4. 再次启动 `NovaFlare Engine`，程序会进入所选引擎。
+3. D.C.E. 会保存选择并退出。
+4. 再次启动 `D.C.E.`，程序会进入所选引擎。
 
-**CodeName Engine 仅在 PC 版本提供；手机版只能进入 OriginFunkin 或继续使用 NovaFlare Engine。**
+**CodeName Engine 仅在 PC 版本提供；手机版只能进入 OriginFunkin 或继续使用 D.C.E.。**
 
 ## 启动配置入口
 
@@ -114,10 +114,10 @@ Funkin/chain.json
 
 | 值 | 启动目标 |
 | --- | --- |
-| `novaflare` | NovaFlare Engine |
+| `dce` | D.C.E. |
 | `origin` | OriginFunkin |
 | `codename` | CodeName Engine（仅 PC） |
-| `auto` | 优先尝试 OriginFunkin；资源不可用时回到 NovaFlare Engine |
+| `auto` | 优先尝试 OriginFunkin；资源不可用时回到 D.C.E. |
 
 建议通过游戏内的引擎选择界面修改，不建议在程序运行时手动编辑 `chain.json`。
 

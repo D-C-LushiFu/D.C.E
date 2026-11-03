@@ -4,6 +4,7 @@ import flixel.graphics.FlxGraphic;
 import flixel.util.FlxColor;
 import codename.funkin.backend.shaders.CustomShader;
 import codename.funkin.backend.system.github.GitHub;
+import haxe.io.Bytes;
 import openfl.display.BitmapData;
 import codename.funkin.backend.system.github.GitHubContributor.CreditsGitHubContributor;
 
@@ -35,18 +36,26 @@ class GithubUserIcon extends FlxSprite
 	public var waitUntilLoad:Null<Float>;
 	private var user:CreditsGitHubContributor;
 	private var size:Int;
+	private var cacheKey:String;
+	private var downloadStarted:Bool = false;
+	private var downloadFinished:Bool = false;
+	private var pendingBytes:Bytes = null;
+	private var disposed:Bool = false;
+	private var appliedOffset:Float = 0;
 
 	public override function new(user:CreditsGitHubContributor, size:Int = 96, waitUntilLoad:Float = 0.25) {
 		this.user = user;
 		this.size = size;
 		this.waitUntilLoad = waitUntilLoad;
+		this.cacheKey = 'GITHUB-USER:${user.login}';
 		super();
 		makeGraphic(size, size, FlxColor.TRANSPARENT);
 		antialiasing = true;
 	}
 
 	override function update(elapsed:Float) {
-		if(waitUntilLoad > 0) waitUntilLoad -= elapsed;
+		if(waitUntilLoad != null && waitUntilLoad > 0) waitUntilLoad -= elapsed;
+		consumePendingDownload();
 		super.update(elapsed);
 	}
 
@@ -65,61 +74,107 @@ class GithubUserIcon extends FlxSprite
 		#end
 	}
 
-	override function drawComplex(camera:FlxCamera):Void {  // Making the image download only if the player actually sees it on the screen  - Nex
-		if(waitUntilLoad <= 0) {
+	override function drawComplex(camera:FlxCamera):Void {
+		// Start network work only after the option is actually visible. The worker
+		// may download bytes, but every Flixel/OpenFL display mutation stays on the
+		// main update thread.
+		if(!downloadStarted && waitUntilLoad != null && waitUntilLoad <= 0) {
 			waitUntilLoad = null;
-			Main.execAsync(function() {
-				var key:String = 'GITHUB-USER:${user.login}';
-				var bmap:Dynamic = FlxG.bitmap.get(key);
-
-				if(bmap == null) {
-					trace('Downloading avatar: ${user.login}');
-					var unfLink:Bool = StringTools.endsWith(user.avatar_url, '.png');
-					var planB:Bool = true;
-
-					var bytes = null;
-					if(unfLink) {
-						try bytes = HttpUtil.requestBytes('${user.avatar_url}?size=$size')
-						catch(e) Logs.error('Failed to download github pfp for ${user.login}: ${CoolUtil.removeIP(e.message)} - (Retrying using the api..)');
-
-						if(bytes != null) {
-							bmap = BitmapData.fromBytes(bytes);
-							planB = false;
-						}
-					}
-
-					if(planB) {
-						if(unfLink) user = cast GitHub.getUser(user.login, function(e) Logs.error('Failed to download github user info for ${user.login}: ${CoolUtil.removeIP(e.message)}'));  // Api part - Nex
-						try bytes = HttpUtil.requestBytes('${user.avatar_url}&size=$size')
-						catch(e) Logs.error('Failed to download github pfp for ${user.login}: ${CoolUtil.removeIP(e.message)}');
-
-						if(bytes != null) bmap = BitmapData.fromBytes(bytes);
-					}
-
-					if(bmap != null) try {
-						acquireMutex();  // Avoiding critical section  - Nex
-						var leGraphic:FlxGraphic = FlxG.bitmap.add(bmap, false, key);
-						leGraphic.persist = true;
-						updateDaFunni(leGraphic);
-						bmap = null;
-						releaseMutex();
-					} catch(e) {
-						Logs.error('Failed to update the pfp for ${user.login}: ${e.message}');
-					}
-				} else {
-					acquireMutex();
-					updateDaFunni(bmap);
-					releaseMutex();
-				}
-			});
+			startAvatarDownload();
 		}
 		super.drawComplex(camera);
 	}
 
+	private function startAvatarDownload() {
+		downloadStarted = true;
+		var cached = FlxG.bitmap.get(cacheKey);
+		if (cached != null) {
+			updateDaFunni(cached);
+			return;
+		}
+
+		var login = user.login;
+		var avatarURL = user.avatar_url;
+		var requestedSize = size;
+		Main.execAsync(function() {
+			var bytes:Bytes = null;
+			try {
+				trace('Downloading avatar: $login');
+				var directPNG = avatarURL != null && StringTools.endsWith(avatarURL, '.png');
+				if (directPNG) {
+					try bytes = HttpUtil.requestBytes(withSize(avatarURL, requestedSize))
+					catch(e) Logs.error('Failed to download github pfp for $login: ${CoolUtil.removeIP(e.message)} - (Retrying using the api..)');
+				}
+
+				if (bytes == null) {
+					if (directPNG) {
+						var apiUser = GitHub.getUser(login, function(e)
+							Logs.error('Failed to download github user info for $login: ${CoolUtil.removeIP(e.message)}'));
+						if (apiUser != null && apiUser.avatar_url != null) avatarURL = apiUser.avatar_url;
+					}
+					if (avatarURL != null)
+						try bytes = HttpUtil.requestBytes(withSize(avatarURL, requestedSize))
+						catch(e) Logs.error('Failed to download github pfp for $login: ${CoolUtil.removeIP(e.message)}');
+				}
+			} catch(e) {
+				Logs.error('Failed to prepare the github pfp for $login: ${e.message}');
+			}
+			publishDownloadedBytes(bytes);
+		});
+	}
+
+	private static inline function withSize(url:String, requestedSize:Int):String
+		return '$url${url.indexOf("?") >= 0 ? "&" : "?"}size=$requestedSize';
+
+	private function publishDownloadedBytes(bytes:Bytes) {
+		acquireMutex();
+		if (!disposed) {
+			pendingBytes = bytes;
+			downloadFinished = true;
+		}
+		releaseMutex();
+	}
+
+	private function consumePendingDownload() {
+		acquireMutex();
+		var ready = downloadFinished;
+		var bytes = pendingBytes;
+		if (ready) {
+			downloadFinished = false;
+			pendingBytes = null;
+		}
+		releaseMutex();
+
+		if (!ready || bytes == null || disposed) return;
+		try {
+			var graphic:FlxGraphic = FlxG.bitmap.get(cacheKey);
+			if (graphic == null) {
+				var bitmap = BitmapData.fromBytes(bytes);
+				if (bitmap == null) return;
+				graphic = FlxG.bitmap.add(bitmap, false, cacheKey);
+				graphic.persist = true;
+			}
+			updateDaFunni(graphic);
+		} catch(e) {
+			Logs.error('Failed to apply the pfp for ${user.login}: ${e.message}');
+		}
+	}
+
 	public inline function updateDaFunni(graphic:FlxGraphic) {
+		x -= appliedOffset;
 		loadGraphic(graphic);
 		this.setUnstretchedGraphicSize(size, size, false);
 		updateHitbox();
-		x += 90 - width;
+		appliedOffset = 90 - width;
+		x += appliedOffset;
+	}
+
+	override function destroy() {
+		acquireMutex();
+		disposed = true;
+		pendingBytes = null;
+		downloadFinished = false;
+		releaseMutex();
+		super.destroy();
 	}
 }

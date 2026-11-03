@@ -1,4 +1,4 @@
-# NovaFlare 新 hxcpp：完整功能、实现状态与后续路线汇总
+# D.C.E. 新 hxcpp：完整功能、实现状态与后续路线汇总
 
 > 汇总日期：2026-07-13  
 > 当前状态：按用户要求暂停生成、编译、启动和 GC 改写  
@@ -905,15 +905,15 @@ _constructor.copyNonReferenceFrom(_hx_v);
 
 现有关键备份：
 
-- 初始备份：`D:\game\NovaFlare-backups\20260712-002120`
-- 已批准重写基线：`D:\game\NovaFlare-backups\20260712-005805-approved-rewrite-baseline`
-- 旧尝试回滚：`D:\game\NovaFlare-backups\20260712-220000-rollback-fresh-zgc`
-- handle 阶段：`D:\game\NovaFlare-backups\20260712-223829-hxcpp-zgc-mark-relocation-handles`
-- relocation/TLAB 阶段：`D:\game\NovaFlare-backups\20260712-230747-hxcpp-zgc-concurrent-relocation-tlab`
-- Haxe frontend 阶段：`D:\game\NovaFlare-backups\20260713-004506-hxcpp-zgc-haxe-frontend`
-- CFFI 阶段：`D:\game\NovaFlare-backups\20260713-020035-hxcpp-zgc-cffi-descriptor-prime`
-- native thread ABI 阶段：`D:\game\NovaFlare-backups\20260713-040820-hxcpp-zgc-native-thread-abi`
-- 已知完整链接基线：`D:\game\NovaFlare-backups\20260713-111300-hxcpp-zgc-full-link-tls`
+- 初始备份：`D:\game\D.C.E.-backups\20260712-002120`
+- 已批准重写基线：`D:\game\D.C.E.-backups\20260712-005805-approved-rewrite-baseline`
+- 旧尝试回滚：`D:\game\D.C.E.-backups\20260712-220000-rollback-fresh-zgc`
+- handle 阶段：`D:\game\D.C.E.-backups\20260712-223829-hxcpp-zgc-mark-relocation-handles`
+- relocation/TLAB 阶段：`D:\game\D.C.E.-backups\20260712-230747-hxcpp-zgc-concurrent-relocation-tlab`
+- Haxe frontend 阶段：`D:\game\D.C.E.-backups\20260713-004506-hxcpp-zgc-haxe-frontend`
+- CFFI 阶段：`D:\game\D.C.E.-backups\20260713-020035-hxcpp-zgc-cffi-descriptor-prime`
+- native thread ABI 阶段：`D:\game\D.C.E.-backups\20260713-040820-hxcpp-zgc-native-thread-abi`
+- 已知完整链接基线：`D:\game\D.C.E.-backups\20260713-111300-hxcpp-zgc-full-link-tls`
 
 最后一个备份是已知完整链接基线，但不包含之后全部启动语义修复。恢复时应优先继续当前源码；只有出现无法启动且无法定位的破坏性回归时，才从最近验证备份恢复并重新应用后续已验证补丁。
 

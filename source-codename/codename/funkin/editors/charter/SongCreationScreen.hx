@@ -316,6 +316,27 @@ class SongCreationScreen extends UISubstateWindow {
 		super.update(elapsed);
 	}
 
+	#if mobile
+	public override function onMobileBack():Void {
+		if (curPage > 0) {
+			curPage--;
+			refreshPages();
+			updatePagesTexts();
+			return;
+		}
+
+		if (isImporting) {
+			winTitle = translate("win-title");
+			isImporting = false;
+			refreshPages();
+			updatePagesTexts();
+			return;
+		}
+
+		super.onMobileBack();
+	}
+	#end
+
 	function refreshPages() {
 		for (i=>page in pages)
 			page.visible = page.exists = i == curPage && !isImporting;

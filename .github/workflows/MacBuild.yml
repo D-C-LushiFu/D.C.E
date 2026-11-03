@@ -1,5 +1,8 @@
 name: MacBuild
 on:
+  push:
+    branches: [ main ]
+
   workflow_dispatch:
   
   workflow_call:
@@ -8,7 +11,7 @@ jobs:
   build:
     name: macOS
     runs-on: macos-${{matrix.version}}
-    environment: ${{ github.repository == 'NovaFlare-Engine-Concentration/FNF-NovaFlare-Engine' && 'private-build' || 'public-build' }}
+    environment: ${{ github.repository == 'D-C-LushiFu/Different-Creatingness-Engine' && 'private-build' || 'public-build' }}
     strategy:
       matrix:
         version: [14, 15]
@@ -22,7 +25,7 @@ jobs:
           haxe-version: 4.3.7
 
       - name: Restore private GameAnalytics
-        if: github.repository == 'NovaFlare-Engine-Concentration/FNF-NovaFlare-Engine' && github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
+        if: github.repository == 'D-C-LushiFu/Different-Creatingness-Engine' && github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
         shell: pwsh
         env:
           NOVA_GA_IMPL_B64: ${{ secrets.NOVA_GA_IMPL_B64 }}

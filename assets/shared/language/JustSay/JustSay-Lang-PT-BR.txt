@@ -24,7 +24,7 @@ Vocês estão todos indo muito bem, mesmo quem tá travando.
 Se as setas de repente aumentarem de tamanho, não entre em pânico — é só desativar o pré-carregamento.  
 Preciso de férias, tipo, AGORA.  
 Verifica o nível da bateria. Agora. De verdade.  
-debugPrint("NovaFlare Engine travou.")  
+debugPrint("D.C.E. travou.")  
 Acha que sabe? Não sabe não.  
 Vai ao banheiro se precisar.  
 Jogadores mobile com dois dedos: tenta com quatro.  
@@ -47,10 +47,10 @@ Você já pensou nos sentimentos da sua tela/teclado?
 Você já imaginou jogar fases sem nenhum dispositivo?  
 Você provavelmente já superou 90% dos jogadores de FNF.  
 BotPlay, ativar!  
-Lembrete: NovaFlare Engine é baseado no PE0.7.3.  
+Lembrete: D.C.E. é baseado no PE0.7.3.  
 Boato: Ajuste uma configuração para ficar compatível com alguns mods do 0.6.3.  
 A primeira opção nas configurações é literalmente seleção de idioma — por que as pessoas ainda perguntam?  
-Confira o GitHub Actions do NovaFlare para o progresso das atualizações.  
+Confira o GitHub Actions do D.C.E. para o progresso das atualizações.  
 Curiosidade: O que você "produz" está relacionado ao que você "consumiu" antes. (Trocadilho duplo)  
 Bugs menores só devem aparecer com supervisão parental.
 Parabéns! Você foi parabenizado.  
@@ -58,9 +58,9 @@ Inventar essas mensagens tá me dando dor de cabeça.
 Deixa eu ver quais mensagens você ainda não viu.  
 Três… Dois… Um… Vai!  
 Espero que você não tenha enfiado mods esquisitos na pasta. O_o  
-Boato: Uma versão futura do NovaFlare pode abandonar o Haxe.  
+Boato: Uma versão futura do D.C.E. pode abandonar o Haxe.  
 ZA WARUDO! (Jogo pausado.)  
-Lembra da sua primeira versão do NovaFlare Engine?  
+Lembra da sua primeira versão do D.C.E.?  
 Você perde se ficar me olhando.  
 FNF treina seu cérebro para fazer várias coisas ao mesmo tempo.  
 Divertido. Emocionante. Alegre. Empolgante.  
@@ -68,9 +68,9 @@ Você escuta as músicas no modo Freeplay?
 Ainda uma lenda das 4 teclas.  
 Deixa eu adivinhar — você já jogou FNF antes.  
 Pedra, papel ou tesoura? Você começa.  
-NovaFlare-Engine tem um grupo QQ na China. Já entrou?  
+D.C.E. tem um grupo QQ na China. Já entrou?  
 Se os shaders travarem seu dispositivo, é só desligar.  
-Você sabe por que o NovaFlare-Engine foi criado?  
+Você sabe por que o D.C.E. foi criado?  
 debugPrint("debugPrint("debugPrint("666")")")  
 if true then  
 GOGOGOGOGOGOGO  
@@ -98,4 +98,4 @@ A gente se encontra de novo... de novo. :)
 Travamentos? Faz parte da experiência.  
 Curiosidade: *Dead Cells* foi escrito em Heaps.  
 Ãham, ãham, tá, com certeza.
-Você deveria agradecer ao DeepSeek por ter te deixado ver as mensagens em inglês.
+Obrigado por ler as mensagens em inglês.

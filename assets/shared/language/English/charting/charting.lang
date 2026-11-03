@@ -61,7 +61,7 @@ item_prev_event => Previous
 item_next_event => Next
 
 # ===== Items: Note menu =====
-item_sustain_len => Sustain Length
+item_sustain_len => Sustain Length (ms)
 item_strum_time => Strum Time (ms)
 item_note_type => Note Type
 
@@ -137,7 +137,7 @@ desc_add_event => Insert a brand new event of the currently selected type at the
 desc_del_event => Delete the currently selected event permanently. There's no undo, so hit Save before deleting anything important.
 desc_prev_event => Move selection backward to the previous event in chronological order.
 desc_next_event => Move selection forward to the next event in chronological order.
-desc_sustain_len => Sustain length, measured in beats (1 = one standard beat). 0 gives you a short tap, 0.5 a half-beat hold, 2 a two-beat hold, etc.
+desc_sustain_len => Hold duration in milliseconds. Its length in beats depends on the current BPM: one beat is 60,000 / BPM ms. 0 gives you a short tap.
 desc_strum_time => The exact millisecond moment (counted from song start) at which the note should be hit by the player.
 desc_note_type => Marks a note as special. Choices: None = normal, Alt Animation = uses the alt animation group, Hey! = plays the VO clip, Hurt Note = damages on hit, GF Sing = triggers GF sing, No Animation = silent visually.
 desc_must_hit => When ON this section is played by BF (the player); when OFF it's played by the opponent. Choose one per section, don't mix and match randomly.
@@ -212,7 +212,7 @@ label_note_splash => Note Splash:
 label_event_type => Event Type:
 label_value1 => Value 1:
 label_value2 => Value 2:
-label_sustain_len => Sustain Length:
+label_sustain_len => Sustain Length (ms):
 label_strum_time => Strum Time:
 label_note_type => Note Type:
 label_beats => Beats/Section:
@@ -223,9 +223,9 @@ label_song_bpm => BPM:
 label_song_speed => Speed:
 label_song_mania => Mania:
 label_stage => Stage:
-label_player1 => Opponent:
+label_player1 => Player:
 label_gf => Girlfriend:
-label_player2 => Player:
+label_player2 => Opponent:
 
 # ===== Confirm prompts (destructive actions) =====
 prompt_paste_section => Paste clipboard into current section?\nThis will overwrite the current section.
@@ -234,3 +234,27 @@ prompt_swap_section => Swap the player's and opponent's notes in this section?
 prompt_copy_beat => Copy the target beat and overwrite the current section?
 prompt_duet_notes => Balance this section's two sides?\nCopy the notes of the fuller side to the emptier side.
 prompt_mirror_notes => Mirror every note of this section?
+item_history => History
+desc_history => View and jump through the chart editing history
+item_redo => Redo
+desc_redo => Redo the most recently undone edit
+history_title => Edit History
+history_undo => Undo  Ctrl+Z
+history_redo => Redo  Ctrl+Y
+history_opened_chart => Opened chart
+history_add_item => Added note or event
+history_delete_item => Deleted note or event
+history_edit_chart => Edited chart data
+history_apply_note_skin => Applied note type
+history_paste_section => Pasted section
+history_clear_section => Cleared section
+history_swap_sides => Swapped note sides
+history_copy_section => Copied previous section
+history_copy_beat => Copied beat
+history_duet => Balanced note sides
+history_mirror => Mirrored notes
+history_clear_events => Cleared events
+history_clear_notes => Cleared notes
+history_change_sustain => Changed sustain length
+history_load_events => Loaded events
+history_load_autosave => Loaded autosave

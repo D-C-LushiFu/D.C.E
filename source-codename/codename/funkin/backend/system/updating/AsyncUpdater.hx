@@ -26,15 +26,16 @@ class AsyncUpdater {
 	#end
 
 
-	#if windows
+	#if mobile
+	public static var executableGitHubName:String = "";
+	public static var executableName:String = "";
+	#elseif windows
 	public static var executableGitHubName:String = "update-windows.exe";
 	public static var executableName:String = "CodenameEngine.exe";
-	#end
-	#if linux
+	#elseif linux
 	public static var executableGitHubName:String = "update-linux";
 	public static var executableName:String = "CodenameEngine";
-	#end
-	#if mac
+	#elseif mac
 	public static var executableGitHubName:String = "update-mac";
 	public static var executableName:String = "CodenameEngine";
 	#end
@@ -49,8 +50,15 @@ class AsyncUpdater {
 	public var oldBytesLoaded:Float = 0;
 
 	public function installUpdates() {
+		#if mobile
+		// Mobile updates are installed by the platform/browser. Never try to
+		// replace the running APK/IPA or download an empty executable asset.
+		progress.done = true;
+		return;
+		#else
 		prepareInstallationEnvironment();
 		downloadFiles();
+		#end
 	}
 
 	public function installFiles(files:Array<String>) {
@@ -67,7 +75,7 @@ class AsyncUpdater {
 			ZipUtil.uncompressZip(reader, './', null, progress.curZipProgress);
 			// FileSystem.deleteFile(path);
 		}
-		if (executableReplaced = FileSystem.exists('$path$executableName')) {
+		if (executableReplaced = executableName.length > 0 && FileSystem.exists('$path$executableName')) {
 			progress.curFile = files.length;
 			progress.curFileName = executableName;
 

@@ -4,6 +4,7 @@ import general.objects.AttachedSprite;
 import general.objects.state.CreditsShape;
 
 import substates.CreditsSubState;
+import substates.DCECreditsSubState;
 import substates.PsychCreditsSubState;
 
 import states.mainMenuState.MainMenuState;
@@ -14,7 +15,7 @@ class CreditsState extends MusicBeatState
 	private var iconArray:Array<AttachedSprite> = [];
 
 	private var nameSave:Array<String> = [
-		"NovaFlare Engine",
+		"D.C.E.",
 		"Psych Engine",
 		#if mobile
 		"mobile Team",
@@ -24,12 +25,12 @@ class CreditsState extends MusicBeatState
 
 	private var NucreditsStuff:Array<Array<Array<String>>> = [
 		[
-			['NovaFlare Engine Team'],
+			['D.C.E. Team'],
 			[
 				'Beihu',
 				'beihu',
 				'Main Programmer',
-				'Head of NovaFlare Engine\n\n\nNothing special',
+				'Head of D.C.E.\n\n\nNothing special',
 				'FFC0CB',
 				'https://b23.tv/QfPKw2o',
 				'https://youtube.com/@beihu235?si=BI2efmEcI8_mZoUp',
@@ -306,7 +307,7 @@ class CreditsState extends MusicBeatState
 	];
 
 	private var UncreditsStuff:Array<String> = [
-		"Nova Flare Engine Team",
+		"D.C.E. Team",
 		"Psych Engine Team",
 		#if mobile
 		"mobile port team",
@@ -331,6 +332,7 @@ class CreditsState extends MusicBeatState
 
 	private static var position:Float = 100 - 45;
 	private static var lerpPosition:Float = 100 - 45;
+	private var openingDCE:Bool = false;
 
 	override function create()
 	{
@@ -380,6 +382,7 @@ class CreditsState extends MusicBeatState
 	override function update(elapsed:Float)
 	{
 		super.update(elapsed);
+		if (openingDCE) return;
 
 		if (FlxG.sound.music.volume < 0.7)
 		{
@@ -441,9 +444,24 @@ class CreditsState extends MusicBeatState
 							if (creditsStuff != null)
 							{
 								CreditsSubState.creditsStuff = creditsStuff;
-								persistentUpdate = false;
 								Mods.currentModDirectory = UncreditsStuff[i];
-								openSubState(new CreditsSubState());
+								if (i == 0)
+								{
+									openingDCE = true;
+									FlxG.camera.fade(FlxColor.BLACK, 1.4, false, function()
+									{
+										persistentUpdate = persistentDraw = false;
+										var dce = new DCECreditsSubState();
+										dce.closeCallback = function()
+										{
+											persistentUpdate = persistentDraw = true;
+											openingDCE = false;
+											FlxG.camera.fade(FlxColor.BLACK, .45, true);
+										};
+										openSubState(dce);
+									});
+								}
+								else { persistentUpdate = false; openSubState(new CreditsSubState()); }
 								trace("false");
 							}
 						}

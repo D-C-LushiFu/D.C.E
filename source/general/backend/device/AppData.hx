@@ -3,6 +3,7 @@ package general.backend.device;
 // make Sscript can check those data
 #if android
 import android.os.AppDetails;
+import lime.system.JNI;
 
 class AppData
 {
@@ -28,7 +29,21 @@ class AppData
 	
 	public static function verifySignature():Bool
 	{
-		return AppDetails.verifySignature();
+		return AppDetails.verifySignature() || DceSignatureVerifier.verifySignature();
+	}
+}
+
+private class DceSignatureVerifier
+{
+	private static final verifyMethod = JNI.createStaticMethod(
+		"org/novaflare/security/DceSignatureVerifier",
+		"verifySignature",
+		"()Z"
+	);
+
+	public static function verifySignature():Bool
+	{
+		return verifyMethod();
 	}
 }
 #end

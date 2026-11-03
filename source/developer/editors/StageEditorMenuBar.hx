@@ -35,7 +35,7 @@ import general.backend.Paths;
  */
 class StageEditorMenuBar extends FlxSpriteGroup
 {
-	// ============ NovaFlare 设计系统颜色（深色模式，AARRGGBB） ============
+	// ============ D.C.E. 设计系统颜色（深色模式，AARRGGBB） ============
 	// —— 中性色 ——
 	static final C_PAGE_BG:FlxColor = 0xFF12141A;    // 页面底层背景
 	static final C_CARD:FlxColor = 0xFF1C1F28;       // 卡片面板背景
@@ -67,17 +67,32 @@ class StageEditorMenuBar extends FlxSpriteGroup
 	static final C_TEST_ACCENT:FlxColor = 0xFFFFD166; // 测试菜单标识（黄）
 
 	// ============ 布局常量 ============
-	public static final BAR_HEIGHT:Int = 36;
-	public static final STATUS_HEIGHT:Int = 25;
-	public static final MENU_W:Int = 88;
+	public static var BAR_HEIGHT(get, never):Int;
+	static function get_BAR_HEIGHT():Int return EditorInputStyle.si(36);
+	static function set_BAR_HEIGHT(v:Int):Int return v;
+	public static var STATUS_HEIGHT(get, never):Int;
+	static function get_STATUS_HEIGHT():Int return EditorInputStyle.si(25);
+	static function set_STATUS_HEIGHT(v:Int):Int return v;
+	public static var MENU_W(get, never):Int;
+	static function get_MENU_W():Int return EditorInputStyle.si(88);
+	static function set_MENU_W(v:Int):Int return v;
 	// ★ 所有菜单下拉统一宽度（= DROP_MAX_W）：保证各菜单的输入框/控件区宽度一致，不再长短不一
-	public static final DROP_MIN_W:Int = 420;
-	public static final DROP_MAX_W:Int = 420;
-	public static final DESC_MAX_W:Int = 620;
-	public static final ROW_H:Int = 22;
-	public static final ROW_PAD_X:Int = 10;
+	public static var DROP_MIN_W(get, never):Int;
+	static function get_DROP_MIN_W():Int return EditorInputStyle.si(420);
+	static function set_DROP_MIN_W(v:Int):Int return v;
+	public static var DROP_MAX_W(get, never):Int;
+	static function get_DROP_MAX_W():Int return EditorInputStyle.si(420);
+	public static var DESC_MAX_W(get, never):Int;
+	static function get_DESC_MAX_W():Int return EditorInputStyle.si(620);
+	public static var ROW_H(get, never):Int;
+	static function get_ROW_H():Int return EditorInputStyle.si(22);
+	static function set_ROW_H(v:Int):Int return v;
+	public static var ROW_PAD_X(get, never):Int;
+	static function get_ROW_PAD_X():Int return EditorInputStyle.si(10);
 	// 自绘下拉选项列表：每项高度 / 最多同时显示项数
-	static final DROP_OPT_H:Int = 20;
+	static var DROP_OPT_H(get, never):Int;
+	static function get_DROP_OPT_H():Int return EditorInputStyle.si(20);
+	static function set_DROP_OPT_H(v:Int):Int return v;
 	static final MAX_DROP_OPT:Int = 20;
 
 	// 走马灯：长文本滚动速度（px/s）与两端停留秒数
@@ -87,6 +102,8 @@ class StageEditorMenuBar extends FlxSpriteGroup
 	// ============ 菜单定义 ============
 	public var menus:Array<StageMenuDef> = [];
 	public var activeMenu:Int = -1;
+	/** Translation group used by editor-specific subclasses that reuse this menu skin. */
+	public var languageGroup:String = 'stage';
 
 	// ============ 顶栏视觉元素 ============
 	var barBg:FlxSprite;
@@ -173,7 +190,7 @@ class StageEditorMenuBar extends FlxSpriteGroup
 		uiCamera = flixel.FlxG.camera;
 
 		// 先添加状态栏，确保下拉菜单和描述条在其之上渲染
-		statusBar = new StageEditorStatusBar();
+		statusBar = createStatusBar();
 		statusBar.scrollFactor.set();
 		add(statusBar);
 
@@ -183,6 +200,12 @@ class StageEditorMenuBar extends FlxSpriteGroup
 
 		buildMenus();
 		applyLang();
+	}
+
+	/** Factory hook so a specialized editor can pair this skin with its own status bar. */
+	public function createStatusBar():StageEditorStatusBar
+	{
+		return new StageEditorStatusBar();
 	}
 
 	/** 按当前客户端语言返回合适的字体文件名（读 main 语言组配置，非硬编码） */
@@ -224,11 +247,11 @@ class StageEditorMenuBar extends FlxSpriteGroup
 		descBg = new FlxSprite().makeGraphic(1, 1, C_CARD);
 		descBg.visible = false;
 		add(descBg);
-		descIcon = new FlxText(0, 0, 0, '[i]', 12);
+		descIcon = new EditorText(0, 0, 0, '[i]', 12);
 		descIcon.setFormat(Paths.font(langFont()), 12, C_ACCENT, LEFT);
 		descIcon.visible = false;
 		add(descIcon);
-		descText = new FlxText(0, 0, DESC_MAX_W, '', 12);
+		descText = new EditorText(0, 0, DESC_MAX_W, '', 12);
 		descText.setFormat(Paths.font(langFont()), 12, C_TEXT_HINT, LEFT);
 		descText.visible = false;
 		descText.alignment = LEFT;
@@ -357,10 +380,10 @@ class StageEditorMenuBar extends FlxSpriteGroup
 		var itemKey = key;
 		if (key.indexOf('w_') == 0)
 			itemKey = 'item_' + key.substring(2);
-		var translated = Language.get(itemKey, 'stage');
+		var translated = Language.get(itemKey, languageGroup);
 		if (translated == itemKey || translated.indexOf('(404)') != -1) {
 			// 尝试不带 item_ 前缀
-			translated = Language.get(key.substring(2), 'stage');
+			translated = Language.get(key.substring(2), languageGroup);
 		}
 		return translated;
 	}
@@ -368,10 +391,10 @@ class StageEditorMenuBar extends FlxSpriteGroup
 	/** LabelWidget 类型：label_bpm -> label_bpm (直接查) */
 	function translateLabelKey(key:String):String
 	{
-		var translated = Language.get(key, 'stage');
+		var translated = Language.get(key, languageGroup);
 		if (translated == key || translated.indexOf('(404)') != -1) {
 			// 尝试带 label_ 前缀
-			translated = Language.get('label_' + key, 'stage');
+			translated = Language.get('label_' + key, languageGroup);
 		}
 		if (translated == 'label_' + key || translated.indexOf('(404)') != -1) {
 			// 还是找不到，就用原始 key
@@ -444,7 +467,7 @@ class StageEditorMenuBar extends FlxSpriteGroup
 			add(selBar);
 			menuSelBars.push(selBar);
 
-			var txt:FlxText = new FlxText(bx, 0, MENU_W, Language.get('menu_' + m.key, 'stage'), 14);
+			var txt:FlxText = new EditorText(bx, 0, MENU_W, Language.get('menu_' + m.key, languageGroup), 14);
 			txt.setFormat(Paths.font(langFont()), 14, m.isTest ? C_TEST_ACCENT : C_TEXT_SUB, CENTER);
 			txt.borderStyle = NONE;
 			txt.y = (BAR_HEIGHT - txt.height) / 2;
@@ -518,10 +541,9 @@ class StageEditorMenuBar extends FlxSpriteGroup
 		//   menuBar 所有 sprite 用 scrollFactor.set()=0（不随相机 scroll 移动），
 		//   sprite.x 是世界坐标，但因为 scrollFactor=0，等价于视图空间坐标。
 		//   HUD 相机 zoom=1/scroll=0，所以这里是纯屏幕坐标，不受主相机缩放影响。
-		var mp:FlxPoint = FlxG.mouse.getViewPosition(uiCamera);
+		var mp = EditorPointer.position(uiCamera);
 		mViewX = mp.x;
 		mViewY = mp.y;
-		mp.put();
 
 		// 鼠标在顶栏按钮上 hover
 		var hoverIdx:Int = -1;
@@ -539,14 +561,21 @@ class StageEditorMenuBar extends FlxSpriteGroup
 
 		// Adobe 风格：当菜单已经展开时，hover 其他菜单项直接切换（不用再点）
 		// 但只在 hover 索引变化时触发一次，不每帧重建
-		if (activeMenu >= 0 && hoverIdx >= 0 && hoverIdx != activeMenu && hoverIdx != lastHoverSwitchIdx && !FlxG.mouse.justPressed)
+		if (activeMenu >= 0 && hoverIdx >= 0 && hoverIdx != activeMenu && hoverIdx != lastHoverSwitchIdx && !EditorPointer.justPressedNow())
 		{
 			lastHoverSwitchIdx = hoverIdx;
 			openMenu(hoverIdx);
 		}
 		if (hoverIdx < 0) lastHoverSwitchIdx = -1;
 
-		if (FlxG.mouse.justPressed)
+		// Secondary and middle clicks dismiss an open menu without activating its row.
+		if (activeMenu >= 0 && (FlxG.mouse.justPressedRight || FlxG.mouse.justPressedMiddle))
+		{
+			closeMenu();
+			return;
+		}
+
+		if (EditorPointer.justPressedNow())
 		{
 			var mx:Float = mViewX;
 			var my:Float = mViewY;
@@ -729,10 +758,10 @@ class StageEditorMenuBar extends FlxSpriteGroup
 				else
 				{
 					// 移动超过阈值才视为拖拽（区分"原地点击"）
-					if (!dragActive && FlxG.mouse.pressed && Math.abs(mViewY - dragStartY) > 4)
+					if (!dragActive && EditorPointer.pressed() && Math.abs(mViewY - dragStartY) > 4)
 						dragActive = true;
 
-					if (dragActive && FlxG.mouse.pressed)
+					if (dragActive && EditorPointer.pressed())
 					{
 						var dTotal:Int = (dragDropdownCtrl.options != null) ? dragDropdownCtrl.options.length : 0;
 						var dMaxScroll:Int = Std.int(Math.max(0, dTotal - MAX_DROP_OPT));
@@ -746,7 +775,7 @@ class StageEditorMenuBar extends FlxSpriteGroup
 						}
 					}
 
-					if (FlxG.mouse.justReleased)
+					if (EditorPointer.justReleased())
 					{
 						if (!dragActive)
 						{
@@ -764,7 +793,7 @@ class StageEditorMenuBar extends FlxSpriteGroup
 		for (ctrl in customControls)
 		{
 			if (ctrl.ctype != 'slider' || ctrl.dragging != true) continue;
-			if (FlxG.mouse.pressed)
+			if (EditorPointer.pressed())
 				sliderDrag(ctrl, mViewX);
 			else
 				ctrl.dragging = false;
@@ -1046,7 +1075,7 @@ class StageEditorMenuBar extends FlxSpriteGroup
 			stepperOverlay = new FlxUIInputText(0, 0, 60, '', 8);
 			try { stepperOverlay.scrollFactor.set(0, 0); } catch (e:Dynamic) {}
 			// ★ 双相机：camHUD 与菜单同层（不缩放），主相机兜底（输入覆盖层实测在主相机可见）
-			try { stepperOverlay.cameras = [uiCamera, FlxG.camera]; } catch (e:Dynamic) {}
+			try { stepperOverlay.cameras = [uiCamera != null ? uiCamera : FlxG.camera]; } catch (e:Dynamic) {}
 			// 挂到顶层覆盖层容器（渲染在菜单之上）；无容器时挂 state
 			var st:Dynamic = FlxG.state;
 			try { if (overlayLayer != null) overlayLayer.add(stepperOverlay); else st.add(stepperOverlay); } catch (e:Dynamic) {}
@@ -1093,8 +1122,8 @@ class StageEditorMenuBar extends FlxSpriteGroup
 		var w:Dynamic = ctrl.widget;
 		if (w != null && stepperOverlay != null)
 		{
-			var parsed:Float = Std.parseFloat(stepperOverlay.text);
-			if (!Math.isNaN(parsed))
+			var parsed:Null<Float> = EditorInputValidation.parseNumber(stepperOverlay.text);
+			if (parsed != null)
 			{
 				// clamp 到 min/max
 				try { var mn:Float = w.min; parsed = Math.max(parsed, mn); } catch (e:Dynamic) {}
@@ -1275,7 +1304,7 @@ class StageEditorMenuBar extends FlxSpriteGroup
 			bg.antialiasing = ClientPrefs.data.antialiasing;
 			addToDrop(bg, false);
 
-			var t:FlxText = new FlxText(0, 0, Std.int(pw) - 10, opts[optIdx], 11);
+			var t:FlxText = new EditorText(0, 0, Std.int(pw) - 10, opts[optIdx], 11);
 			t.setFormat(Paths.font(langFont()), 11, C_TEXT_SUB, LEFT);
 			fitTextOneLine(t);
 			t.x = Std.int(px + 5);
@@ -1389,31 +1418,7 @@ class StageEditorMenuBar extends FlxSpriteGroup
 	 *    setGraphicSize 围绕中心缩放会向两边扩展 → 背景左边超出 box（看起来"向左移动"） */
 	function stretchOverlayBackground(w:Dynamic, boxW:Float):Void
 	{
-		if (w == null) return;
-		try
-		{
-			var bs:Dynamic = Reflect.field(w, 'backgroundSprite');
-			if (bs != null && bs.visible)
-			{
-				bs.origin.set(0, 0); // 缩放围绕左上角，只向右延伸
-				var targetW:Int = Std.int(boxW - 4);
-				if (Std.int(bs.width) != targetW)
-					bs.setGraphicSize(targetW, Std.int(bs.height));
-			}
-		}
-		catch (e:Dynamic) {}
-		try
-		{
-			var fs:Dynamic = Reflect.field(w, 'fieldBorderSprite');
-			if (fs != null && fs.visible)
-			{
-				fs.origin.set(0, 0); // 同上，只向右延伸
-				var targetW:Int = Std.int(boxW - 2);
-				if (Std.int(fs.width) != targetW)
-					fs.setGraphicSize(targetW, Std.int(fs.height));
-			}
-		}
-		catch (e:Dynamic) {}
+		EditorInputStyle.fitInputOverlay(w, boxW);
 	}
 
 	/** 点击 input 自绘区域 → 弹出原生输入覆盖层（定位到自绘 box 区域并聚焦） */
@@ -1457,6 +1462,7 @@ class StageEditorMenuBar extends FlxSpriteGroup
 		try { w.active = false; } catch (e:Dynamic) {}
 		// ★ 提升绘制层级：移到 overlayLayer 末尾（顶层容器内最上，渲染在菜单之上）
 		try { if (overlayLayer != null) { overlayLayer.remove(w, true); overlayLayer.add(w); } } catch (e:Dynamic) {}
+		if (ctrl.text != null) ctrl.text.visible = false;
 		activeEditWidget = w;
 		// ★ FlxInputText 没有 startFocus() 方法（编译过但运行时空调用被 try 吞掉 → 点了没反应）。
 		//   hasFocus 的 setter 是 private，用 Dynamic 赋值绕过可见性检查直接聚焦。
@@ -1479,7 +1485,10 @@ class StageEditorMenuBar extends FlxSpriteGroup
 			for (ctrl in customControls)
 			{
 				if (ctrl.ctype == 'input' && ctrl.widget == activeEditWidget)
+				{
 					updateInputDisplay(ctrl);
+					if (ctrl.text != null) ctrl.text.visible = true;
+				}
 			}
 			try
 			{
@@ -1662,58 +1671,58 @@ class StageEditorMenuBar extends FlxSpriteGroup
 				var w = widgetRefs.get(wKey);
 				var wh = (w != null) ? Std.int(w.height) : ROW_H;
 				if (wh < ROW_H) wh = ROW_H;
-				wh += 4;
+				wh += EditorInputStyle.si(4);
 				totalH += wh;
 				if (w != null)
 				{
 					var ww = Std.int(w.width);
 					// NumericStepper 右侧横向两个 +/- 按钮额外占空间
-					if (Std.is(w, FlxUINumericStepper)) ww += 42;
+					if (Std.is(w, FlxUINumericStepper)) ww += EditorInputStyle.si(42);
 					// LabelWidget：标签 120 + 6 间距 + widget.width + 10 两侧边距
-					var neededW = (it.type == LabelWidget) ? (120 + 6 + ww + 20) : (ww + 40);
+					var neededW = (it.type == LabelWidget) ? (EditorInputStyle.si(120) + EditorInputStyle.si(6) + ww + EditorInputStyle.si(20)) : (ww + EditorInputStyle.si(40));
 					if (neededW > dropW) dropW = neededW;
 					if (dropW > DROP_MAX_W) dropW = DROP_MAX_W;
 				}
 				if (it.type == LabelWidget)
 				{
 					// 标签最小宽度
-					var lbl = Language.get(it.labelKey, 'stage');
-					var approxW = lbl.length * 8 + 140;
+					var lbl = Language.get(it.labelKey, languageGroup);
+					var approxW = lbl.length * EditorInputStyle.si(8) + EditorInputStyle.si(140);
 					if (approxW > dropW) dropW = approxW;
 					if (dropW > DROP_MAX_W) dropW = DROP_MAX_W;
 				}
 			}
 			else if (it.type == TextLine)
 			{
-				var txt = Language.get(it.labelKey, 'stage');
-				var lineH = 16;
+				var txt = Language.get(it.labelKey, languageGroup);
+				var lineH = EditorInputStyle.si(16);
 				// 估算文本行数
-				var charW = 7;
+				var charW = EditorInputStyle.si(7);
 				var approxLines = Math.ceil((txt.length * charW) / (DROP_MAX_W - ROW_PAD_X * 2));
 				if (approxLines < 1) approxLines = 1;
 				if (approxLines > 3) approxLines = 3; // 最多3行
-				totalH += approxLines * lineH + 2;
-				var approxW = txt.length * charW + 20;
+				totalH += approxLines * lineH + EditorInputStyle.si(2);
+				var approxW = txt.length * charW + EditorInputStyle.si(20);
 				if (approxW > dropW) dropW = approxW;
 				if (dropW > DROP_MAX_W) dropW = DROP_MAX_W;
 			}
 			else if (it.type == DynText)
 			{
 				// 动态文本行：内容由 provider 决定，预留 4 行高度
-				totalH += 4 * 14 + 4;
-				if (dropW < 380) dropW = 380;
+				totalH += 4 * EditorInputStyle.si(14) + EditorInputStyle.si(4);
+				if (dropW < EditorInputStyle.si(380)) dropW = EditorInputStyle.si(380);
 				if (dropW > DROP_MAX_W) dropW = DROP_MAX_W;
 			}
 			else
 			{
-				var lbl = (it.type == RawCmd && it.rawText != null) ? it.rawText : Language.get('item_' + it.labelKey, 'stage');
-				var approxW = lbl.length * 8 + 60;
+				var lbl = (it.type == RawCmd && it.rawText != null) ? it.rawText : Language.get('item_' + it.labelKey, languageGroup);
+				var approxW = lbl.length * EditorInputStyle.si(8) + EditorInputStyle.si(60);
 				if (approxW > dropW) dropW = approxW;
 				if (dropW > DROP_MAX_W) dropW = DROP_MAX_W;
 				totalH += ROW_H;
 			}
 		}
-		totalH += 4;
+		totalH += EditorInputStyle.si(4);
 
 		// 位置：紧跟菜单栏正下方（下拉面板覆盖状态栏，无间隙）
 		var dropX = Std.int(activeMenu * MENU_W);
@@ -1752,9 +1761,9 @@ class StageEditorMenuBar extends FlxSpriteGroup
 					{
 						widgetW = Std.int(widget.width);
 						// 放一点额外边距防止贴得太近
-						rowH = Std.int(Math.max(ROW_H, Std.int(widget.height) + 4));
+						rowH = Std.int(Math.max(ROW_H, Std.int(widget.height) + EditorInputStyle.si(4)));
 						// NumericStepper 右侧横向两个 +/- 按钮额外占空间
-						if (Std.is(widget, FlxUINumericStepper)) widgetW += 42;
+						if (Std.is(widget, FlxUINumericStepper)) widgetW += EditorInputStyle.si(42);
 					}
 					catch (e:Dynamic) {}
 				}
@@ -1778,7 +1787,7 @@ class StageEditorMenuBar extends FlxSpriteGroup
 					try { if (widget != null) isChecked = widget.checked; } catch(e:Dynamic) {}
 
 					// 标签（左）—— 纯文本，勾选状态只由右侧勾选框表达
-					var lbl = new FlxText(0, 0, Std.int(dropW - 50), labelForDisplay, 12);
+					var lbl = new EditorText(0, 0, Std.int(dropW - EditorInputStyle.si(50)), labelForDisplay, 12);
 					lbl.setFormat(Paths.font(langFont()), 12, C_TEXT_SUB, LEFT);
 					lbl.x = Std.int(dropX + ROW_PAD_X);
 					lbl.y = Std.int(curY + (rowH - lbl.height) / 2);
@@ -1788,13 +1797,13 @@ class StageEditorMenuBar extends FlxSpriteGroup
 					var checkIcon:FlxSprite = new FlxSprite().makeGraphic(14, 14, C_BG_2);
 					checkIcon.antialiasing = ClientPrefs.data.antialiasing;
 					checkIcon.color = isChecked ? C_ACCENT_CHECK : C_BG_2;
-					checkIcon.x = Std.int(dropX + dropW - 18 - ROW_PAD_X);
-					checkIcon.y = Std.int(curY + (rowH - 14) / 2);
+					checkIcon.x = Std.int(dropX + dropW - EditorInputStyle.si(18) - ROW_PAD_X);
+					checkIcon.y = Std.int(curY + (rowH - EditorInputStyle.si(14)) / 2);
 					addToDrop(checkIcon, false);
 
 					// 勾选标记 √（始终创建；★ 文本内容 + visible 双保险控制：
 					//   即使 visible 被 FlxSpriteGroup 级联误改成 true，空文本也不会画出 √）
-					var checkTxt = new FlxText(0, 0, 14, isChecked ? '√' : '', 11);
+					var checkTxt = new EditorText(0, 0, 14, isChecked ? '√' : '', 11);
 					checkTxt.setFormat(Paths.font(langFont()), 11, FlxColor.WHITE, CENTER);
 					checkTxt.x = checkIcon.x;
 					checkTxt.y = checkIcon.y - 1;
@@ -1828,7 +1837,7 @@ class StageEditorMenuBar extends FlxSpriteGroup
 					var labelForDisplay = translateLabelKey(it.labelKey);
 
 					// 标签（左，固定宽度 120）
-					var lbl = new FlxText(0, 0, 120, labelForDisplay + ':', 12);
+					var lbl = new EditorText(0, 0, EditorInputStyle.si(120), EditorInputStyle.withLabelColon(labelForDisplay), 12);
 					lbl.setFormat(Paths.font(langFont()), 12, C_TEXT_HINT, LEFT);
 					lbl.x = Std.int(dropX + ROW_PAD_X);
 					lbl.y = Std.int(curY + (rowH - lbl.height) / 2);
@@ -1837,11 +1846,11 @@ class StageEditorMenuBar extends FlxSpriteGroup
 					var ctrl:StageCustomControl = null;
 					if (widget != null)
 					{
-						var ctrlX:Int = Std.int(dropX + ROW_PAD_X + 120 + 6);
+						var ctrlX:Int = Std.int(dropX + ROW_PAD_X + EditorInputStyle.si(120) + EditorInputStyle.si(6));
 						var ctrlY:Int = Std.int(curY + 2);
-						var ctrlH:Int = Std.int(Math.max(ROW_H - 4, 18));
+						var ctrlH:Int = Std.int(Math.max(ROW_H - EditorInputStyle.si(4), EditorInputStyle.si(18)));
 						var ctrlW:Int = Std.int(dropX + dropW - ROW_PAD_X - ctrlX);
-						if (ctrlW < 40) ctrlW = 40;
+						if (ctrlW < EditorInputStyle.si(40)) ctrlW = EditorInputStyle.si(40);
 
 						// 底板 + 1px 边框
 						var border:FlxSprite = new FlxSprite().makeGraphic(ctrlW, ctrlH, C_BORDER);
@@ -1856,7 +1865,7 @@ class StageEditorMenuBar extends FlxSpriteGroup
 						box.antialiasing = ClientPrefs.data.antialiasing;
 						addToDrop(box, false);
 
-						var txt:FlxText = new FlxText(ctrlX + 6, 0, ctrlW - 26, '', 12);
+						var txt:FlxText = new EditorText(ctrlX + 6, 0, ctrlW - 26, '', 12);
 						txt.setFormat(Paths.font(langFont()), 12, C_TEXT_SUB, LEFT);
 						txt.wordWrap = false; // 强制单行，防止长文本换行把 y 对齐撑乱
 						txt.y = Std.int(ctrlY + (ctrlH - txt.height) / 2);
@@ -1865,21 +1874,21 @@ class StageEditorMenuBar extends FlxSpriteGroup
 						if (Std.is(widget, FlxUINumericStepper))
 						{
 							// ---- 数字步进器：右侧横向 [-] [+]（照顾移动端，竖排俩按钮太挤）----
-							var btnW:Int = 14;
-							var btnGap:Int = 3;
+							var btnW:Int = EditorInputStyle.si(14);
+							var btnGap:Int = EditorInputStyle.si(3);
 							var btnH:Int = Std.int(ctrlH - 2);
 							var btnPlusX:Int = ctrlX + ctrlW - btnW - 2;
 							var btnMinusX:Int = btnPlusX - btnGap - btnW;
 
 							// 文本宽度让出两个按钮 + 间距
-							txt.fieldWidth = Std.int(ctrlW - (btnW * 2 + btnGap) - 12);
+							txt.fieldWidth = Std.int(ctrlW - (btnW * 2 + btnGap) - EditorInputStyle.si(12));
 
 							var btnPlus:FlxSprite = new FlxSprite().makeGraphic(btnW, btnH, C_ACCENT);
 							btnPlus.x = btnPlusX;
 							btnPlus.y = ctrlY + 1;
 							btnPlus.antialiasing = ClientPrefs.data.antialiasing;
 							addToDrop(btnPlus, false);
-							var plusTxt = new FlxText(0, 0, btnW, '+', 12);
+							var plusTxt = new EditorText(0, 0, btnW, '+', 12);
 							plusTxt.setFormat(Paths.font(langFont()), 12, FlxColor.WHITE, CENTER);
 							plusTxt.x = btnPlusX;
 							plusTxt.y = btnPlus.y + (btnH - plusTxt.height) / 2 - 1;
@@ -1890,7 +1899,7 @@ class StageEditorMenuBar extends FlxSpriteGroup
 							btnMinus.y = ctrlY + 1;
 							btnMinus.antialiasing = ClientPrefs.data.antialiasing;
 							addToDrop(btnMinus, false);
-							var minusTxt = new FlxText(0, 0, btnW, '-', 12);
+							var minusTxt = new EditorText(0, 0, btnW, '-', 12);
 							minusTxt.setFormat(Paths.font(langFont()), 12, FlxColor.WHITE, CENTER);
 							minusTxt.x = btnMinusX;
 							minusTxt.y = btnMinus.y + (btnH - minusTxt.height) / 2 - 1;
@@ -1903,7 +1912,7 @@ class StageEditorMenuBar extends FlxSpriteGroup
 						else if (Std.is(widget, FlxUIDropDownMenu))
 						{
 							// ---- 下拉列表：右侧 ▼ 箭头 ----
-							var arrow:FlxText = new FlxText(0, 0, 18, '▼', 10);
+							var arrow:FlxText = new EditorText(0, 0, 18, '▼', 10);
 							arrow.setFormat(Paths.font(langFont()), 10, C_TEXT_HINT, CENTER);
 							arrow.x = ctrlX + ctrlW - 18;
 							arrow.y = Std.int(ctrlY + (ctrlH - arrow.height) / 2);
@@ -2000,11 +2009,11 @@ class StageEditorMenuBar extends FlxSpriteGroup
 
 			if (it.type == TextLine)
 			{
-				var txt = Language.get(it.labelKey, 'stage');
+				var txt = Language.get(it.labelKey, languageGroup);
 				var isHeader = (it.labelKey == 'help_camera' || it.labelKey == 'help_char' || it.labelKey == 'help_other');
 
 				// 文本行（帮助菜单用）
-				var txtLabel = new FlxText(0, 0, Std.int(dropW - ROW_PAD_X * 2), txt, isHeader ? 12 : 11);
+				var txtLabel = new EditorText(0, 0, Std.int(dropW - ROW_PAD_X * 2), txt, isHeader ? 12 : 11);
 				txtLabel.setFormat(Paths.font(langFont()), isHeader ? 12 : 11, isHeader ? C_TEXT_MAIN : C_TEXT_HINT, LEFT);
 				if (isHeader) txtLabel.bold = true;
 				txtLabel.alignment = LEFT;
@@ -2037,7 +2046,7 @@ class StageEditorMenuBar extends FlxSpriteGroup
 			if (it.type == DynText)
 			{
 				// 动态文本行：显示 "标签: 值"（单行，紧凑），内容由外部 provider 提供
-				var txtLabel = new FlxText(0, 0, Std.int(dropW - ROW_PAD_X * 2), ' ', 11);
+				var txtLabel = new EditorText(0, 0, Std.int(dropW - ROW_PAD_X * 2), ' ', 11);
 				txtLabel.setFormat(Paths.font(langFont()), 11, C_TEXT_SUB, LEFT);
 				txtLabel.alignment = LEFT;
 				txtLabel.wordWrap = false;
@@ -2094,14 +2103,14 @@ class StageEditorMenuBar extends FlxSpriteGroup
 				addToDrop(selBg, false);
 
 				// 左侧选中标记 ✓
-				var selIcon = new FlxText(0, 0, 14, isSelected ? '✓' : '', 12);
+				var selIcon = new EditorText(0, 0, 14, isSelected ? '✓' : '', 12);
 				selIcon.setFormat(Paths.font(langFont()), 12, C_SUB_SEL_TEXT, CENTER);
 				selIcon.x = Std.int(dropX + ROW_PAD_X - 2);
 				selIcon.y = Std.int(curY + (ROW_H - selIcon.height) / 2 - 1);
 				addToDrop(selIcon, false);
 
 				// 标签（选中行：浅紫文字）
-				var lbl = new FlxText(0, 0, Std.int(dropW - ROW_PAD_X * 2 - 30), labelStr, 12);
+				var lbl = new EditorText(0, 0, Std.int(dropW - ROW_PAD_X * 2 - 30), labelStr, 12);
 				lbl.setFormat(Paths.font(langFont()), 12, isSelected ? C_SUB_SEL_TEXT : C_TEXT_SUB, LEFT);
 				lbl.x = Std.int(dropX + ROW_PAD_X + 16);
 				lbl.y = Std.int(curY + 3);
@@ -2129,7 +2138,7 @@ class StageEditorMenuBar extends FlxSpriteGroup
 			}
 
 			// === Cmd 行 ===
-			var labelStr = Language.get('item_' + it.labelKey, 'stage');
+			var labelStr = Language.get('item_' + it.labelKey, languageGroup);
 			var isDanger = (it.labelKey == 'anim_remove');
 
 			// hover 背景（先加）
@@ -2141,7 +2150,22 @@ class StageEditorMenuBar extends FlxSpriteGroup
 			addToDrop(hoverBg, false);
 
 			// 标签（后加，渲染在 hoverBg 之上）
-			var lbl = new FlxText(0, 0, Std.int(dropW - ROW_PAD_X * 2 - 20), labelStr, 12);
+			var lbl = new EditorText(0, 0, Std.int(dropW - ROW_PAD_X * 2 - 20), labelStr, 12);
+			if(it.shortcut != null && it.shortcut.length > 0)
+			{
+				var shortcutStart = labelStr.indexOf('    ');
+				if(shortcutStart > 0) labelStr = labelStr.substr(0, shortcutStart);
+				lbl.text = labelStr;
+				var paren = labelStr.lastIndexOf('(');
+				if(paren < 0) paren = labelStr.lastIndexOf('（');
+				if(paren > 0) lbl.text = StringTools.rtrim(labelStr.substr(0, paren));
+				lbl.fieldWidth = Math.max(40, dropW - ROW_PAD_X * 2 - EditorInputStyle.si(120));
+				var hint = new EditorText(0, 0, EditorInputStyle.si(112), it.shortcut, 11);
+				hint.setFormat(Paths.font(langFont()), 11, C_TEXT_SUB, RIGHT);
+				hint.x = dropX + dropW - ROW_PAD_X - hint.fieldWidth;
+				hint.y = curY + (ROW_H - hint.height) / 2;
+				addToDrop(hint, false);
+			}
 			lbl.setFormat(Paths.font(langFont()), 12, isDanger ? C_DANGER : C_TEXT_SUB, LEFT);
 			lbl.x = Std.int(dropX + ROW_PAD_X);
 			lbl.y = Std.int(curY + 3);
@@ -2341,12 +2365,20 @@ class StageEditorMenuBar extends FlxSpriteGroup
 			hideDescBar();
 			return;
 		}
-		var txt = Language.get(row.def.descKey, 'stage');
+		var txt = Language.get(row.def.descKey, languageGroup);
 		if (txt == row.def.descKey) { hideDescBar(); return; }
 		// Language.get 在开发者模式下找不到 key 时返回 "key (404)"，跟 key 本身不同，会继续显示
 		// 这里再拦截一次，避免 (404) 出现在描述条里
 		if (txt.indexOf(' (404)') == txt.length - 6) { hideDescBar(); return; }
 
+		for (ctrl in customControls)
+		{
+			if (ctrl.ctype == 'dropdown' && ctrl.open == true)
+			{
+				hideDescBar();
+				return;
+			}
+		}
 		descText.text = txt;
 		descText.color = C_TEXT_HINT;
 		// 测量并定位
@@ -2424,7 +2456,8 @@ typedef StageMenuItemDef =
 	?getChecked:Void->Bool,
 	?onCheck:Bool->Void,
 	?onClick:Void->Void,
-	?widgetKey:String // LabelWidget 类型时从 widgetRefs 获取控件
+	?widgetKey:String, // LabelWidget 类型时从 widgetRefs 获取控件
+	?shortcut:String
 };
 
 typedef StageMenuDef =

@@ -1,6 +1,6 @@
-# NovaFlare 编辑器自绘菜单栏架构报告(以 CharacterEditorMenuBar 为样本)
+# D.C.E. 编辑器自绘菜单栏架构报告(以 CharacterEditorMenuBar 为样本)
 
-> 工程根:`C:\Users\Admin1\Desktop\FNF-NovaFlare-Engine-1.2.1`
+> 工程根:`C:\Users\Admin1\Desktop\FNF-D.C.E.-1.2.1`
 >
 > **行号口径说明**:被分析文件为 UTF-8 / LF 换行,下文全部行号以按 `\n` 拆分的实际行数为准
 > (CharacterEditorMenuBar.hx 共 **2425** 行、CharacterEditorState.hx 共 **1679** 行、CharacterEditorStatusBar.hx 共 **96** 行)。
@@ -54,7 +54,7 @@ applyLang();                                         // 194 建顶栏按钮文�
 
 ### 1.3 常量
 
-**配色常量(39-76)**——NovaFlare 深色规范,AARRGGBB:
+**配色常量(39-76)**——D.C.E. 深色规范,AARRGGBB:
 - 中性:`C_PAGE_BG=0xFF12141A`(39)、`C_CARD_BG=0xFF1C1F28`(40)、`C_FIELD_BG=0xFF12141A`(41)、
   `C_HOVER_OVERLAY=0x147C7FFF`(42)、`C_BORDER=0x14FFFFFF`(43)、`C_BORDER_STRONG=0x26FFFFFF`(44)、
   `C_TEXT_MAIN=0xFFF2F3F5`(45)、`C_TEXT_SEC=0xFFC9CDD4`(46)、`C_TEXT_HINT=0xFF86909C`(47)

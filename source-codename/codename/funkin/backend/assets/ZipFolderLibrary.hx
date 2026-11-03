@@ -25,10 +25,12 @@ class ZipFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 	public var lowerCaseAssets:Map<String, SysZipEntry> = [];
 	public var nameMap:Map<String, String> = [];
 
-	public var PRELOAD_VIDEOS:Bool = true;
+	public var PRELOAD_VIDEOS:Bool;
 
-	public function new(basePath:String, libName:String, ?modName:String, ?preloadVideos:Bool = true) {
+	public function new(basePath:String, libName:String, ?modName:String,
+		?preloadVideos:Bool = #if CODENAME_ENGINE_COMPAT false #else true #end) {
 		this.libName = libName;
+		this.PRELOAD_VIDEOS = preloadVideos;
 
 		this.basePath = basePath;
 		
@@ -47,8 +49,8 @@ class ZipFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 
 		isCompressed = true;
 		
-		// don't override default value of true if the file exists.
-		// by default `PRELOAD_VIDEOS` is true so you will never need to add this file, but in the case of it being false this is a backup method.
+		// A marker file lets a mod opt into eager video extraction when the
+		// platform default is lazy (notably the CNE compatibility build).
 		PRELOAD_VIDEOS = (!PRELOAD_VIDEOS) ? exists("assets/data/PRECACHE_VIDEOS", "TEXT") : PRELOAD_VIDEOS;
 
 		// if (PRELOAD_VIDEOS) precacheVideos(); // we do this in `MainState` now to handle for `Flags.VIDEO_EXT` :)
@@ -73,7 +75,8 @@ class ZipFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 	public var _videoExtensions:Array<String> = [Flags.VIDEO_EXT];
 	public var videoCacheRemap:Map<String, String> = [];
 	public function getVideoRemap(originalPath:String):String {
-		if (!_videoExtensions.contains(Path.extension(_parsedAsset))) return originalPath;
+		var extension = Path.extension(_parsedAsset);
+		if (extension == null || !_videoExtensions.contains(extension.toLowerCase())) return originalPath;
 		if (videoCacheRemap.exists(originalPath)) return videoCacheRemap.get(originalPath);
 
 		// We adding the length of the string to counteract folder in folder naming duplicates.

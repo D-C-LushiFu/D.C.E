@@ -55,16 +55,21 @@ class SliderOption extends TextOption implements ITreeFloatOption {
 
 	override function update(elapsed:Float) {
 		if (slider.selected = selected && !locked) {
-			if (__mouseControl && FlxG.mouse.justReleased) __mouseControl = false;
-			else if (FlxG.mouse.justPressed) __mouseControl = slider.overlapsPoint(FlxG.mouse.getPosition(@:privateAccess flixel.input.FlxPointer._cachedPoint), true);
+			var pointerEnabled = !codename.funkin.options.PlayerSettings.solo.controls.touchC;
+			if (!pointerEnabled)
+				__mouseControl = false;
+			else {
+				if (__mouseControl && FlxG.mouse.justReleased) __mouseControl = false;
+				else if (FlxG.mouse.justPressed) __mouseControl = slider.overlapsPoint(FlxG.mouse.getPosition(@:privateAccess flixel.input.FlxPointer._cachedPoint), true);
 
-			if (__mouseControl) {
-				var p = @:privateAccess flixel.input.FlxPointer._cachedPoint;
-				if (!FlxG.mouse.justPressed) FlxG.mouse.getPosition(p);
-				p.subtractPoint(camera.scroll);
+				if (__mouseControl) {
+					var p = @:privateAccess flixel.input.FlxPointer._cachedPoint;
+					if (!FlxG.mouse.justPressed) FlxG.mouse.getPosition(p);
+					p.subtractPoint(camera.scroll);
 
-				slider.getScreenPosition(_point, camera);
-				changeValue((FlxMath.remapToRange(p.x - _point.x, 0, slider.width, min, max) - currentValue) / step);
+					slider.getScreenPosition(_point, camera);
+					changeValue((FlxMath.remapToRange(p.x - _point.x, 0, slider.width, min, max) - currentValue) / step);
+				}
 			}
 		}
 		else

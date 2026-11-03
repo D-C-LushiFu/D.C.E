@@ -24,10 +24,13 @@ class StageEditorStatusBar extends FlxSpriteGroup
 	static final TEXT_VAL:FlxColor = 0xFFC9CDD4;    // 次级文字
 	static final BORDER_COLOR:FlxColor = 0x14FFFFFF; // 分割/边框
 
-	public static final HEIGHT:Int = 25;
+	public static var HEIGHT(get, never):Int;
+	static function get_HEIGHT():Int return EditorInputStyle.si(25);
+	static function set_HEIGHT(v:Int):Int return v;
 
 	var bg:FlxSprite;
 	var rootLabel:FlxText;
+	public var languageGroup:String = 'stage';
 
 	// 当前状态字段
 	public var stageStr:String = '-';
@@ -48,7 +51,7 @@ class StageEditorStatusBar extends FlxSpriteGroup
 		topLine.y = 0;
 		add(topLine);
 
-		rootLabel = new FlxText(10, 4, FlxG.width - 20, '', 13);
+		rootLabel = new EditorText(EditorInputStyle.sv(10), EditorInputStyle.sv(4), FlxG.width - EditorInputStyle.sv(20), '', 13);
 		rootLabel.setFormat(Paths.font(StageEditorMenuBar.langFont()), 13, TEXT_VAL, LEFT);
 		add(rootLabel);
 
@@ -72,11 +75,11 @@ class StageEditorStatusBar extends FlxSpriteGroup
 	function refreshText():Void
 	{
 		var parts:Array<String> = [
-			Language.get('status_stage', 'stage') + ' ' + stageStr,
-			Language.get('status_directory', 'stage') + ' ' + directoryStr,
-			Language.get('status_object', 'stage') + ' ' + objectStr,
-			Language.get('status_pos', 'stage') + ' ' + posStr,
-			Language.get('status_zoom', 'stage') + ' ' + zoomStr,
+			Language.get('status_stage', languageGroup) + ' ' + stageStr,
+			Language.get('status_directory', languageGroup) + ' ' + directoryStr,
+			Language.get('status_object', languageGroup) + ' ' + objectStr,
+			Language.get('status_pos', languageGroup) + ' ' + posStr,
+			Language.get('status_zoom', languageGroup) + ' ' + zoomStr,
 		];
 		var full = parts.join('  |  ');
 		// 只有文本真的变了才改 text 字段，否则 FlxText 每帧都会重建纹理，看起来就像在抽搐

@@ -39,7 +39,7 @@ class PirateState extends MusicBeatState
 	override function update(elapsed:Float)
 	{
 		if (controls.ACCEPT)
-			CoolUtil.browserLoad('https://github.com/D-C-LushiFu/NovaFlare-Engine-LushiFuFixedsss/releases');
+			CoolUtil.browserLoad('https://github.com/D-C-LushiFu/Different-Creatingness-Engine/releases');
 
 		super.update(elapsed);
 	}

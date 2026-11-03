@@ -9,6 +9,8 @@ noteColorSwap => Note HSV
 NotesSubState => Note Color Setup
 NotesSubStateLegacy => Legacy Color Setup
 
+KeyboardViewerSubState => Keyboard Feedback
+
 Splash => Splash
 
 showSplash => Show Splash

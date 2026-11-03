@@ -105,7 +105,7 @@ class Preferences
   }
 
   /**
-   * If enabled, the player's strumline is centered like NovaFlare's
+   * If enabled, the player's strumline is centered like D.C.E.'s
    * Middle Scroll option.
    * @default `false`
    */

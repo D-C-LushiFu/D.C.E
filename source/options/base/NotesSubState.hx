@@ -233,10 +233,28 @@ class NotesSubState extends MusicBeatSubstate
 		//   用户在 HEX 输入框里敲 0 会顺带把声音关掉。销毁时恢复。
 		ClientPrefs.toggleVolumeKeys(false);
 
+		// ★ 移动端虚拟键：原来这里是 `addVirtualPad(NONE, B_C)`，但 B 键在本界面里
+		//   没有任何功能（多余的），用户反馈右下角那个 B 是废键。
+		//   现在删掉 B，并把**有功能的** C（重置所选音符颜色，见 update 里的
+		//   `virtualPad.buttonC.justPressed || controls.RESET`）挪到 B 原来的位置：
+		//   屏幕右下角（x = 右边缘 - 键宽，y = height - 135）。
+		//   退出本界面仍可用底部的「退出」按钮（或键盘 ESC / BACK）。
 		addVirtualPad(NONE, B_C);
-		virtualPad.buttonC.x = 0;
+		if (virtualPad.buttonB != null)
+		{
+			var padB:mobile.flixel.FlxButton = virtualPad.buttonB;
+			virtualPad.remove(padB);
+			virtualPad.buttonB = null;
+			try
+			{
+				padB.destroy();
+			}
+			catch (e:Dynamic) {}
+			// 键位追踪表里还挂着 B 的 back 绑定，移除后重建，避免按到"不存在的键"
+			virtualPad.updateTrackedButtons();
+		}
+		virtualPad.buttonC.x = FlxG.width - virtualPad.buttonC.width;
 		virtualPad.buttonC.y = FlxG.height - 135;
-		virtualPad.buttonB.x = FlxG.width - virtualPad.buttonB.width;
 
 		#if sys
 		checkAndPromptPixelArrowAssets();

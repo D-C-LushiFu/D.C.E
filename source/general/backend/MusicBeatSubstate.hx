@@ -125,6 +125,10 @@ class MusicBeatSubstate extends FlxSubState
 	{
 		super.destroy();
 
+		#if NF_LEAK_PROBE
+		general.backend.debug.LeakProbe.watch(this, 'substate:' + Type.getClassName(Type.getClass(this)));
+		#end
+
 		var currentControls = controls;
 		if (currentControls != null)
 			currentControls.isInSubstate = false;
@@ -138,7 +142,28 @@ class MusicBeatSubstate extends FlxSubState
 			mobileControls = FlxDestroyUtil.destroy(mobileControls);
 			mobileControls = null;
 		}
+
+		// ★ 放在最后才清静态 self 引用：上面那句 `controls` 是靠 MusicBeatSubstate.instance
+		//   解析出来的（Controls.requested），先清就会让 isInSubstate 复位不掉、输入被卡住。
+		//
+		//   为什么必须清：这个静态是构造函数里赋的值，destroy 不清理就会**永久钉住最后一个
+		//   子状态**。历史上试玩为全曲每个音符都建精灵（32787 音符实测 600MB+），
+		//   静态引用会让整个子状态及其资源一直存活；EditorPlayState 现已改为按生成窗口构造音符。
+		if (instance == this) instance = null;
+		// 子类自己声明的 instance（GameOverSubstate / NewControlsSubState / CustomSubstate /
+		// EditorPlayState …）也一并按类链清掉，否则"最后一个子状态"同样会被永久钉住。
+		MusicBeatState.clearStaticSelfRefs(this);
+		// 子状态里创建的 PsychUIInputText 同样挂了全局监听（stage KEY_DOWN / lime window 文本
+		// 输入信号），漏一个就会用闭包把整个子状态钉住 —— 这里做和 MusicBeatState 一样的兜底。
+		general.backend.ui.PsychUIInputText.releaseOwnedBy(this);
+		// 指向"本状态或其子状态"的 Note 静态回引用一并兜底
+		games.objects.Note.clearFollowStale(this);
+		// ★ 兜底收尾：把"不在成员表里的大块内容"确定性地放掉（见 MusicBeatState.hollowOut）
+		try hollowOut() catch (e:Dynamic) {}
 	}
+
+	/** 见 `MusicBeatState.hollowOut`：默认什么都不做，子类按需 override。 */
+	public function hollowOut():Void {}
 
 	override function close()
 	{

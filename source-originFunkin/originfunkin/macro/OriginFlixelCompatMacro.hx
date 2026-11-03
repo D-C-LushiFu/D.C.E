@@ -7,7 +7,7 @@ import haxe.macro.Expr;
 
 /**
  * Restores the harmless zIndex storage field supplied by FunkinCrew's Flixel
- * fork without editing NovaFlare's Flixel checkout.
+ * fork without editing D.C.E.'s Flixel checkout.
  */
 class OriginFlixelCompatMacro
 {
@@ -58,7 +58,7 @@ class OriginFlixelCompatMacro
 	}
 
 	/**
-	 * Adds the movement values supplied by FunkinCrew's Flixel fork to NF's
+	 * Adds the movement values supplied by FunkinCrew's Flixel fork to D.C.E.'s
 	 * existing FlxTouch without changing the selected haxelib.
 	 */
 	public static macro function addTouchCompatibility():Array<Field>
@@ -212,7 +212,7 @@ class OriginFlixelCompatMacro
 	}
 
 	/**
-	 * Adds only the touch gesture fields needed by FNF 0.8.4 to NF's current
+	 * Adds only the touch gesture fields needed by FNF 0.8.4 to D.C.E.'s current
 	 * FlxTouchManager.
 	 */
 	public static macro function addTouchManagerCompatibility():Array<Field>

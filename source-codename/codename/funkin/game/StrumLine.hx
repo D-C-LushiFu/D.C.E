@@ -1,9 +1,12 @@
 package codename.funkin.game;
 
+import flixel.FlxSprite;
+import flixel.graphics.frames.FlxFramesCollection;
 import flixel.math.FlxPoint;
 import flixel.sound.FlxSound;
 import flixel.tweens.FlxTween;
 import flixel.util.FlxSignal.FlxTypedSignal;
+import haxe.ds.ObjectMap;
 import codename.funkin.backend.chart.ChartData;
 import codename.funkin.backend.scripting.events.note.*;
 import codename.funkin.backend.system.Conductor;
@@ -14,6 +17,46 @@ import codename.funkin.backend.system.Controls;
  * Used in PlayState.
 **/
 class StrumLine extends FlxTypedGroup<Strum> {
+	private var __skinPrefixFrames:ObjectMap<FlxFramesCollection, Map<String, Array<Int>>> = new ObjectMap();
+
+	@:allow(codename.funkin.game.Note)
+	private function addCachedSkinAnimation(sprite:FlxSprite, name:String, prefix:String,
+		frameRate:Float = 30, looped:Bool = true, flipX:Bool = false, flipY:Bool = false):Bool {
+		if (sprite.frames == null) {
+			sprite.animation.addByPrefix(name, prefix, frameRate, looped, flipX, flipY);
+			return sprite.animation.exists(name);
+		}
+
+		var atlasCache = __skinPrefixFrames.get(sprite.frames);
+		if (atlasCache == null) {
+			atlasCache = [];
+			__skinPrefixFrames.set(sprite.frames, atlasCache);
+		}
+
+		if (atlasCache.exists(prefix)) {
+			var frameIndices = atlasCache.get(prefix);
+			if (frameIndices.length == 0) return false;
+			// FlxAnimation retains the provided array, so keep every Note's
+			// animation independently mutable for scripts.
+			sprite.animation.add(name, frameIndices.copy(), frameRate, looped, flipX, flipY);
+			#if CODENAME_ENGINE_COMPAT
+			var cachedAnimation = sprite.animation.getByName(name);
+			if (cachedAnimation != null) cachedAnimation.prefix = prefix;
+			#end
+			return true;
+		}
+
+		// A script may have installed an animation with this name during
+		// onNoteCreation. Only cache a positive prefix lookup when Flixel
+		// actually replaced that animation with a newly-created one.
+		var before = sprite.animation.getByName(name);
+		sprite.animation.addByPrefix(name, prefix, frameRate, looped, flipX, flipY);
+		var after = sprite.animation.getByName(name);
+		var found = after != null && after != before;
+		atlasCache.set(prefix, found ? after.frames.copy() : []);
+		return found;
+	}
+
 	/**
 	 * Signal that triggers whenever a note is hit. Similar to onPlayerHit and onDadHit, except strumline specific.
 	 * To add a listener, do

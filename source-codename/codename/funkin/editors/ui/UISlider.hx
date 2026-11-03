@@ -112,7 +112,7 @@ class UISlider extends UISprite {
 			var mousePos = FlxG.mouse.getScreenPosition(__lastDrawCameras[0], FlxPoint.get());
 			__barProgress = CoolUtil.bound(mousePos.x-x, 0, barWidth)/barWidth;
 			mousePos.put();
-			if (FlxG.mouse.justReleased) isSliding = false;
+			if (FlxG.mouse.released) isSliding = false;
 		}
 
 		if (__barProgress != lastBarProgress) {

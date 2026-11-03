@@ -46,6 +46,34 @@ class PsychUIInputText extends FlxSpriteGroup
 
 	public static var focusOn(default, set):PsychUIInputText = null;
 
+	/**
+	 * 全体存活实例登记表。
+	 *
+	 * 为什么需要：本控件在构造时就把 `onKeyDown` 挂到 **全局** `FlxG.stage`、
+	 * 把 `_handleTextInput/_handleTextEditing` 挂到 **全局** lime window 信号上。
+	 * 这些是实例方法闭包（捕获 this），只要有一个实例没走到 destroy()（编辑器里
+	 * "new 了但没 add 进状态"的控件、放进非成员容器的控件都会这样），它的监听就
+	 * 永远留在全局——于是**整个编辑器状态**（连同波形/小地图位图、谱面缓存）
+	 * 被这个闭包钉住，退出编辑器也回收不掉，而且每开一次编辑器就多钉一个。
+	 * 实测：stage KEY_DOWN 监听数每开一次编谱器就永久 +1，编谱器实例逐轮累积。
+	 *
+	 * 所以除了正常 destroy()，再提供一个"按归属状态强制收尾"的入口，由
+	 * MusicBeatState.destroy() 兜底调用。
+	 */
+	static var liveInstances:Array<PsychUIInputText> = [];
+	/** 创建它的状态（用来在状态销毁时兜底收尾） */
+	var ownerState:Dynamic = null;
+	/** 已经走过 destroy()（FlxBasic 没有 destroyed 字段，自己记一个） */
+	var cleanedUp:Bool = false;
+
+	// ★ 把全局监听的回调先绑进实例字段：Haxe 每次求值方法引用都会 new 一个闭包，
+	//   若 add/remove 都用裸 onKeyDown，两边闭包不是同一引用 → removeEventListener 永远匹配不上，
+	//   stage 上的 KEY_DOWN 监听每构造一个实例就永久 +1（实测每开编谱器 +1，且钉死整个状态）。
+	//   用同一个字段做 add 和 remove 才能真摘掉。
+	var _onKeyDown:KeyboardEvent->Void = null;
+	var _handleTextInputFn:String->Void = null;
+	var _handleTextEditingFn:String->Int->Int->Void = null;
+
 	public var name:String;
 	public var bg:FlxSprite;
 	public var behindText:FlxSprite;
@@ -93,9 +121,74 @@ class PsychUIInputText extends FlxSpriteGroup
 		updateHitbox();
 		this.text = text;
 
-		FlxG.stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
-		Lib.application.window.onTextInput.add(_handleTextInput);
-		Lib.application.window.onTextEdit.add(_handleTextEditing);
+		if (_onKeyDown == null) _onKeyDown = onKeyDown;
+		if (_handleTextInputFn == null) _handleTextInputFn = _handleTextInput;
+		if (_handleTextEditingFn == null) _handleTextEditingFn = _handleTextEditing;
+		FlxG.stage.addEventListener(KeyboardEvent.KEY_DOWN, _onKeyDown);
+		Lib.application.window.onTextInput.add(_handleTextInputFn);
+		Lib.application.window.onTextEdit.add(_handleTextEditingFn);
+
+		// 登记 + 记下归属状态（见 liveInstances 的说明）
+		ownerState = flixel.FlxG.state;
+		liveInstances.push(this);
+	}
+
+	/**
+	 * 强制销毁所有存活实例（诊断/兜底用）。
+	 * 用于"探针消去法"：如果清掉全部输入框之后某个界面状态立刻被回收，
+	 * 就说明是这个控件漏在全局的监听闭包钉住了它。
+	 */
+	public static function releaseAll():Int
+	{
+		var n:Int = 0;
+		var i:Int = liveInstances.length - 1;
+		while (i >= 0)
+		{
+			var inp:PsychUIInputText = liveInstances[i];
+			i--;
+			if (inp == null)
+			{
+				liveInstances.remove(inp);
+				continue;
+			}
+			n++;
+			try inp.destroy() catch (e:Dynamic) liveInstances.remove(inp);
+		}
+		return n;
+	}
+
+	/**
+	 * 兜底收尾：把"属于这个状态、却还没被销毁"的输入框销毁掉（顺带摘掉它们的全局监听）。
+	 * 由 MusicBeatState.destroy() 在 super.destroy() 之后调用，返回收尾了几个。
+	 */
+	public static function releaseOwnedBy(owner:Dynamic):Int
+	{
+		if (owner == null || liveInstances.length == 0) return 0;
+		var n:Int = 0;
+		var i:Int = liveInstances.length - 1;
+		while (i >= 0)
+		{
+			var inp:PsychUIInputText = liveInstances[i];
+			i--;
+			if (inp == null)
+			{
+				liveInstances.remove(inp);
+				continue;
+			}
+			if (inp.ownerState == owner && !inp.cleanedUp)
+			{
+				n++;
+				try
+				{
+					inp.destroy();
+				}
+				catch (e:Dynamic)
+				{
+					liveInstances.remove(inp);
+				}
+			}
+		}
+		return n;
 	}
 
 	public var selectIndex:Int = -1;
@@ -736,18 +829,25 @@ class PsychUIInputText extends FlxSpriteGroup
 
 	override public function destroy()
 	{
+		if (cleanedUp)
+		{
+			super.destroy();
+			return;
+		}
+		cleanedUp = true;
 		_boundaries = null;
 		if (focusOn == this)
 		{
 			focusOn = null;
 			_safeDisableTextInput();
 		}
-		FlxG.stage.removeEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
-		Lib.application.window.onTextInput.remove(_handleTextInput);
-		Lib.application.window.onTextEdit.remove(_handleTextEditing);
+		FlxG.stage.removeEventListener(KeyboardEvent.KEY_DOWN, _onKeyDown);
+		Lib.application.window.onTextInput.remove(_handleTextInputFn);
+		Lib.application.window.onTextEdit.remove(_handleTextEditingFn);
+		liveInstances.remove(this);
+		ownerState = null;
 		super.destroy();
 	}
-
 	private inline function _getWindow():Window {
 		var w:Window = null;
 		try {

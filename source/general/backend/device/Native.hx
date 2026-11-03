@@ -29,6 +29,7 @@ import lime.system.System;
 struct HandleData {
 	DWORD pid = 0;
 	HWND handle = 0;
+	int score = -1;
 };
 
 BOOL CALLBACK findByPID(HWND handle, LPARAM lParam) {
@@ -40,18 +41,54 @@ BOOL CALLBACK findByPID(HWND handle, LPARAM lParam) {
 		return TRUE;
 	}
 
-	((HandleData*)lParam)->handle = handle;
-	return FALSE;
+	RECT rect;
+	int area = 0;
+	if (GetWindowRect(handle, &rect)) {
+		int width = rect.right - rect.left;
+		int height = rect.bottom - rect.top;
+		if (width > 0 && height > 0) {
+			int measuredArea = width * height;
+			area = measuredArea > 1000000 ? 1000000 : measuredArea;
+		}
+	}
+	wchar_t title[256] = {0};
+	int titleLength = GetWindowTextW(handle, title, 256);
+	int score = area + (titleLength > 0 ? 2000000 : 0);
+	if (score > ((HandleData*)lParam)->score) {
+		((HandleData*)lParam)->handle = handle;
+		((HandleData*)lParam)->score = score;
+	}
+	return TRUE;
 }
 
 HWND curHandle = 0;
 void getHandle() {
-	if (curHandle == (HWND)0) {
-		HandleData data;
-		data.pid = GetCurrentProcessId();
-		EnumWindows(findByPID, (LPARAM)&data);
-		curHandle = data.handle;
-	}
+	HandleData data;
+	data.pid = GetCurrentProcessId();
+	data.handle = 0;
+	data.score = -1;
+	EnumWindows(findByPID, (LPARAM)&data);
+	if (data.handle != (HWND)0) curHandle = data.handle;
+}
+
+void keepWindowOnScreenNative() {
+	getHandle();
+	if (curHandle == (HWND)0) return;
+	HMONITOR monitorHandle = MonitorFromWindow(curHandle, MONITOR_DEFAULTTONEAREST);
+	MONITORINFO monitorInfo;
+	monitorInfo.cbSize = sizeof(MONITORINFO);
+	if (monitorHandle == NULL || !GetMonitorInfo(monitorHandle, &monitorInfo)) return;
+	RECT windowRect;
+	if (!GetWindowRect(curHandle, &windowRect)) return;
+	RECT work = monitorInfo.rcWork;
+	if (windowRect.left >= work.left && windowRect.top >= work.top && windowRect.right <= work.right && windowRect.bottom <= work.bottom) return;
+	int windowW = windowRect.right - windowRect.left;
+	int windowH = windowRect.bottom - windowRect.top;
+	int workW = work.right - work.left;
+	int workH = work.bottom - work.top;
+	int newX = work.left + (workW > windowW ? (workW - windowW) / 2 : 0);
+	int newY = work.top + (workH > windowH ? (workH - windowH) / 2 : 0);
+	SetWindowPos(curHandle, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void refreshWindowFrame() {
@@ -498,7 +535,7 @@ void resDlgCloseMessageBox() {
 
 DWORD WINAPI resMsgThread(LPVOID param) {
 	UINT flags = MB_YESNO | MB_ICONINFORMATION | MB_TOPMOST | MB_SETFOREGROUND | MB_DEFBUTTON1;
-	int r = MessageBoxW(curHandle != 0 ? curHandle : 0, resDlgMsg.c_str(), L"NovaFlare Engine", flags);
+	int r = MessageBoxW(curHandle != 0 ? curHandle : 0, resDlgMsg.c_str(), L"D.C.E.", flags);
 	if (resDlgState == 1)
 		resDlgState = (r == IDNO) ? 2 : 3; // 是=应用 否=撤销；WM_CLOSE/异常=应用
 	resDlgThreadRunning = false;
@@ -687,7 +724,6 @@ class Native
 		#if (cpp && windows)
 		// DPI Scaling fix for windows
 		// this shouldn't be needed for other systems
-		// Credit to YoshiCrafter29 for finding this function
 		untyped __cpp__('
 			SetProcessDPIAware();	
 			#ifdef DPI_AWARENESS_CONTEXT
@@ -730,8 +766,18 @@ class Native
 			final maxScale:Float = Math.min(targetW / cfgW, targetH / cfgH);
 			if (dpiScale > maxScale) dpiScale = maxScale;
 
-			defaultClientW = Std.int(cfgW * dpiScale);
-			defaultClientH = Std.int(cfgH * dpiScale);
+			if (Main.nativeResRequested())
+			{
+				// 「屏幕原生分辨率创建」实验：窗口直接铺满屏幕，
+				// 让 OpenFL 的舞台/后缓冲从一开始就是屏幕分辨率。
+				defaultClientW = Std.int(display.bounds.width);
+				defaultClientH = Std.int(display.bounds.height);
+			}
+			else
+			{
+				defaultClientW = Std.int(cfgW * dpiScale);
+				defaultClientH = Std.int(cfgH * dpiScale);
+			}
 			@:privateAccess Application.current.window.width = defaultClientW;
 			@:privateAccess Application.current.window.height = defaultClientH;
 
@@ -740,7 +786,7 @@ class Native
 		}
 
 		untyped __cpp__('
-			getHandle();
+			keepWindowOnScreenNative();
 			if (curHandle != (HWND)0) {
 				HDC curHDC = GetDC(curHandle);
 				RECT curRect;
@@ -751,6 +797,15 @@ class Native
 		');
 
 		// 记录默认窗口矩形（“恢复默认窗口大小”按钮使用）
+		captureDefaultWindowRect();
+		#end
+	}
+
+	/** Rechecks the native window after OpenFL attaches it to the display. */
+	public static function ensureWindowOnScreen():Void
+	{
+		#if (cpp && windows)
+		untyped __cpp__('keepWindowOnScreenNative();');
 		captureDefaultWindowRect();
 		#end
 	}

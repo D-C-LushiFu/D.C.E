@@ -13,6 +13,12 @@ import codename.funkin.backend.system.framerate.Framerate;
 import codename.funkin.backend.system.interfaces.IBeatReceiver;
 import codename.funkin.backend.system.interfaces.IBeatCancellableReceiver;
 import codename.funkin.options.PlayerSettings;
+#if TOUCH_CONTROLS
+import codename.mobile.MobileControlLayer;
+import codename.mobile.MobileControlScheme;
+import mobile.objects.TouchPad;
+import mobile.objects.Hitbox;
+#end
 
 /**
  * Base class for all the states.
@@ -115,8 +121,56 @@ class MusicBeatState extends FlxState implements IBeatCancellableReceiver
 	inline function get_controlsP2():Controls
 		return PlayerSettings.player2.controls;
 
+	#if TOUCH_CONTROLS
+	var mobileControlLayer:MobileControlLayer;
+	public var touchPad(get, never):TouchPad;
+	public var hitbox(get, never):Hitbox;
+	public var hboxCam(get, never):FlxCamera;
+	public var tpadCam(get, never):FlxCamera;
+	/** Allows a state to keep its mobile controls hidden across update frames. */
+	public var mobileControlsVisible:Bool = true;
+
+	inline function get_touchPad():TouchPad return mobileControlLayer != null ? mobileControlLayer.touchPad : null;
+	inline function get_hitbox():Hitbox return mobileControlLayer != null ? mobileControlLayer.hitbox : null;
+	inline function get_hboxCam():FlxCamera return mobileControlLayer != null ? mobileControlLayer.hitboxCamera : null;
+	inline function get_tpadCam():FlxCamera return mobileControlLayer != null ? mobileControlLayer.touchPadCamera : null;
+	#end
+
+	public function addTouchPad(DPad:String, Action:String):Void {
+		#if TOUCH_CONTROLS
+		mobileControlLayer.setTouchPad(DPad, Action);
+		#end
+	}
+
+	public function removeTouchPad():Void {
+		#if TOUCH_CONTROLS
+		if (mobileControlLayer != null) mobileControlLayer.clearTouchPad();
+		#end
+	}
+
+	public function addHitbox(?defaultDrawTarget:Bool = false):Void {
+		#if TOUCH_CONTROLS
+		mobileControlLayer.setHitbox(Options.extraHints, defaultDrawTarget);
+		#end
+	}
+
+	public function removeHitbox():Void {
+		#if TOUCH_CONTROLS
+		if (mobileControlLayer != null) mobileControlLayer.clearHitbox();
+		#end
+	}
+
+	public function addTouchPadCamera(?defaultDrawTarget:Bool = false):Void {
+		#if TOUCH_CONTROLS
+		mobileControlLayer.giveTouchPadCamera(defaultDrawTarget);
+		#end
+	}
+
 	public function new(scriptsAllowed:Bool = true, ?scriptName:String) {
 		super();
+		#if TOUCH_CONTROLS
+		mobileControlLayer = new MobileControlLayer(this);
+		#end
 		this.scriptsAllowed = #if SOFTCODED_STATES scriptsAllowed #else false #end;
 
 		if(lastStateName != (lastStateName = Type.getClassName(Type.getClass(this)))) {
@@ -133,7 +187,7 @@ class MusicBeatState extends FlxState implements IBeatCancellableReceiver
 		if (scriptsAllowed) {
 			if (stateScripts.scripts.length == 0) {
 				var scriptName = this.scriptName != null ? this.scriptName : className.substr(className.lastIndexOf(".")+1);
-				for (i in codename.funkin.backend.assets.ModsFolder.getLoadedMods()) {
+				for (i in codename.funkin.backend.assets.ModsFolder.getLoadedMods(true, true)) {
 					var path = Paths.script('data/states/${scriptName}/LIB_$i');
 					var script = Script.create(path);
 					if (script is DummyScript) continue;
@@ -146,10 +200,26 @@ class MusicBeatState extends FlxState implements IBeatCancellableReceiver
 			else stateScripts.reload();
 			#end
 		}
+		#if TOUCH_CONTROLS
+		stateScripts.set("setTouchPadMode", function(dpadMode:String, actionMode:String, ?addCamera:Bool = false) {
+			removeTouchPad();
+			addTouchPad(dpadMode, actionMode);
+			if (addCamera) addTouchPadCamera();
+		});
+		stateScripts.set("checkMobileInput", codename.mobile.CodeNameMobileInput.checkMobile);
+		#end
 	}
 
 	public override function tryUpdate(elapsed:Float):Void
 	{
+		#if TOUCH_CONTROLS
+		// Keep the state's controls ready behind transition-in. Regular substates
+		// still hide them so their own controls remain the only active layer.
+		var transitionOpen = Std.isOfType(subState, MusicBeatTransition);
+		var showMobileControls = mobileControlsVisible && (subState == null || transitionOpen);
+		mobileControlLayer.updateAvailability(showMobileControls, controls.touchC, subState == null || transitionOpen);
+		codename.mobile.CodeNameMobileInput.beginConsumer(this);
+		#end
 		if (persistentUpdate || subState == null) {
 			call("preUpdate", [elapsed]);
 			update(elapsed);
@@ -163,8 +233,12 @@ class MusicBeatState extends FlxState implements IBeatCancellableReceiver
 
 		if (/*subState == null && */(ALLOW_DEV_RELOAD && controls.DEV_RELOAD)) {
 			Logs.trace("Reloading Current State...", INFO, YELLOW);
+			Paths.assetsTree.invalidateLookupCaches();
 			FlxG.resetState();
 		}
+		#if TOUCH_CONTROLS
+		codename.mobile.CodeNameMobileInput.endConsumer(this);
+		#end
 
 		if (subState != null)
 			subState.tryUpdate(elapsed);
@@ -175,12 +249,42 @@ class MusicBeatState extends FlxState implements IBeatCancellableReceiver
 		loadScript();
 		Framerate.offset.y = 0;
 		super.create();
+		#if TOUCH_CONTROLS
+		// Create before createPost(), where the transition-in substate is opened.
+		addDefaultMobileControls();
+		#end
 		call("create");
 	}
+
+	#if TOUCH_CONTROLS
+	function addDefaultMobileControls():Void {
+		var scheme = MobileControlScheme.forState(this);
+		if (scheme == null) return;
+		mobileControlLayer.apply(scheme, Options.extraHints);
+
+		var className = Type.getClassName(Type.getClass(this));
+		if (className == "codename.funkin.game.PlayState" && hitbox != null && touchPad != null)
+			hitbox.forEachAlive(button -> button.deadZones.push(touchPad.buttonP));
+		else if (className == "codename.funkin.menus.MainMenuState" && touchPad != null) {
+			#if !MOD_SUPPORT
+			touchPad.buttonM.visible = touchPad.buttonM.active = false;
+			#end
+			if (!Options.devMode || Flags.DISABLE_EDITORS)
+				touchPad.buttonE.visible = touchPad.buttonE.active = false;
+		}
+	}
+
+	function bringMobileControlsToFront():Void {
+		mobileControlLayer.raise();
+	}
+	#end
 
 	public override function createPost() {
 		super.createPost();
 		persistentUpdate = true;
+		#if TOUCH_CONTROLS
+		bringMobileControlsToFront();
+		#end
 		call("postCreate");
 		if(!Flags.DISABLE_TRANSITIONS) {
 			if (!skipTransIn)
@@ -288,6 +392,9 @@ class MusicBeatState extends FlxState implements IBeatCancellableReceiver
 	}
 
 	public override function destroy() {
+		#if TOUCH_CONTROLS
+		if (mobileControlLayer != null) mobileControlLayer.destroy();
+		#end
 		super.destroy();
 		graphicCache.destroy();
 		call("destroy");
@@ -328,7 +435,13 @@ class MusicBeatState extends FlxState implements IBeatCancellableReceiver
 	}
 
 	public override function resetSubState() {
+		var previousSubState = subState;
 		super.resetSubState();
+		#if TOUCH_CONTROLS
+		// The parent's controls were inactive while the substate owned the touch.
+		// Require that touch to end before those controls can become active again.
+		if (previousSubState != null && subState == null) mobileControlLayer.blockCurrentTouches();
+		#end
 		if (subState != null && subState is MusicBeatSubstate) {
 			var subState:MusicBeatSubstate = cast subState;
 			subState.parent = this;

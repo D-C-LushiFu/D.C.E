@@ -15,7 +15,7 @@ $resolvedOutput = [IO.Path]::GetFullPath($OutputPath)
 $parent = Split-Path -Parent $resolvedOutput
 New-Item -ItemType Directory -Path $parent -Force | Out-Null
 
-if (-not ('NovaFlareDiagnostics.DumpWriter' -as [type])) {
+if (-not ('DCEDiagnostics.DumpWriter' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
 using System.ComponentModel;
@@ -23,7 +23,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 
-namespace NovaFlareDiagnostics {
+namespace DCEDiagnostics {
     [Flags]
     public enum MiniDumpType : uint {
         Normal = 0x00000000,
@@ -73,7 +73,7 @@ namespace NovaFlareDiagnostics {
 '@
 }
 
-[NovaFlareDiagnostics.DumpWriter]::Write(
+[DCEDiagnostics.DumpWriter]::Write(
     $TargetProcessId, $resolvedOutput, $DumpType -eq 'Full')
 $item = Get-Item -LiteralPath $resolvedOutput
 [pscustomobject]@{

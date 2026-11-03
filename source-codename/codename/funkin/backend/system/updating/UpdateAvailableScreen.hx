@@ -34,7 +34,7 @@ class UpdateAvailableScreen extends MusicBeatState {
 	public override function create() {
 		super.create();
 		MusicBeatState.skipTransIn = true;
-		FlxG.mouse.visible = true;
+		FlxG.mouse.visible = !controls.touchC;
 
 		FlxG.camera.flash(0xFF000000, 0.25);
 
@@ -95,7 +95,7 @@ class UpdateAvailableScreen extends MusicBeatState {
 		add(installButton);
 		add(skipButton);
 
-		oldPos = FlxG.mouse.getScreenPosition();
+		oldPos = controls.touchC ? FlxPoint.get() : FlxG.mouse.getScreenPosition();
 
 		changeSelection(false);
 
@@ -108,7 +108,11 @@ class UpdateAvailableScreen extends MusicBeatState {
 	public override function update(elapsed:Float) {
 		super.update(elapsed);
 
-		destY = CoolUtil.bound(destY - (FlxG.mouse.wheel * 75), 0, Math.max(0, changeLogText.height - FlxG.height + versionCheckBG.height + 20 + optionsBG.height));
+		if (controls.touchC)
+			destY += ((controls.DOWN ? 1 : 0) - (controls.UP ? 1 : 0)) * 500 * elapsed;
+		else
+			destY -= FlxG.mouse.wheel * 75;
+		destY = CoolUtil.bound(destY, 0, Math.max(0, changeLogText.height - FlxG.height + versionCheckBG.height + 20 + optionsBG.height));
 		FlxG.camera.scroll.y = lerp(FlxG.camera.scroll.y, destY, 1/3);
 
 		if (controls.LEFT_P || controls.RIGHT_P) {
@@ -116,8 +120,8 @@ class UpdateAvailableScreen extends MusicBeatState {
 			changeSelection();
 		}
 
-		var newPos = FlxG.mouse.getScreenPosition();
-		if (oldPos.x != newPos.x || oldPos.y != newPos.y) {
+		var newPos = controls.touchC ? oldPos : FlxG.mouse.getScreenPosition();
+		if (!controls.touchC && (oldPos.x != newPos.x || oldPos.y != newPos.y)) {
 			if (newPos.y >= optionsBG.y) {
 				if (installSelected != (installSelected = (newPos.x < (FlxG.width / 2)))) {
 					changeSelection();
@@ -126,14 +130,25 @@ class UpdateAvailableScreen extends MusicBeatState {
 			oldPos = newPos;
 		}
 
-		if (controls.ACCEPT || (newPos.y >= optionsBG.y && FlxG.mouse.justPressed))
+		if (controls.BACK) {
+			CoolUtil.playMenuSFX(CANCEL);
+			FlxG.switchState(new MainMenuState());
+			return;
+		}
+
+		if (controls.ACCEPT || (!controls.touchC && newPos.y >= optionsBG.y && FlxG.mouse.justPressed))
 			select();
 	}
 
 	public function select() {
 		if (installSelected) {
 			CoolUtil.playMenuSFX(CONFIRM);
+			#if mobile
+			FlxG.openURL(Flags.REPO_URL + "/releases");
+			FlxG.switchState(new MainMenuState());
+			#else
 			FlxG.switchState(new UpdateScreen(check));
+			#end
 		} else {
 			CoolUtil.playMenuSFX(CANCEL);
 			FlxG.switchState(new MainMenuState());

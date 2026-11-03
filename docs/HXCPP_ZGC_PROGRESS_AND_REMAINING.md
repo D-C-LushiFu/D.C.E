@@ -1,7 +1,7 @@
-# NovaFlare 新 hxcpp：当前进度、剩余工作与恢复点
+# D.C.E. 新 hxcpp：当前进度、剩余工作与恢复点
 
 > 状态日期：2026-07-13  
-> 实现目标：从零实现一个对外仍名为 `hxcpp`、但不依赖旧 hxcpp GC、Immix 或 LegacyBridge 的现代 Haxe C++ 运行时；采用精确追踪、并发标记、并发移动、彩色引用和低停顿调度，最终以真实 NovaFlare 游戏路径验证。  
+> 实现目标：从零实现一个对外仍名为 `hxcpp`、但不依赖旧 hxcpp GC、Immix 或 LegacyBridge 的现代 Haxe C++ 运行时；采用精确追踪、并发标记、并发移动、彩色引用和低停顿调度，最终以真实 D.C.E. 游戏路径验证。  
 > Windows 最终候选版本的单轮稳定性测试上限：20 分钟。  
 > 当前阶段：完整项目已能生成、编译和链接；正在打通 Lime Prime/CFFI 原生调用边界，程序尚未稳定启动到窗口和主菜单。
 
@@ -10,7 +10,7 @@
 ### 1.1 现在做到哪里
 
 - 新 GC 和运行时的核心原型已经成立，不是旧 GC 的包装层。
-- 自定义 Haxe C++ 后端可以生成完整 NovaFlare 项目。
+- 自定义 Haxe C++ 后端可以生成完整 D.C.E. 项目。
 - 2761 个 C++ 翻译单元已经完成过完整构建；最近一次受生成头变化影响的 1139 个单元也全部编译并成功链接。
 - 最新已链接的 `ApplicationMain.exe` 为 791,668,875 字节，时间戳为 2026-07-13 18:55:03。
 - 已修复此前 `FlxPool.get()` 中 Dynamic setter 丢失 tag/载荷的问题；生成审计为 743/743 正确、0 遗漏。
@@ -90,7 +90,7 @@
 
 - Object、String、Dynamic、Array 的基础运行时模型。
 - Class、Enum、Closure、异常、反射所需的部分入口。
-- 新 Haxe C++ 生成器能够生成完整 NovaFlare 项目。
+- 新 Haxe C++ 生成器能够生成完整 D.C.E. 项目。
 - 生成器能够输出精确字段描述符、根注册和写屏障。
 - Dynamic setter 会同时复制引用和非引用元数据。
 
@@ -107,7 +107,7 @@
 
 当前未完成的是“外部 Lime NDLL 的 typed Prime 调用桥”，这正是最新启动阻塞点。
 
-## 3. 完整 NovaFlare 集成已经到达的边界
+## 3. 完整 D.C.E. 集成已经到达的边界
 
 ### 3.1 最近一次成功构建
 
@@ -434,15 +434,15 @@ Windows 达标后，再进入 Linux、Android、macOS 和 iOS 的同类适配及
 
 现有关键备份：
 
-- `D:\game\NovaFlare-backups\20260712-002120`
-- `D:\game\NovaFlare-backups\20260712-005805-approved-rewrite-baseline`
-- `D:\game\NovaFlare-backups\20260712-220000-rollback-fresh-zgc`
-- `D:\game\NovaFlare-backups\20260712-223829-hxcpp-zgc-mark-relocation-handles`
-- `D:\game\NovaFlare-backups\20260712-230747-hxcpp-zgc-concurrent-relocation-tlab`
-- `D:\game\NovaFlare-backups\20260713-004506-hxcpp-zgc-haxe-frontend`
-- `D:\game\NovaFlare-backups\20260713-020035-hxcpp-zgc-cffi-descriptor-prime`
-- `D:\game\NovaFlare-backups\20260713-040820-hxcpp-zgc-native-thread-abi`
-- `D:\game\NovaFlare-backups\20260713-111300-hxcpp-zgc-full-link-tls`
+- `D:\game\D.C.E.-backups\20260712-002120`
+- `D:\game\D.C.E.-backups\20260712-005805-approved-rewrite-baseline`
+- `D:\game\D.C.E.-backups\20260712-220000-rollback-fresh-zgc`
+- `D:\game\D.C.E.-backups\20260712-223829-hxcpp-zgc-mark-relocation-handles`
+- `D:\game\D.C.E.-backups\20260712-230747-hxcpp-zgc-concurrent-relocation-tlab`
+- `D:\game\D.C.E.-backups\20260713-004506-hxcpp-zgc-haxe-frontend`
+- `D:\game\D.C.E.-backups\20260713-020035-hxcpp-zgc-cffi-descriptor-prime`
+- `D:\game\D.C.E.-backups\20260713-040820-hxcpp-zgc-native-thread-abi`
+- `D:\game\D.C.E.-backups\20260713-111300-hxcpp-zgc-full-link-tls`
 
 最后一个现有备份早于 18:55 的 Dynamic setter 全量再生成和成功链接，也早于当前 Prime 根因诊断及生成器修正。继续进行 runtime Prime bridge 之前，应先制作包含当前工作区的新增快照。
 
@@ -477,7 +477,7 @@ Windows 达标后，再进入 Linux、Android、macOS 和 iOS 的同类适配及
 
 - 这是独立的新 hxcpp/GC 原型，不是 legacy GC 包装。
 - 核心精确并发移动 GC 骨架存在并有 16 项回归。
-- 完整 NovaFlare 已成功生成、编译和链接。
+- 完整 D.C.E. 已成功生成、编译和链接。
 - 当前 external Prime 故障已有明确根因和修复路线。
 
 不能确认：

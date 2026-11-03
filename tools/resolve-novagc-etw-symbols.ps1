@@ -121,7 +121,7 @@ function Find-Symbol {
 $inputText = [IO.File]::ReadAllText($inputFullPath)
 $addressPattern = [regex]::new(
     '(?i)(?<module>(?:[a-z]:\\[^\r\n\t]*)?' +
-    'novaflare engine\.exe)\+0x' +
+    'dce engine\.exe)\+0x' +
     '(?<address>[0-9a-f]+)',
     [Text.RegularExpressions.RegexOptions]::Compiled)
 $frequency = [Collections.Generic.Dictionary[UInt64, int]]::new()

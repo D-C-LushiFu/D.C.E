@@ -16,6 +16,7 @@ import flixel.FlxObject;
 import flixel.FlxSubState;
 import flixel.util.FlxSort;
 import flixel.util.FlxStringUtil;
+import flixel.util.FlxDestroyUtil;
 import flixel.util.FlxSave;
 import flixel.input.keyboard.FlxKey;
 import flixel.animation.FlxAnimationController;
@@ -25,7 +26,9 @@ import flixel.graphics.FlxGraphic;
 import modchart.Manager;
 
 import general.objects.AttachedSprite;
+import general.objects.screen.MouseEffect;
 import general.backend.DeepDebugTracker;
+import general.backend.CoolUtil;
 import general.backend.gc.GCManager.GameplayGC;
 
 import states.storyMenuState.StoryMenuState;
@@ -179,6 +182,8 @@ class PlayState extends MusicBeatState
 	public var inst:FlxSound;
 	public var vocals:FlxSound;
 	public var opponentVocals:FlxSound;
+	/** 挂在全局 FlxG.sound.music 上的完成回调（闭包捕获 this；销毁时必须摘除） */
+	var musicOnComplete:Void->Void = null;
 	public var splitVocals:Bool = false;
 
 	public var dad:Character = null;
@@ -217,6 +222,7 @@ class PlayState extends MusicBeatState
 	public var NoteTime:Array<Float> = [];
 
 	var numItems:FlxTypedGroup<FlxSprite>;
+	private static var EMPTY_SCRIPT_ARGS:Array<Dynamic> = [];
 	var onUpdateArgs:Array<Dynamic> = [0.0];
 	var onUpdatePostArgs:Array<Dynamic> = [0.0];
 	var spawnNoteArgs:Array<Dynamic> = [0, 0, null, false, 0.0];
@@ -260,6 +266,9 @@ class PlayState extends MusicBeatState
 
 	public static var changedDifficulty:Bool = false;
 	public static var chartingMode:Bool = false;
+	public static var openCameraEditorOnCreate:Bool = false;
+	public static var cameraEditorReturnToMenu:Bool = false;
+	public static var cameraEditorLoadStartedAt:Float = 0;
 
 	// Gameplay settings
 	public var healthGain:Float = 1;
@@ -378,6 +387,8 @@ class PlayState extends MusicBeatState
 	
 	override public function create()
 	{
+		MouseEffect.enterGameplay();
+
 		if (ClientPrefs.data.deepDebug && !DeepDebugTracker.active && SONG != null)
 			DeepDebugTracker.begin(SONG.song, Mods.currentModDirectory, Difficulty.getString());
 
@@ -386,6 +397,8 @@ class PlayState extends MusicBeatState
 		// and animations can be reused instead of rebuilt synchronously.
 		GCManager.enable(false);
 		
+		// The camera editor uses a normal PlayState host; its launch path skips only
+		// the visual countdown below, then runs the chart with BotPlay enabled.
 		startCallback = startCountdown;
 		endCallback = endSong;
 		
@@ -412,6 +425,12 @@ class PlayState extends MusicBeatState
 		practiceMode = ClientPrefs.getGameplaySetting('practice');
 		cpuControlled = ClientPrefs.getGameplaySetting('botplay');
 		cpuControlled_opponent = ClientPrefs.getGameplaySetting('botplay');
+		if (openCameraEditorOnCreate)
+		{
+			cpuControlled = true;
+			cpuControlled_opponent = true;
+			skipCountdown = true;
+		}
 		guitarHeroSustains = ClientPrefs.data.guitarHeroSustains;
 		if (ClientPrefs.data.playOpponent)
 			cpuControlled = ClientPrefs.data.botOpponentFix;
@@ -442,6 +461,10 @@ class PlayState extends MusicBeatState
         Conductor.bpm = SONG.bpm;
         timing = new TimingSystem();
         timing.setRate(playbackRate);
+        // ★ 让"外部跳时间"能带动引擎时钟：mod 直接写 Conductor.songPosition /
+        //   FlxG.sound.music.time（过场视频后跳过前奏、自定义跳转等）时，否则会被
+        //   handleInput 每帧写回的 timing 值覆盖掉 —— 表现就是谱面从 0 重新开始。
+        Conductor.onExternalSeek = handleExternalSeek;
 
 		#if DISCORD_ALLOWED
 		// String that contains the mode defined here so it isn't necessary to call changePresence for each mode
@@ -626,7 +649,10 @@ class PlayState extends MusicBeatState
 		{
 			dad.setPosition(GF_X, GF_Y);
 			if (gf != null)
+			{
+				gf.active = false;
 				gf.visible = false;
+			}
 		}
 
 		comboGroup = new FlxSpriteGroup();
@@ -900,6 +926,15 @@ class PlayState extends MusicBeatState
 			checkEventNote();
 
 		allowMinorGc = true;
+
+		// Open only after create() and onCreateFinal have completed so the editor
+		// can safely use the PlayState cameras, characters, and stage objects.
+		if (openCameraEditorOnCreate)
+		{
+			openCameraEditorOnCreate = false;
+			startingSong = false;
+			openCameraEditor();
+		}
 	}
 
 	function set_songSpeed(value:Float):Float
@@ -952,11 +987,14 @@ class PlayState extends MusicBeatState
 	#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
 	public function addTextToDebug(text:String, color:FlxColor)
 	{
-		//if (!ClientPrefs.data.developerMode) return;
+		// ★ 这条通道对**所有**调用方一律照原样显示，不做任何拦截：
+		//   debugPrint 的输出、luaTrace 的白字/彩字、引擎自身的缺 shader / 缺视频等红字，
+		//   全都走这里。写 mod 的人靠 debugPrint 调脚本，绝不能因为一个显示开关被吞掉。
+		//   需要受「Lua 语法错误提示」控制的只有下面那条 addScriptErrorToDebug()。
 		var newText:DebugLuaText = luaDebugGroup.recycle(DebugLuaText);
 		newText.text = text;
 		#if android
-		newText.text = StringTools.replace(text, "/storage/emulated/0/.NovaFlare Engine/", ""); // delete stupid path
+		newText.text = StringTools.replace(text, "/storage/emulated/0/.D.C.E./", ""); // delete stupid path
 		#end
 		newText.color = color;
 		newText.disableTime = 6;
@@ -968,6 +1006,63 @@ class PlayState extends MusicBeatState
 			spr.y += newText.height + 2;
 		});
 		luaDebugGroup.add(newText);
+		#if sys
+		Sys.println(text);
+		#else
+		trace(text);
+		#end
+	}
+
+	/**
+	 * 脚本报错专用通道 —— 唯一受「设置 › 维护设置 › Lua 语法错误提示」控制的出口
+	 * （ClientPrefs.luaErrorOverlay，默认关闭）。
+	 *
+	 * 只有真正的报错走这里：FunkinLua.reportRuntimeErrorOnce 的 `ERROR (回调) [脚本]: ...`
+	 * （含 makeLuaSprite 缺图、Lua 运行时错误 "attempt to call global ..." 等），
+	 * 以及 CallbackHandler.reportError 的 `Lua 回调出错 [...]`。
+	 * 所以关掉开关**不会**误伤 debugPrint / luaTrace —— 那些走上面的 addTextToDebug。
+	 *
+	 * 关闭时只是不上屏，日志照留（控制台 / 日志文件里照样查得到），游戏行为完全不变。
+	 */
+	public function addScriptErrorToDebug(text:String):Void
+	{
+		if (ClientPrefs.data.luaErrorOverlay)
+		{
+			addTextToDebug(text, FlxColor.RED);
+			return;
+		}
+
+		#if sys
+		Sys.println(text);
+		#else
+		trace(text);
+		#end
+	}
+
+	/**
+	 * HScript 报错专用通道 —— 受「设置 › 维护设置 › HScript 语法错误提示」控制
+	 * （ClientPrefs.hscriptErrorOverlay，默认关闭），与上面那条 Lua 通道各自独立。
+	 *
+	 * ★ 它管的只有 HScriptBase 里那几处会铺到屏幕上的脚本报错：
+	 *   runHaxeCode 执行抛错、addHaxeLibrary 解析失败（interp 侧 / Lua 回调侧各一处）。
+	 *
+	 * ★ 它管不到、也**不需要**管的：HScript 脚本自身的报错走 Iris ——
+	 *   Iris.error / Iris.warn → Iris.logLevel（Sys.println + 开发者控制台 + 1145 trace 客户端），
+	 *   那条链里根本没有 addTextToDebug，本来就不会上屏。
+	 *   另外「HScript isn't supported on this platform」这类**平台能力提示**、以及
+	 *   「诊断包装器安装失败」这类**引擎自身诊断**也保持常显，不归这个开关管
+	 *   （与 Lua 那条只拦脚本报错、不拦缺 shader / 缺视频的做法一致）。
+	 *
+	 * 关闭时只是不上屏，日志照留（Sys.println → stdout / 日志文件 / 1145 trace 客户端）。
+	 */
+	public function addHScriptErrorToDebug(text:String):Void
+	{
+		if (ClientPrefs.data.hscriptErrorOverlay)
+		{
+			addTextToDebug(text, FlxColor.RED);
+			return;
+		}
+
 		#if sys
 		Sys.println(text);
 		#else
@@ -994,6 +1089,8 @@ class PlayState extends MusicBeatState
 					boyfriendGroup.add(newBoyfriend);
 					startCharacterPos(newBoyfriend);
 					newBoyfriend.alpha = 0.00001;
+					newBoyfriend.active = false;
+					newBoyfriend.visible = false;
 					startCharacterScripts(newBoyfriend.curCharacter);
 				}
 
@@ -1005,6 +1102,8 @@ class PlayState extends MusicBeatState
 					dadGroup.add(newDad);
 					startCharacterPos(newDad, true);
 					newDad.alpha = 0.00001;
+					newDad.active = false;
+					newDad.visible = false;
 					startCharacterScripts(newDad.curCharacter);
 				}
 
@@ -1017,6 +1116,8 @@ class PlayState extends MusicBeatState
 					gfGroup.add(newGf);
 					startCharacterPos(newGf);
 					newGf.alpha = 0.00001;
+					newGf.active = false;
+					newGf.visible = false;
 					startCharacterScripts(newGf.curCharacter);
 				}
 		}
@@ -1234,6 +1335,23 @@ class PlayState extends MusicBeatState
 
 	var startTimer:FlxTimer;
 	var finishTimer:FlxTimer = null;
+
+	/**
+	 * 本局是否已经走过 finishSong()（= 结尾结算只放行一次）。
+	 * 音乐轨的 onComplete 与 update() 里的结尾兜底有可能先后进来；重复执行会把
+	 * finishTimer 重开、并把 endSong() 的 transitioning 状态搅乱。
+	 * setSongTime()（脚本做循环谱面时会 seek 回 0）会把它复位，让下一轮的结尾还能结算。
+	 */
+	private var songFinished:Bool = false;
+
+	/**
+	 * 引擎自己跳时间（setSongTime / resyncVocals）时置位，
+	 * 免得把"外部跳变"那套处理（重新锚定 + 清理已过时音符）也套到引擎自己的跳转上。
+	 */
+	private var engineSeeking:Bool = false;
+
+	/** 上一帧音乐轨的位置，用于识别 mod 只改 `FlxG.sound.music.time` 的跳时间写法。 */
+	private var lastMusicSeekTime:Float = -1;
     
 
 	// For being able to mess with the sprites on Lua
@@ -1584,40 +1702,29 @@ class PlayState extends MusicBeatState
         };
         if (timing != null) timing.pause();
 
-		FlxG.sound.music.time = time;
+		// ★ 显式定位：旧写法 `FlxG.sound.music.time = time; FlxG.sound.music.play();` 里的
+		//   play() 在音轨"没在播、也不是暂停态"（已播完 / 被 stop 过 / 上一次启动失败）时
+		//   会从 0 开始，等于把这次 seek 直接丢掉。play(forceRestart, time) 才是确定行为。
+		FlxG.sound.music.play(true, time);
 		#if FLX_PITCH FlxG.sound.music.pitch = playbackRate; #end
-		FlxG.sound.music.play();
 
-		#if FLX_PITCH
-		vocals.pitch = playbackRate;
-		opponentVocals.pitch = playbackRate;
-		#end
-
-		if (Conductor.songPosition <= vocals.length)
-		{
-			vocals.time = time;
-			if (!vocals.playing) vocals.play();
-		}
-		else
-		{
-			vocals.stop();
-		}
-
-		if (Conductor.songPosition <= opponentVocals.length)
-		{
-			opponentVocals.time = time;
-			if (!opponentVocals.playing) opponentVocals.play();
-		}
-		else
-		{
-			opponentVocals.stop();
-		}
+		// 人声轨：同样显式定位；超出音轨长度时保持停止，不能"从头重播"。
+		// 判定用 time 而不是赋值前的 Conductor.songPosition（旧代码比的是旧位置）。
+		resyncVoiceTrack(vocals, time);
+		resyncVoiceTrack(opponentVocals, time);
 		if (videoCutscene != null)
 		{
 			videoCutscene.resume();
 		};
 		pausedTimePos = time;
+        // 引擎自己的 seek：不要触发"外部跳变"那套处理（否则会把调用方特意留着的
+        // 那点前奏音符也一起清掉 —— 比如 startOnTime 流程只清了 startOnTime 之前的）
+        engineSeeking = true;
         Conductor.songPosition = time;
+        engineSeeking = false;
+        // ★ seek 等于开启新的一段：把"本局已结算"复位，脚本做循环谱面（结尾 seek 回 0）
+        //   时下一轮的结尾才能再走一次 finishSong()；同时把结尾兜底重新武装。
+        songFinished = false;
         if (timing != null) {
 			timing.setPosition(time);
 		    timing.play();
@@ -1643,7 +1750,11 @@ class PlayState extends MusicBeatState
 		@:privateAccess
 		FlxG.sound.playMusic(inst._sound, 1, false);
 		#if FLX_PITCH FlxG.sound.music.pitch = playbackRate; #end
-		FlxG.sound.music.onComplete = () -> finishSong();
+		// FlxG.sound.music 是 flixel 自己的 persist 音轨（跨状态存活）。挂在它上面的
+		// onComplete 闭包会捕获 this(=本 PlayState)，因此必须留个引用，销毁时摘掉 ——
+		// 否则整棵 PlayState 对象图（音符/精灵/文字/相机…）会被这条全局音轨一直拽住。
+		musicOnComplete = () -> finishSong();
+		FlxG.sound.music.onComplete = musicOnComplete;
 		vocals.play();
 		opponentVocals.play();
 
@@ -1695,6 +1806,7 @@ class PlayState extends MusicBeatState
 
 	private function generateSong(dataPath:String):Void
 	{
+		general.backend.cameraeditor.CameraEditorData.mergeCamIntoEvents();
 		// FlxG.log.add(ChartParser.parse());
 		songSpeed = PlayState.SONG.speed;
 		songSpeedType = ClientPrefs.getGameplaySetting('scrolltype');
@@ -1779,13 +1891,13 @@ class PlayState extends MusicBeatState
 		var eventsChart:SwagSong = null;
 		try
 		{
-			eventsChart = Song.getChart('events', songName);
+			eventsChart = Song.getChart('events', songName, false);
 		}
 		catch (e:Dynamic)
 		{
 			eventsChart = null;
 		}
-		if (eventsChart != null)
+		if (eventsChart != null && !openCameraEditorOnCreate)
 		{
 			try
 			{
@@ -1808,11 +1920,24 @@ class PlayState extends MusicBeatState
 		KeyChange.sortPoints(keyChangePoints);
 
 		Note.init(instance);
+		if(openCameraEditorOnCreate)
+		{
+			// The seekable editor reads raw note metadata. Building every gameplay
+			// head/tail and its shader here wastes memory and delays the first frame.
+			generatedMusic = true;
+			return;
+		}
 
 		for (section in songData.notes)
 		{
+			if (section == null || section.sectionNotes == null) continue;
 			for (songNotes in section.sectionNotes)
 			{
+				if (songNotes == null || !Std.isOfType(songNotes, Array) || songNotes.length < 2
+					|| !(Std.isOfType(songNotes[0], Int) || Std.isOfType(songNotes[0], Float))
+					|| !(Std.isOfType(songNotes[1], Int) || Std.isOfType(songNotes[1], Float)))
+					continue;
+				if (Std.int(songNotes[1]) < 0) continue; // Events belong to songData.events.
 				var daStrumTime:Float = songNotes[0];
 				// ★ 该音符所属「段」的 mania：取它 strumTime 前最近一次 KeyChange 事件的目标键数
 				var noteMania:Int = KeyChange.maniaAt(daStrumTime + ClientPrefs.data.noteOffset, keyChangePoints, SONG.mania);
@@ -1883,7 +2008,7 @@ class PlayState extends MusicBeatState
 						var sustainNote:Note = new Note(daStrumTime + (Conductor.stepCrochet * susNote), daNoteData, oldNote, true, false, null, noteMania);
 						sustainNote.hitMultUpdate(susNote, floorSus);
 						sustainNote.mustPress = gottaHitNote;
-						sustainNote.gfNote = (section.gfSection && (songNotes[1] < perSideKeys));
+					sustainNote.gfNote = swagNote.gfNote;
 						sustainNote.noteType = swagNote.noteType;
 						sustainNote.scrollFactor.set();
 						sustainNote.parent = swagNote;
@@ -2248,8 +2373,13 @@ class PlayState extends MusicBeatState
 			strumLineNotes.add(babyArrow);
 			babyArrow.postAddedToGroup();
 		}
-		adaptStrumline(opponentStrums);
-		adaptStrumline(playerStrums);
+		// Non-pixel ExtraKeys scales are shared by receptors and falling notes.
+		// Resizing only the receptors from atlas frame bounds desynchronizes custom skins.
+		if (isPixelStage)
+		{
+			adaptStrumline(opponentStrums);
+			adaptStrumline(playerStrums);
+		}
 
 		if (ClientPrefs.data.showKeybinds)
 		{
@@ -2265,6 +2395,16 @@ class PlayState extends MusicBeatState
 				add(keyShowcase);
 			}
 		}
+	}
+
+	private function parkCharacter(char:Character):Void
+	{
+		if (char == null) return;
+		// Change Character is also a precache mechanism. Destroying the outgoing
+		// entry invalidates that cache and makes a later switch synchronously load
+		// its atlas again. Keep it parked in the map without updating or drawing.
+		char.active = false;
+		char.visible = false;
 	}
 
 	public function adaptStrumline(strumline:FlxTypedGroup<StrumNote>)
@@ -2332,6 +2472,16 @@ class PlayState extends MusicBeatState
 			resumeGameplayGcAfterSubstate = false;
 			if (FlxG.sound.music != null && !startingSong)
 				resyncVocals(true, pausedTimePos);
+			if (!startingSong)
+			{
+				// ★ 无论 resyncVocals 有没有提前返回（finishTimer != null 那条早退），歌曲时钟
+				//   都必须重新锚定到暂停点：暂停期间一旦失焦/回焦，TimingSystem.onFocus() 会把
+				//   时钟重新拉起来，而 resume() 不会重置基准 —— 于是 timing.resume() 之后
+				//   Conductor.songPosition 会直接前跳掉整段暂停时长。这里补一次显式对齐。
+				//   倒计时中（startingSong）不动：那时时钟还没接管，位置由 handleInput 的负数分支推进。
+				Conductor.songPosition = pausedTimePos < 0 ? 0 : pausedTimePos;
+				if (timing != null) timing.setPosition(Conductor.songPosition);
+			}
 
 			FlxTimer.globalManager.forEach(function(tmr:FlxTimer) if (!tmr.finished)
 				tmr.active = true);
@@ -2366,7 +2516,11 @@ class PlayState extends MusicBeatState
 		callOnScripts('onFocus');
 		if (health > 0 && !paused)
 			resetRPC(Conductor.songPosition > 0.0);
-		if (timing != null) timing.onFocus();
+		// ★ 暂停中不能把歌曲时钟拉起来：失焦→回焦时 flixel 一样会派发 focusGained，
+		//   而 TimingSystem.onFocus() 只认 FlxG.autoPause。若在这里 resume()，暂停期间
+		//   时钟会一直偷跑，恢复时即使 resyncVocals 被跳过也不会有人纠正它。
+		//   暂停期间的时钟由 openPauseMenu()/closeSubState() 这对函数负责启停。
+		if (timing != null && !paused) timing.onFocus();
 		super.onFocus();
 		callOnScripts('onFocusPost');
 	}
@@ -2424,37 +2578,105 @@ class PlayState extends MusicBeatState
 		if (fixVocals == null)
 			fixVocals = false;
 
-		if (ClientPrefs.data.developerMode) trace('resynced vocals at ' + Math.floor(Conductor.songPosition));
+		// ★ 以「引擎时钟」为准，绝不再从音乐轨反读时间。
+		//   旧写法是 FlxG.sound.music.play() 之后 `Conductor.songPosition = FlxG.sound.music.time`，
+		//   而 FlxSound.play()（flixel 5.9.0 FlxSound.hx:745）在音轨"没在播、也不是暂停态"时
+		//   会用 StartTime = 0 去 startSound()：既可能是播放失败（openfl Sound.play() 在活跃
+		//   声道 >= 32 时返回 null，_time 被写成 0），也可能是音轨已播完 stopped()→cleanup()
+		//   或被 stop() 过。这时 _time = 0，反读回来就把 songPosition（进而 timing）拽到 0 ——
+		//   表现就是「暂停后继续 / 失步自愈后 谱面从头重放」，而且只在那种罕见到来的状态下出现，
+		//   所以是"偶然"发生。这里统一显式定位：play(forceRestart, 目标时间)，读回去的风险消失。
+		var targetPos:Float = (fixVocals && fixTime != null) ? fixTime : Conductor.songPosition;
+		if (targetPos < 0)
+			targetPos = 0;
+
+		if (ClientPrefs.data.developerMode) trace('resynced vocals at ' + Math.floor(targetPos));
 		fixDesyncedStep = 0;
 		checkIfDesynced = false;
 		lastDesyncCheckTime = Lib.getTimer();
 
-		FlxG.sound.music.play();
-		#if FLX_PITCH FlxG.sound.music.pitch = playbackRate; #end
-		if (fixVocals && fixTime != null)
-			FlxG.sound.music.time = Std.int(fixTime);
-        Conductor.songPosition = FlxG.sound.music.time;
-        if (timing != null) timing.setPosition(Conductor.songPosition);
-
-		if (Conductor.songPosition <= vocals.length)
+		if (FlxG.sound.music != null)
 		{
-			if (fixVocals)
-				vocals.time = Conductor.songPosition;
-			#if FLX_PITCH vocals.pitch = playbackRate; #end
+			FlxG.sound.music.play(true, targetPos);
+			#if FLX_PITCH FlxG.sound.music.pitch = playbackRate; #end
+			// 播放失败（声道数打满、资源丢失）时音乐轨会彻底哑掉、onComplete 也永远不会来，
+			// 这里补一条日志，方便排查「结尾不结算」是不是音轨根本没起来。
+			if (!FlxG.sound.music.exists && ClientPrefs.data.developerMode)
+				trace('resyncVocals: instrumental failed to start (exists=false)');
 		}
 
-		if (Conductor.songPosition <= opponentVocals.length)
-		{
-			if (fixVocals)
-				opponentVocals.time = Conductor.songPosition;
-			#if FLX_PITCH opponentVocals.pitch = playbackRate; #end
-		}
-		vocals.play();
-		opponentVocals.play();
+		// 引擎自己的对齐：不要触发"外部跳变"那套处理（会去清音符）
+		engineSeeking = true;
+		Conductor.songPosition = targetPos;
+		engineSeeking = false;
+		if (timing != null) timing.setPosition(targetPos);
+
+		resyncVoiceTrack(vocals, targetPos);
+		resyncVoiceTrack(opponentVocals, targetPos);
 		if (videoCutscene != null)
 		{
 			videoCutscene.resume();
 		};
+	}
+
+	/**
+	 * 把一条人声轨精确定位到 targetPos。
+	 * 已经唱完（时间点越过音轨长度）时必须保持停止 —— 旧实现在这里无条件 vocals.play()，
+	 * 而唱完的音轨处于"没在播、也不是暂停态"，play() 会从 0 重播，于是暂停→继续之后
+	 * 人声整段重来（越界时连 vocals.time 都不会被设置）。
+	 */
+	private function resyncVoiceTrack(track:FlxSound, targetPos:Float):Void
+	{
+		if (track == null)
+			return;
+
+		if (track.length <= 0 || targetPos > track.length)
+		{
+			track.stop();
+			return;
+		}
+
+		track.play(true, targetPos);
+		#if FLX_PITCH track.pitch = playbackRate; #end
+	}
+
+	/**
+	 * 外部（mod 脚本 / 其它代码）把歌曲时间跳到别处时的处理。
+	 *
+	 * 本引擎的歌曲时钟是 timing 这套独立时钟，handleInput 每帧都会执行
+	 * `Conductor.songPosition = timing.getPositionMs()`。所以 mod 里最经典的跳时间写法
+	 *
+	 *     setPropertyFromClass('Conductor', 'songPosition', X)
+	 *     setPropertyFromClass('flixel.FlxG', 'sound.music.time', X)
+	 *
+	 * 会被下一帧覆盖回去 —— 典型症状就是「过场视频播完之后谱面从 0 重新开始，视频却不再播」。
+	 * 这里做两件事：
+	 *   1) 把引擎时钟重新锚定到新位置，让跳转真正生效；
+	 *   2) 向前跳时把已经落在新位置之前的音符清掉（与引擎自带的 Skip Time 完全一致：
+	 *      那些音符已经不可能被打到，留着只会在跳转那一刻集中变成一堆 miss，直接掉血到死）。
+	 * 倒计时中 / 暂停中 / 结算中一律不动手，那些阶段的 songPosition 由各自的流程负责。
+	 */
+	private function handleExternalSeek(newPos:Float):Void
+	{
+		if (engineSeeking || timing == null)
+			return;
+		if (!startedCountdown || startingSong || paused || endingSong || destroying || isDead)
+			return;
+		if (newPos < 0 || Math.isNaN(newPos))
+			return;
+
+		if (newPos > timing.getPositionMs() + 1)
+			clearNotesBefore(newPos);
+
+		timing.setPosition(newPos);
+		if (!timing.isPlaying)
+		{
+			timing.tickEnabled = true;
+			timing.resume();
+		}
+
+		if (ClientPrefs.data.developerMode)
+			trace('external seek -> ' + Math.floor(newPos));
 	}
 
 	public var fixDesyncedStep:Int = 0;
@@ -2488,6 +2710,20 @@ class PlayState extends MusicBeatState
 	{
 		if (startedCountdown && !paused)
         {
+            // ★ mod 另一种常见的跳时间写法是只动音乐轨：`FlxG.sound.music.time = X`。
+            //   音乐轨在一帧里被跳走（正常播放每帧只前进十几毫秒）就说明是外部跳转，
+            //   这时把引擎时钟跟过去；否则下面这行会把时钟写回旧值，而 0.6 秒后的
+            //   失步自愈还会反过来把音乐拽回时钟，跳转等于没发生。
+            if (FlxG.sound.music != null && FlxG.sound.music.playing)
+            {
+                var musicNow:Float = FlxG.sound.music.time;
+                if (lastMusicSeekTime >= 0 && Math.abs(musicNow - lastMusicSeekTime) > Conductor.SEEK_JUMP_EPSILON)
+                    handleExternalSeek(musicNow);
+                lastMusicSeekTime = musicNow;
+            }
+            else
+                lastMusicSeekTime = -1;
+
             if (Conductor.songPosition < 0)
                 Conductor.songPosition += elapsed * 1000 * playbackRate;
             else if (timing != null && (timing.isPlaying || timing.tickEnabled))
@@ -2521,6 +2757,21 @@ class PlayState extends MusicBeatState
 
 	override function update(elapsed:Float)
 	{
+		if(subState is developer.editors.CameraEditorState)
+		{
+			// Continue scene/character animation updates without consuming the
+			// gameplay note queue, dispatching events, or applying keyboard input.
+			super.update(elapsed);
+			return;
+		}
+		if (openCameraEditorOnCreate && !startingSong)
+		{
+			openCameraEditorOnCreate = false;
+			openCameraEditor();
+			super.update(elapsed);
+			return;
+		}
+
 		if (ClientPrefs.data.pauseButton)
 		{
 			var Pressed:Bool = (pauseButton_menu != null && pauseButton_menu.touchJustPressed(camPause));
@@ -2589,7 +2840,9 @@ class PlayState extends MusicBeatState
 			replayTxt.alpha = 1 - Math.cos((Math.PI * txtSine) / 180);
 		}
 
-		if ((controls.PAUSE #if android || FlxG.android.justReleased.BACK #end) && (startedCountdown && canPause))
+		// A persistent camera-editor substate keeps PlayState.update running while
+		// paused. Do not let the same Escape/Back press open PauseSubState behind it.
+		if ((controls.PAUSE #if android || FlxG.android.justReleased.BACK #end) && !paused && (startedCountdown && canPause))
 		{
 			var ret:Dynamic = callOnScripts('onPause', null, true);
 			if (ret != LuaUtils.Function_Stop)
@@ -2638,6 +2891,32 @@ class PlayState extends MusicBeatState
 
 			if (ClientPrefs.data.timeBarType != 'Song Name')
 				timeTxt.text = FlxStringUtil.formatTime(secondsTotal, false);
+		}
+
+		// ★ 结尾兜底：正常结算路径只有一条 —— 音乐轨的 onComplete -> finishSong()。
+		//   那条回调一旦不来，玩家就永远卡在最后一小节（endSong 都没跑过，连"结算不了"
+		//   之外还会表现为结尾处没有反应）。实测可行的成因不止一个：
+		//   · openfl Sound.play() 在活跃声道 >= 32 时返回 null（openfl/media/Sound.hx:702），
+		//     FlxSound.startSound() 于是把 exists 置 false —— 音轨自此永久哑掉，onComplete 再也不会来；
+		//   · 脚本/舞台脚本用 FlxG.sound.playMusic 换掉音乐轨，loadEmbedded -> reset() 会清空 onComplete；
+		//   · 音轨加载失败 / 声道被系统回收。
+		//   这里按引擎自己的歌曲时钟兜底：越过尾音 + 宽限时间仍未走过结算，就强制走一次。
+		//   只在 songFinished == false 时触发 —— 也就是说音乐轨的 onComplete 正常来过时，
+		//   这条兜底永远不会介入（脚本刻意拦下结算去循环谱面的场景也照旧不打扰）。
+		if (!paused && !endingSong && !startingSong && !songFinished && startedCountdown && songLength > 0)
+		{
+			var endGrace:Float = 2000 + ClientPrefs.data.noteOffset;
+			if (endGrace < 1000)
+				endGrace = 1000;
+
+			if (Conductor.songPosition > songLength + endGrace)
+			{
+				trace('[D.C.E.] song end fallback: songPosition=' + Math.floor(Conductor.songPosition)
+					+ ' songLength=' + Math.floor(songLength)
+					+ ' musicPlaying=' + (FlxG.sound.music != null && FlxG.sound.music.playing)
+					+ ' musicExists=' + (FlxG.sound.music != null && FlxG.sound.music.exists));
+				finishSong(true);
+			}
 		}
 
 		FlxG.watch.addQuick("secShit", curSection);
@@ -2822,6 +3101,8 @@ class PlayState extends MusicBeatState
 		if (nps > maxNPS)
 			maxNPS = nps;
 
+		// Keep publishing these globals every frame. Lua states can be added while
+		// a song is running and must receive the current values immediately.
 		setOnLuas('nps', nps);
 		setOnLuas('maxFPS', maxNPS);
 
@@ -3024,6 +3305,17 @@ class PlayState extends MusicBeatState
 		MusicBeatState.switchState(new ChartingState());
 	}
 
+	public function openCameraEditor():Void
+	{
+		if (startingSong) return;
+		persistentUpdate = true;
+		paused = true;
+		if (FlxG.sound.music != null) FlxG.sound.music.pause();
+		if (vocals != null) vocals.pause();
+		if (opponentVocals != null) opponentVocals.pause();
+		openSubState(new developer.editors.CameraEditorState());
+	}
+
 	function openCharacterEditor()
 	{
 		FlxG.camera.followLerp = 0;
@@ -3137,6 +3429,86 @@ class PlayState extends MusicBeatState
 		}
 		else switch (eventName)
 		{
+			case 'Focus Camera':
+				if (camFollow != null)
+				{
+					var startX:Float = camFollow.x;
+					var startY:Float = camFollow.y;
+					var targetX:Float = camFollow.x;
+					var targetY:Float = camFollow.y;
+					switch (value1.toLowerCase().trim())
+					{
+						case 'boyfriend' | 'bf':
+							targetX = boyfriend.getMidpoint().x - 100 - boyfriend.cameraPosition[0] + boyfriendCameraOffset[0] + boyfriend.additionalX;
+							targetY = boyfriend.getMidpoint().y - 100 + boyfriend.cameraPosition[1] + boyfriendCameraOffset[1] + boyfriend.additionalY;
+						case 'dad' | 'opponent':
+							targetX = dad.getMidpoint().x + 150 + dad.cameraPosition[0] + opponentCameraOffset[0] + dad.additionalX;
+							targetY = dad.getMidpoint().y - 100 + dad.cameraPosition[1] + opponentCameraOffset[1] + dad.additionalY;
+						case 'gf' | 'girlfriend':
+							if (gf != null)
+							{
+								targetX = gf.getMidpoint().x + gf.cameraPosition[0] + girlfriendCameraOffset[0] + gf.additionalX;
+								targetY = gf.getMidpoint().y + gf.cameraPosition[1] + girlfriendCameraOffset[1] + gf.additionalY;
+							}
+						case 'pos':
+							targetX = 0;
+							targetY = 0;
+					}
+					var parts = value2.split(',');
+					var ox = (parts.length > 0) ? Std.parseFloat(StringTools.trim(parts[0])) : 0;
+					var oy = (parts.length > 1) ? Std.parseFloat(StringTools.trim(parts[1])) : 0;
+					if (!Math.isFinite(ox)) ox = 0;
+					if (!Math.isFinite(oy)) oy = 0;
+					ox = Math.max(-100000, Math.min(100000, ox));
+					oy = Math.max(-100000, Math.min(100000, oy));
+					targetX += ox;
+					targetY += oy;
+					var dur = (parts.length > 2) ? Std.parseFloat(StringTools.trim(parts[2])) : 2;
+					var easeName = (parts.length > 3) ? StringTools.trim(parts[3]) : 'CLASSIC';
+					if (!Math.isFinite(dur) || dur < 0) dur = 2;
+					dur = Math.min(600, dur);
+					isCameraOnForcedPos = true;
+					FlxTween.cancelTweensOf(camFollow);
+					camFollow.setPosition(startX, startY);
+					if (dur <= 0.001 || easeName.toUpperCase() == 'INSTANT' || easeName.toUpperCase() == 'CLASSIC')
+						camFollow.setPosition(targetX, targetY);
+					else
+						FlxTween.tween(camFollow, {x: targetX, y: targetY}, dur, {ease: CoolUtil.getTweenEaseByString(easeName)});
+				}
+
+			case 'Zoom Camera':
+				if (camGame != null)
+				{
+					var targetZoom:Float = (flValue1 != null && Math.isFinite(flValue1)) ? flValue1 : defaultCamZoom;
+					var parts = value2.split(',');
+					var dur = (parts.length > 0) ? Std.parseFloat(StringTools.trim(parts[0])) : 0;
+					var easeName = (parts.length > 1) ? StringTools.trim(parts[1]) : 'linear';
+					if (parts.length > 2 && StringTools.trim(parts[2]).toLowerCase() == 'stage') targetZoom *= defaultCamZoom;
+					if (!Math.isFinite(targetZoom)) targetZoom = 1;
+					targetZoom = Math.max(0.01, Math.min(10, targetZoom));
+					if (!Math.isFinite(dur) || dur < 0) dur = 0;
+					dur = Math.min(600, dur);
+					FlxTween.cancelTweensOf(camGame);
+					if (dur <= 0.001) camGame.zoom = targetZoom;
+					else FlxTween.tween(camGame, {zoom: targetZoom}, dur, {ease: CoolUtil.getTweenEaseByString(easeName)});
+				}
+
+			case 'Camera Angle':
+				if (camGame != null)
+				{
+					var targetAngle:Float = (flValue1 != null && Math.isFinite(flValue1)) ? flValue1 : 0;
+					var parts = value2.split(',');
+					var dur = (parts.length > 0) ? Std.parseFloat(StringTools.trim(parts[0])) : 0;
+					var easeName = (parts.length > 1) ? StringTools.trim(parts[1]) : 'linear';
+					if (!Math.isFinite(targetAngle)) targetAngle = 0;
+					targetAngle = Math.max(-3600, Math.min(3600, targetAngle));
+					if (!Math.isFinite(dur) || dur < 0) dur = 0;
+					dur = Math.min(600, dur);
+					FlxTween.cancelTweensOf(camGame);
+					if (dur <= 0.001) camGame.angle = targetAngle;
+					else FlxTween.tween(camGame, {angle: targetAngle}, dur, {ease: CoolUtil.getTweenEaseByString(easeName)});
+				}
+
 			case 'Hey!':
 				var value:Int = 2;
 				switch (value1.toLowerCase().trim())
@@ -3218,15 +3590,27 @@ class PlayState extends MusicBeatState
 				if (camFollow != null)
 				{
 					isCameraOnForcedPos = false;
-					if (flValue1 != null || flValue2 != null)
+					var parts = value2.split(',');
+					var yValue = (parts.length > 0) ? Std.parseFloat(StringTools.trim(parts[0])) : Math.NaN;
+					var dur = (parts.length > 1) ? Std.parseFloat(StringTools.trim(parts[1])) : 0.5;
+					var easeName = (parts.length > 2) ? StringTools.trim(parts[2]) : 'quadInOut';
+					if (!Math.isFinite(yValue) && flValue2 != null && Math.isFinite(flValue2)) yValue = flValue2;
+					var hasY:Bool = Math.isFinite(yValue);
+					var hasX:Bool = flValue1 != null && Math.isFinite(flValue1);
+					if (hasX || hasY)
 					{
 						isCameraOnForcedPos = true;
-						if (flValue1 == null)
-							flValue1 = 0;
-						if (flValue2 == null)
-							flValue2 = 0;
-						camFollow.x = flValue1;
-						camFollow.y = flValue2;
+						var xValue:Float = hasX ? flValue1 : 0;
+						if (!hasY) yValue = 0;
+						xValue = Math.max(-100000, Math.min(100000, xValue));
+						yValue = Math.max(-100000, Math.min(100000, yValue));
+						if (!Math.isFinite(dur) || dur < 0) dur = 0.5;
+						dur = Math.min(600, dur);
+						FlxTween.cancelTweensOf(camFollow);
+						if (dur <= 0.001 || easeName.toUpperCase() == 'INSTANT')
+							camFollow.setPosition(xValue, yValue);
+						else
+							FlxTween.tween(camFollow, {x: xValue, y: yValue}, dur, {ease: CoolUtil.getTweenEaseByString(easeName)});
 					}
 				}
 
@@ -3297,6 +3681,7 @@ class PlayState extends MusicBeatState
 					case 0:
 						if (boyfriend.curCharacter != value2)
 						{
+							var oldBoyfriend = boyfriend;
 							if (!boyfriendMap.exists(value2))
 							{
 								addCharacterToList(value2, charType);
@@ -3306,15 +3691,20 @@ class PlayState extends MusicBeatState
 							boyfriend.alpha = 0.00001;
 							boyfriend.visible = false;
 							boyfriend = boyfriendMap.get(value2);
+							boyfriend.active = true;
 							boyfriend.visible = true;
 							boyfriend.alpha = lastAlpha;
 							iconP1.changeIcon(boyfriend.healthIcon);
+
+							if (oldBoyfriend != null && oldBoyfriend != boyfriend)
+								parkCharacter(oldBoyfriend);
 						}
 						setOnScripts('boyfriendName', boyfriend.curCharacter);
 
 					case 1:
 						if (dad.curCharacter != value2)
 						{
+							var oldDad = dad;
 							if (!dadMap.exists(value2))
 							{
 								addCharacterToList(value2, charType);
@@ -3325,20 +3715,26 @@ class PlayState extends MusicBeatState
 							dad.alpha = 0.00001;
 							dad.visible = false;
 							dad = dadMap.get(value2);
+							dad.active = true;
 							dad.visible = true;
 							if (!dad.curCharacter.startsWith('gf-') && dad.curCharacter != 'gf')
 							{
 								if (wasGf && gf != null)
 								{
+									gf.active = true;
 									gf.visible = true;
 								}
 							}
 							else if (gf != null)
 							{
+								gf.active = false;
 								gf.visible = false;
 							}
 							dad.alpha = lastAlpha;
 							iconP2.changeIcon(dad.healthIcon);
+
+							if (oldDad != null && oldDad != dad)
+								parkCharacter(oldDad);
 						}
 						setOnScripts('dadName', dad.curCharacter);
 
@@ -3347,6 +3743,7 @@ class PlayState extends MusicBeatState
 						{
 							if (gf.curCharacter != value2)
 							{
+								var oldGf = gf;
 								if (!gfMap.exists(value2))
 								{
 									addCharacterToList(value2, charType);
@@ -3356,8 +3753,12 @@ class PlayState extends MusicBeatState
 								gf.alpha = 0.00001;
 								gf.visible = false;
 								gf = gfMap.get(value2);
+								gf.active = true;
 								gf.visible = true;
 								gf.alpha = lastAlpha;
+
+								if (oldGf != null && oldGf != gf)
+									parkCharacter(oldGf);
 							}
 							setOnScripts('gfName', gf.curCharacter);
 						}
@@ -3398,7 +3799,7 @@ class PlayState extends MusicBeatState
 						LuaUtils.setVarInArray(this, value1, value2);
 					}
 				}
-				catch (e:Dynamic)
+				/*catch (e:Dynamic)
 				{
 					var len:Int = e.message.indexOf('\n') + 1;
 					if (len <= 0)
@@ -3408,7 +3809,7 @@ class PlayState extends MusicBeatState
 					#else
 					FlxG.log.warn('ERROR ("Set Property" Event) - ' + e.message.substr(0, len));
 					#end
-				}
+				}*/
 
 			case 'Play Sound':
 				if (flValue2 == null)
@@ -3733,15 +4134,31 @@ class PlayState extends MusicBeatState
 
 	public function finishSong(?ignoreNoteOffset:Bool = false)
 	{
+		// ★ 只放行一次。音乐轨 onComplete 与 update() 里的结尾兜底可能先后进来，
+		//   重复执行会重开 finishTimer、并把 endSong() 的 transitioning 状态搅乱，
+		//   反过来又变成新的"结算不了"。脚本做循环谱面时由 setSongTime() 复位本标记。
+		if (songFinished)
+			return;
+		songFinished = true;
+
 		updateTime = false;
 		resumeGameplayGcAfterSubstate = false;
 		GameplayGC.finish();
-		FlxG.sound.music.volume = 0;
 
-		vocals.volume = 0;
-		vocals.pause();
-		opponentVocals.volume = 0;
-		opponentVocals.pause();
+		// 音轨可能已经没了（播放失败 exists=false / 被脚本 playMusic 换掉），这里全部判空。
+		if (FlxG.sound.music != null)
+			FlxG.sound.music.volume = 0;
+
+		if (vocals != null)
+		{
+			vocals.volume = 0;
+			vocals.pause();
+		}
+		if (opponentVocals != null)
+		{
+			opponentVocals.volume = 0;
+			opponentVocals.pause();
+		}
 
 		if (ClientPrefs.data.noteOffset <= 0 || ignoreNoteOffset)
 		{
@@ -3834,7 +4251,17 @@ class PlayState extends MusicBeatState
 						NoteTime, NoteMs
 					]
 				];
-				Highscore.saveGameData(SONG.song, storyDifficulty, details, null);
+				// ★ 存分失败绝不能连累结算：异常抛出去会让 endSong() 在打开结算/退出之前
+				//   就整个中断，而现场已经被设成 canPause=false、endingSong=true，
+				//   玩家就永久卡在结尾。统计写不进去是可以接受的，退不出去不行。
+				try
+				{
+					Highscore.saveGameData(SONG.song, storyDifficulty, details, null);
+				}
+				catch (e:Dynamic)
+				{
+					trace('[D.C.E.] saveGameData failed: ' + Std.string(e));
+				}
 				
 				var record:games.backend.Replay.StateRecord = {
 					songName: songName,
@@ -3843,7 +4270,7 @@ class PlayState extends MusicBeatState
 					playDate: Date.now().toString(),
 					modDir: Mods.currentModDirectory == '' ? 'originFunkin' : Mods.currentModDirectory,
 					songSpeed: songSpeed,
-					playbackRate: playbackRate,
+					playbackRate: ClientPrefs.getGameplaySetting('songspeed'),
 					healthGain: healthGain,
 					healthLoss: healthLoss,
 					cpuControlled: cpuControlled,
@@ -3939,8 +4366,23 @@ class PlayState extends MusicBeatState
 
 			if (ClientPrefs.data.resultsScreen)
 			{
-				openSubState(new ResultsScreen(boyfriend.getScreenPosition().x, boyfriend.getScreenPosition().y));
-				FlxG.sound.playMusic(Paths.music('freakyMenu'), 0.7);
+				// ★ 结算界面构造失败也绝不能让玩家卡在"既结算不了也退不出去"：
+				//   endSong() 到这里已经把 canPause / updateTime / persistentUpdate 全关掉了，
+				//   一旦 new ResultsScreen() 抛异常（缺图、自定义皮肤损坏等），
+				//   异常被 CrashHandler 拦下之后游戏就永久停在这一帧，谁都退不出去。
+				//   这里兜底成"回选歌界面"，保证至少能退出。
+				try
+				{
+					openSubState(new ResultsScreen(boyfriend.getScreenPosition().x, boyfriend.getScreenPosition().y));
+					FlxG.sound.playMusic(Paths.music('freakyMenu'), 0.7);
+				}
+				catch (e:Dynamic)
+				{
+					trace('[D.C.E.] ResultsScreen failed, falling back to Freeplay: ' + Std.string(e));
+					Mods.loadTopMod();
+					MusicBeatState.switchState(new FreeplayState());
+					FlxG.sound.playMusic(Paths.music('freakyMenu'), 0.7);
+				}
 			}
 			else
 			{
@@ -3952,6 +4394,19 @@ class PlayState extends MusicBeatState
 			changedDifficulty = false;
 			transitioning = true;
 		}
+		}
+		else if (ret == LuaUtils.Function_Stop && !transitioning)
+		{
+			// ★ 脚本用 Function_Stop 拦下结算（循环谱面、脚本自己播结尾等）。
+			//   endSong() 前半段已经把 canPause / updateTime 关掉了，脚本如果只打算
+			//   接管一会儿却没有自己恢复，玩家就永久锁死在"结算不了也退不出去"的状态 ——
+			//   这就是结尾按暂停没反应、也退不出游戏的那类报告。这里把"能不能操作"
+			//   恢复回来；endingSong / songFinished 故意不动，那是脚本自己要接管的状态。
+			if (!destroying && !isDead)
+			{
+				canPause = true;
+				updateTime = ClientPrefs.data.timeBarType != 'Disabled';
+			}
 		}
 		return true;
 	}
@@ -5031,7 +5486,7 @@ class PlayState extends MusicBeatState
 				}
 			}
 
-			var animToPlay:String = singAnimations[Std.int(Math.abs(Math.min(singAnimations.length - 1, note.noteData)))] + altAnim;
+			var animToPlay:String = singAnimationForNote(note) + altAnim;
 
 			var char:Character = dad;
 			var animCheck:String = 'hey';
@@ -5043,7 +5498,7 @@ class PlayState extends MusicBeatState
 
 			if (char != null)
 			{
-				char.playAnim(animToPlay + note.animSuffix, true);
+				char.playAnim(animToPlay, true);
 				char.holdTimer = 0;
 
 				if (note.noteType == 'Hey!')
@@ -5356,9 +5811,14 @@ class PlayState extends MusicBeatState
 
 	override function destroy()
 	{
+		MouseEffect.leaveGameplay();
+
 		destroying = true;
 		resumeGameplayGcAfterSubstate = false;
 		GameplayGC.abort();
+
+		// 不能再让已销毁的 PlayState 去处理外部跳时间（新的 PlayState.create() 会重新挂上）。
+		Conductor.onExternalSeek = null;
 
 		if (DeepDebugTracker.active)
 			DeepDebugTracker.finish(endingSong ? 'song_state_destroyed_after_end' : 'aborted_or_restarted');
@@ -5384,13 +5844,57 @@ class PlayState extends MusicBeatState
 		}
 		luaArray = [];
 		FunkinLua.customFunctions.clear();
+		// 静态 shader 滤镜表同样是"脚本加了却不摘"的重灾区，随脚本一起收口
+		scripts.lua.ShaderFunctions.clearStoredFilters();
 		#end
 
 		stagesFunc(function(stage:BaseStage) stage.destroy());
 
+		// ★ 三条游玩音轨（Inst / 玩家 vocal / 对手 vocal）被挂在**全局**的 FlxG.sound.list 上，
+		//   状态销毁时必须摘除并释放：否则每进一次歌就永久留下 3 个 FlxSound（连同解码后的
+		//   音频缓冲），反复进歌/换歌会线性增长，也是"玩久了内存越来越高"的主要来源之一。
+		//   （FlxG.sound.music 是 flixel 自己的 persist 音轨，不受影响。）
+		// ★★ 关键：歌的音轨被交给了**全局 persist 音轨** FlxG.sound.music
+		//   —— 见本文件第 1730 行 `FlxG.sound.playMusic(inst._sound, 1, false)`。
+		//   只做 releasePlaySound(inst) 是不够的：那只把 inst 从 FlxG.sound.list 摘掉并 destroy，
+		//   而 `FlxG.sound.music` 这个**全局静态**仍然指向它 → 整首歌的音轨（含解码后的 PCM，
+		//   实测退出后 large 段仍占 132MB、GC used 停在 272MB、reserved 801MB 不归还）
+		//   继续被全局引用钉住，永远回收不掉。
+		//   所以先把全局音轨停掉并换成菜单 BGM —— 与 ChartingState.releaseEditorAudio 同一手法，
+		//   也和本文件 4167 / 4222 行退出到菜单时的写法一致。
+		if (FlxG.sound != null && FlxG.sound.music != null)
+		{
+			try
+			{
+				FlxG.sound.music.stop();
+				FlxG.sound.music.onComplete = null;
+				FlxG.sound.playMusic(Paths.music('freakyMenu'), 0.7);
+			}
+			catch (e:Dynamic) {}
+		}
+
+		releasePlaySound(vocals);
+		vocals = null;
+		releasePlaySound(opponentVocals);
+		opponentVocals = null;
+		releasePlaySound(inst);
+		inst = null;
+
+		// ★ 摘掉我们挂在全局 persist 音轨上的完成回调：闭包捕获了 this，留着 = 整个
+		//   PlayState 及其所有成员（音符/精灵/文字/相机）永远不被回收。
+		//   只在"这个回调还是我们挂的那个"时清（== 比较的是同一个闭包对象），
+		//   避免误清编辑器等其它状态挂上去的回调。
+		if (FlxG.sound != null && FlxG.sound.music != null && musicOnComplete != null
+			&& FlxG.sound.music.onComplete == musicOnComplete)
+			FlxG.sound.music.onComplete = null;
+		musicOnComplete = null;
+
 		FlxG.animationTimeScale = 1;
 		#if FLX_PITCH FlxG.sound.music.pitch = 1; #end
 		Note.globalRgbShaders = [];
+		// ★ 清掉 Note 对"当前游玩状态"的静态回引用（Note.init(instance) 设的）：
+		//   不清 = 整个 PlayState 及其全部成员被这条静态引用钉死，直到下一首歌才被动替换。
+		Note.clearFollow(this);
 		NoteSplash.configs.clear();
 		games.backend.NoteTypesConfig.clearNoteTypesData();
 		instance = null;
@@ -5408,8 +5912,43 @@ class PlayState extends MusicBeatState
 	var checkIfDesynced:Bool = false;
 	var lastStepHit:Int = -1;
 
+	/** 从全局声音列表里摘除并释放一条游玩音轨（见 destroy() 里的说明）。 */
+	static function releasePlaySound(sound:FlxSound):Void
+	{
+		if (sound == null) return;
+		if (FlxG.sound != null && FlxG.sound.list != null)
+			FlxG.sound.list.remove(sound);
+		sound.destroy();
+	}
+
+	/**
+	 * 掏空（见 MusicBeatState.hollowOut）：把整张谱的对象图确定性地放掉。
+	 *
+	 * `unspawnNotes` 里是**整首歌的全部 Note**，它们从没被 add() 进成员表，
+	 * 所以 super.destroy() 管不到 —— 只能等 GC；而本状态的壳被一个反射看不见的根钉住，
+	 * 于是"退出歌曲后整张谱还在"（大谱就是几十万对象）。这里显式销毁 + 清空。
+	 */
+	override function hollowOut():Void
+	{
+		MusicBeatState.freeBunch(cast unspawnNotes);
+		unspawnNotes = [];
+		MusicBeatState.freeBunch(cast killNotes);
+		killNotes = [];
+
+		// 下面这些是成员表里的组：super.destroy() 已经销毁过成员，这里只断开引用，
+		// 免得壳被钉住时还拖着一串空组/精灵引用不让 GC 收。
+		notes = null;
+		noteGroup = null;
+		strumLineNotes = null;
+		grpNoteSplashes = null;
+		eventNotes = [];
+		keyChangePoints = [];
+		notesHitArray = [];
+	}
+
 	override inline function stepHit()
 	{
+		if(subState is developer.editors.CameraEditorState) return;
 		if (FlxG.sound.music.time >= -ClientPrefs.data.noteOffset)
 			checkIfDesynced = true;
 
@@ -5429,6 +5968,9 @@ class PlayState extends MusicBeatState
 
 	override inline function beatHit()
 	{
+		// The seekable editor owns beat dispatch; gameplay's monotonically
+		// increasing lastBeatHit would suppress every beat after a rewind.
+		if(subState is developer.editors.CameraEditorState) return;
 		if (lastBeatHit >= curBeat)
 		{
 			// trace('BEAT HIT: ' + curBeat + ', LAST HIT: ' + lastBeatHit);
@@ -5468,26 +6010,29 @@ class PlayState extends MusicBeatState
 
 	public function playerDance(force:Bool = false):Void
 	{
+		var curAnim:String = boyfriend.getAnimationName();
 		if (force
-			|| boyfriend.animation.curAnim != null
+			|| (curAnim != null
 			&& boyfriend.holdTimer > Conductor.stepCrochet * (0.0011 / FlxG.sound.music.pitch) * boyfriend.singDuration
-				&& boyfriend.animation.curAnim.name.startsWith('sing')
-				&& !boyfriend.animation.curAnim.name.endsWith('miss'))
+				&& curAnim.startsWith('sing')
+				&& !curAnim.endsWith('miss')))
 			boyfriend.dance();
 	}
 
 	public function opponentDance(force:Bool = false):Void
 	{
+		var curAnim:String = dad.getAnimationName();
 		if (force
-			|| dad.animation.curAnim != null
+			|| (curAnim != null
 			&& dad.holdTimer > Conductor.stepCrochet * (0.0011 / FlxG.sound.music.pitch) * dad.singDuration
-				&& dad.animation.curAnim.name.startsWith('sing')
-				&& !dad.animation.curAnim.name.endsWith('miss'))
+				&& curAnim.startsWith('sing')
+				&& !curAnim.endsWith('miss')))
 			dad.dance();
 	}
 
 	override inline function sectionHit()
 	{
+		if(subState is developer.editors.CameraEditorState) return;
 		if (SONG.notes[curSection] != null)
 		{
 			if (generatedMusic && !endingSong && !isCameraOnForcedPos)
@@ -5571,16 +6116,14 @@ class PlayState extends MusicBeatState
 	public function callOnScripts(funcToCall:String, args:Array<Dynamic> = null, ignoreStops = false, exclusions:Array<String> = null,
 			excludeValues:Array<Dynamic> = null):Dynamic
 	{
-		var returnVal:Dynamic = LuaUtils.Function_Continue;
 		if (args == null)
-			args = [];
-		if (exclusions == null)
-			exclusions = [];
-		if (excludeValues == null)
-			excludeValues = [LuaUtils.Function_Continue];
+			args = EMPTY_SCRIPT_ARGS;
 
 		var result:Dynamic = callOnLuas(funcToCall, args, ignoreStops, exclusions, excludeValues);
-		if (result == null || excludeValues.contains(result))
+		var excluded:Bool = excludeValues == null
+			? result == LuaUtils.Function_Continue
+			: excludeValues.contains(result);
+		if (result == null || excluded)
 			result = callOnHScript(funcToCall, args, ignoreStops, exclusions, excludeValues);
 		return result;
 	}
@@ -5591,42 +6134,46 @@ class PlayState extends MusicBeatState
 		var returnVal:Dynamic = LuaUtils.Function_Continue;
 		#if LUA_ALLOWED
 		if (args == null)
-			args = [];
-		if (exclusions == null)
-			exclusions = [];
-		if (excludeValues == null)
-			excludeValues = [LuaUtils.Function_Continue];
+			args = EMPTY_SCRIPT_ARGS;
+		var useDefaultExclude:Bool = excludeValues == null;
 
-		var arr:Array<FunkinLua> = [];
+		var scriptsToRemove:Array<FunkinLua> = null;
 		for (script in luaArray)
 		{
 			if (script.closed)
 			{
-				arr.push(script);
+				if (scriptsToRemove == null) scriptsToRemove = [];
+				scriptsToRemove.push(script);
 				continue;
 			}
 
-			if (exclusions.contains(script.scriptName))
+			if (exclusions != null && exclusions.contains(script.scriptName))
 				continue;
 
 			var myValue:Dynamic = script.call(funcToCall, args);
+			var valueExcluded:Bool = useDefaultExclude
+				? myValue == LuaUtils.Function_Continue
+				: excludeValues.contains(myValue);
 			if ((myValue == LuaUtils.Function_StopLua || myValue == LuaUtils.Function_StopAll)
-				&& !excludeValues.contains(myValue)
+				&& !valueExcluded
 				&& !ignoreStops)
 			{
 				returnVal = myValue;
 				break;
 			}
 
-			if (myValue != null && !excludeValues.contains(myValue))
+			if (myValue != null && !valueExcluded)
 				returnVal = myValue;
 
 			if (script.closed)
-				arr.push(script);
+			{
+				if (scriptsToRemove == null) scriptsToRemove = [];
+				scriptsToRemove.push(script);
+			}
 		}
 
-		if (arr.length > 0)
-			for (script in arr)
+		if (scriptsToRemove != null)
+			for (script in scriptsToRemove)
 				luaArray.remove(script);
 		#end
 		return returnVal;
@@ -5638,12 +6185,6 @@ class PlayState extends MusicBeatState
 		var returnVal:Dynamic = LuaUtils.Function_Continue;
 
 		#if HSCRIPT_ALLOWED
-		if (exclusions == null)
-			exclusions = new Array();
-		if (excludeValues == null)
-			excludeValues = new Array();
-		excludeValues.push(LuaUtils.Function_Continue);
-
 		var len:Int = hscriptArray.length;
 		if (len < 1)
 			return returnVal;
@@ -5651,21 +6192,23 @@ class PlayState extends MusicBeatState
 		for (script in hscriptArray)
 		{
 			@:privateAccess
-			if (script == null || exclusions.contains(script.origin))
+			if (script == null || (exclusions != null && exclusions.contains(script.origin)))
 				continue;
 
 			var myValue = script.call(funcToCall, args);
 			{
+				var valueExcluded:Bool = myValue == LuaUtils.Function_Continue
+					|| (excludeValues != null && excludeValues.contains(myValue));
 
 				if ((myValue == LuaUtils.Function_StopHScript || myValue == LuaUtils.Function_StopAll)
-					&& !excludeValues.contains(myValue)
+					&& !valueExcluded
 					&& !ignoreStops)
 				{
 					returnVal = myValue;
 					break;
 				}
 
-				if (myValue != null && !excludeValues.contains(myValue))
+				if (myValue != null && !valueExcluded)
 					returnVal = myValue;
 			}
 		}
@@ -5676,8 +6219,6 @@ class PlayState extends MusicBeatState
 
 	public function setOnScripts(variable:String, arg:Dynamic, exclusions:Array<String> = null)
 	{
-		if (exclusions == null)
-			exclusions = [];
 		setOnLuas(variable, arg, exclusions);
 		setOnHScript(variable, arg, exclusions);
 	}
@@ -5685,11 +6226,9 @@ class PlayState extends MusicBeatState
 	public function setOnLuas(variable:String, arg:Dynamic, exclusions:Array<String> = null)
 	{
 		#if LUA_ALLOWED
-		if (exclusions == null)
-			exclusions = [];
 		for (script in luaArray)
 		{
-			if (exclusions.contains(script.scriptName))
+			if (exclusions != null && exclusions.contains(script.scriptName))
 				continue;
 
 			script.set(variable, arg);
@@ -5700,15 +6239,13 @@ class PlayState extends MusicBeatState
 	public function setOnHScript(variable:String, arg:Dynamic, exclusions:Array<String> = null)
 	{
 		#if HSCRIPT_ALLOWED
-		if (exclusions == null)
-			exclusions = [];
+		if (!instancesExclude.contains(variable))
+			instancesExclude.push(variable);
 		for (script in hscriptArray)
 		{
-			if (exclusions.contains(script.origin))
+			if (exclusions != null && exclusions.contains(script.origin))
 				continue;
 
-			if (!instancesExclude.contains(variable))
-				instancesExclude.push(variable);
 			script.set(variable, arg);
 		}
 		#end

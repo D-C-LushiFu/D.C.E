@@ -8,8 +8,8 @@ NovaGC 已具备精确类型描述符、影子根、TLAB、分代复制、卡表
 
 ## 备份
 
-- 初始备份：`D:\game\NovaFlare-backups\20260712-002120`
-- 已批准重写基线：`D:\game\NovaFlare-backups\20260712-005805-approved-rewrite-baseline`
+- 初始备份：`D:\game\D.C.E.-backups\20260712-002120`
+- 已批准重写基线：`D:\game\D.C.E.-backups\20260712-005805-approved-rewrite-baseline`
 
 ## 2026-07-12 关键故障与修复
 

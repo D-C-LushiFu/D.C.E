@@ -528,7 +528,6 @@ class Character extends FlxSprite
 	}
 
 	// Atlas support
-	// special thanks ne_eo for the references, you're the goat!!
 	@:allow(developer.editors.CharacterEditorState)
 	public var isAnimateAtlas(default, null):Bool = false;
 	#if flxanimate

@@ -1,7 +1,7 @@
-# NovaFlare(Haxe/FNF)语言系统与窗口 Chrome 机制盘点报告
+# D.C.E.(Haxe/FNF)语言系统与窗口 Chrome 机制盘点报告
 
 > 目的:为三个新编辑器(DialogueEditorState / DialogueCharacterEditorState / NoteSplashEditorState,均位于 `source\developer\editors\`)接入"自绘顶栏菜单 + 自绘窗口控制条"做准备。
-> 工程根:`C:\Users\Admin1\Desktop\FNF-NovaFlare-Engine-1.2.1`。所有结论均附 `文件:行号` 证据。
+> 工程根:`C:\Users\Admin1\Desktop\FNF-D.C.E.-1.2.1`。所有结论均附 `文件:行号` 证据。
 
 ---
 
@@ -316,7 +316,7 @@ windowChrome.onTitleClick = () -> modInfoPopup.openUnder(windowChrome);
 
 - 开关 `adjustMobileEditorKeys`(ClientPrefs.hx:185;维护设置 MaintenanceGroup.hx:38-40),开启后:
   - 默认 virtualPad 被隐藏(`pad.visible=false; pad.active=false`,EditorMobileKeys.hx:287-298);
-  - 换成 `EditorMobileKeyOverlay`(自绘按键,EditorMobileKeys.hx:300-320),触摸/鼠标按下 = **向 FlxG.keys 注入该键绑定的组合键**(EditorMobileKeyOverlay.hx:27 注释;按键定义文件 `FuckYouNFEMobile/<EditorId>NewFuckingButtonMobile.json`,回退链:用户文件 → APK 内置 → 默认模板,EditorMobileKeys.hx:122-153);
+  - 换成 `EditorMobileKeyOverlay`(自绘按键,EditorMobileKeys.hx:300-320),触摸/鼠标按下 = **向 FlxG.keys 注入该键绑定的组合键**(EditorMobileKeyOverlay.hx:27 注释;按键定义文件 `FuckYouDCEMobile/<EditorId>NewFuckingButtonMobile.json`,回退链:用户文件 → APK 内置 → 默认模板,EditorMobileKeys.hx:122-153);
   - `Controls.mobileC` 在开启期间强制返回 false(Controls.hx:187-199)→ 编辑器一律走"键盘分支",自定义组合键即可驱动全部编辑操作。
 - 语义表(每编辑器每个 pad 按钮 ↔ 等价键/组合/中文含义):`EditorMobileKeyData.hx:43-178`。**三个目标编辑器已登记**:`DialogueEditor / DialogueCharacterEditor / NoteSplashEditor` 均有 EDITORS 条目与语义表(71-97 行 S_DIALOGUE、S_DIALOGUE_CHAR;109-122 行 S_NOTE_SPLASH;181-191 行 EDITORS),也即移动端键位体系已为它们预留。
 - MusicBeatState.update 每帧调 `EditorMobileKeys.frameUpdate(this)`(MusicBeatState.hx:242)做启停/挂 overlay。

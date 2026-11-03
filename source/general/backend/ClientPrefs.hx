@@ -12,14 +12,17 @@ import games.backend.ExtraKeysHandler.EKNoteColor;
 
 import lime.system.Display;
 
+#if mobile
+import general.objects.screen.MouseEffect;
+import general.shaders.MobileShaderConverter;
+#end
+
 // Add a variable here and it will get automatically saved
 @:structInit class SaveVariables
 {
-	// Version - used to detect breaking changes and reset prefs
+	//更新这个直接原地爆破所有人设置
 	public var prefsVersion:Int = 120;
-	// One-shot, non-destructive migration for the independent desktop
-	// update/render clocks. This must not reuse prefsVersion because that
-	// would reset every unrelated preference and key binding.
+	//更新这个能让性能相关的强制更新
 	public var performanceDefaultsVersion:Int = 8;
 
 	// General
@@ -27,7 +30,7 @@ import lime.system.Display;
 	public var drawFramerate:Int = 1000;
 	public var lockRender:Bool = true;
 	public var renderThread:Bool = true;
-	public var resolution:String = '720P';
+	public var resolution:String = 'Native';
 	public var colorblindMode:String = 'None';
 	public var lowQuality:Bool = false;
 	public var gameQuality:Int = #if mobile 0 #else 1 #end;
@@ -38,8 +41,10 @@ import lime.system.Display;
 	public var autoPause:Bool = true;
 	public var gcFreeZone:Bool = true;
 	#if mobile
-    public var autoOrientation:Bool = false;
-    #end
+	public var autoOrientation:Bool = false;
+	public var autoShaderConversion:Bool = true;
+	public var mouseTrailEffect:Bool = true;
+	#end
 
 	// Gameplay
 	public var downScroll:Bool = false;
@@ -107,12 +112,185 @@ import lime.system.Display;
 	public var comboStacking:Bool = true;
 	public var comboColor:Bool = true;
 	public var comboOffsetFix:Bool = true;
-	// KeyBoard s
+	// ================= KeyBoard（键盘反馈 / KeyboardViewer）=================
+	//
+	// ★ 这一组是「键盘反馈设置」界面的数据源（options/base/KeyboardViewerSubState.hx）。
+	//   设置项的划分照 KeyDisplay 那套模板（基本 / 各键颜色 / 长条 / 长条颜色 / 消失效果 /
+	//   统计 / 统计颜色 / 布局），只是这里全部由自绘界面读写，不再走 Option 列表。
+
+	// ---- 基本 ----
+	// ★ 总开关沿用上面 Gameplay 区已有的 `keyboardViewer`（游戏界面设置那条），不重复声明。
+	/** 按键底色方块透明度（旧名 keyboardAlpha，保持存档兼容） */
 	public var keyboardAlpha:Float = 0.8;
+	/** 按下时的高亮透明度 */
+	public var keyboardPressedAlpha:Float = 1;
+	/** 按键方块基础大小（px，键与长条共用基准） */
+	public var keyboardKeySize:Int = 50;
+	/** 按键方块基础间距（px） */
+	public var keyboardKeySpacing:Int = 4;
+	/** 显示摁压的时间细节（长条） */
 	public var keyboardTimeDisplay:Bool = true;
+	/** 长条滞留时长（ms） */
 	public var keyboardTime:Float = 500;
+	/** 按键底色 */
 	public var keyboardBGColor:String = 'WHITE';
+	/** 按键文字色 */
 	public var keyboardTextColor:String = 'BLACK';
+	/**
+	 * 当前套用的主题名：'default' / 'black' / 'fnf' / 'fnfpixel' / 'custom'。
+	 * ★ 只要用户改动任何一项（包括逐键颜色），就自动回到 'custom' ——
+	 *   选主题本身不算"改动"，它会一次性把整套配色铺到全部目标上。
+	 */
+	public var keyboardTheme:String = 'default';
+
+	// ---- 各键颜色（10K 逐键，最多 10 组；空串 = 用默认纯白，与旧版观感一致）----
+	public var keyboardKeyColor1:String = '';
+	public var keyboardKeyColor2:String = '';
+	public var keyboardKeyColor3:String = '';
+	public var keyboardKeyColor4:String = '';
+	public var keyboardKeyColor5:String = '';
+	public var keyboardKeyColor6:String = '';
+	public var keyboardKeyColor7:String = '';
+	public var keyboardKeyColor8:String = '';
+	public var keyboardKeyColor9:String = '';
+	public var keyboardKeyColor10:String = '';
+
+	// ---- 逐键颜色 · v2 补充 ----
+	// ★ 键面这一版的规则是「只有颜色才逐键独立，其它（透明度/长条/统计区/配色来源）都是全局」。
+	//   下面四组都遵守同一个约定：**空串 = 回退到旧版的全局值**，
+	//   于是老存档不需要任何迁移，没设过的键观感与旧版完全一致。
+	/** 第 n 键的常态文本颜色（空 = keyboardTextColor） */
+	public var keyboardKeyTextColor1:String = '';
+	public var keyboardKeyTextColor2:String = '';
+	public var keyboardKeyTextColor3:String = '';
+	public var keyboardKeyTextColor4:String = '';
+	public var keyboardKeyTextColor5:String = '';
+	public var keyboardKeyTextColor6:String = '';
+	public var keyboardKeyTextColor7:String = '';
+	public var keyboardKeyTextColor8:String = '';
+	public var keyboardKeyTextColor9:String = '';
+	public var keyboardKeyTextColor10:String = '';
+	/** 第 n 键的按下颜色（空 = 用该键常态色，即旧版观感） */
+	public var keyboardPressedColor1:String = '';
+	public var keyboardPressedColor2:String = '';
+	public var keyboardPressedColor3:String = '';
+	public var keyboardPressedColor4:String = '';
+	public var keyboardPressedColor5:String = '';
+	public var keyboardPressedColor6:String = '';
+	public var keyboardPressedColor7:String = '';
+	public var keyboardPressedColor8:String = '';
+	public var keyboardPressedColor9:String = '';
+	public var keyboardPressedColor10:String = '';
+	/** 第 n 键的按下文本颜色（空 = 按高亮色亮度自动挑黑/白，即旧版的 keyboardPressedTextColor） */
+	public var keyboardPressedTextColor1:String = '';
+	public var keyboardPressedTextColor2:String = '';
+	public var keyboardPressedTextColor3:String = '';
+	public var keyboardPressedTextColor4:String = '';
+	public var keyboardPressedTextColor5:String = '';
+	public var keyboardPressedTextColor6:String = '';
+	public var keyboardPressedTextColor7:String = '';
+	public var keyboardPressedTextColor8:String = '';
+	public var keyboardPressedTextColor9:String = '';
+	public var keyboardPressedTextColor10:String = '';
+	/** 第 n 键的长条颜色（空 = 按 keyboardBarColorMode 决定，即旧版观感） */
+	public var keyboardBarColor1:String = '';
+	public var keyboardBarColor2:String = '';
+	public var keyboardBarColor3:String = '';
+	public var keyboardBarColor4:String = '';
+	public var keyboardBarColor5:String = '';
+	public var keyboardBarColor6:String = '';
+	public var keyboardBarColor7:String = '';
+	public var keyboardBarColor8:String = '';
+	public var keyboardBarColor9:String = '';
+	public var keyboardBarColor10:String = '';
+
+	/** 第 n 键的**描边颜色**（空 = 跟随该键的常态色，即原来的观感） */
+	public var keyboardKeyBorderColor1:String = '';
+	public var keyboardKeyBorderColor2:String = '';
+	public var keyboardKeyBorderColor3:String = '';
+	public var keyboardKeyBorderColor4:String = '';
+	public var keyboardKeyBorderColor5:String = '';
+	public var keyboardKeyBorderColor6:String = '';
+	public var keyboardKeyBorderColor7:String = '';
+	public var keyboardKeyBorderColor8:String = '';
+	public var keyboardKeyBorderColor9:String = '';
+	public var keyboardKeyBorderColor10:String = '';
+
+	/**
+	 * 颜色跟随曲目音符配色。
+	 * 开启后「各键颜色」不再用上面的逐键值，而是按当前曲目的箭头配色循环取色
+	 * （第 i 个键取 `arrowRGB[i % 4]` 的 inner 色；跟随像素配色时取 arrowRGBPixel），
+	 * 于是键盘反馈会和画面上的箭头/音符同色。
+	 */
+	public var keyboardFollowNoteColor:Bool = false;
+	/** 跟随哪一套配色：'Normal' = arrowRGB，'Pixel' = arrowRGBPixel */
+	public var keyboardFollowNotePalette:String = 'Normal';
+
+	// ---- 长条（按下后向上漂的那根；总开关沿用上面的 keyboardTimeDisplay）----
+	/** 长条透明度 */
+	public var keyboardBarAlpha:Float = 1;
+	/** 长条宽度（px；<=0 表示跟随按键宽度） */
+	public var keyboardBarWidth:Int = 0;
+	/** 长条最大高度（px；<=0 表示用按键大小 ×3，即旧版行为） */
+	public var keyboardBarHeight:Int = 0;
+	/** 长条上漂速度倍率（1 = 原版速度；duration = keyboardTime / speed） */
+	public var keyboardBarSpeed:Float = 1;
+	/** 连续按下时的长条创建间隔（秒；0 = 每次按下都创建） */
+	public var keyboardBarInterval:Float = 0;
+	/**
+	 * 长条颜色模式：'Key' = 跟随该键的常态色，'Custom' = 用下面的自定义色。
+	 * ★ 旧版的 'BG'（跟随按键底色 keyboardBGColor）已从设置界面移除，
+	 *   默认改成 'Custom'，界面读到旧值时也会归一化 —— 否则长条会莫名跟着一个
+	 *   用户早就忘了的旧字段走（本机存档里那字段是 #269AFF 蓝）。
+	 */
+	public var keyboardBarColorMode:String = 'Custom';
+	/** 'Custom' 模式下的长条颜色 */
+	public var keyboardBarColor:String = 'WHITE';
+	/** 长条颜色跟随哪一套按键色：'Key' = 各键颜色，'Note' = 曲目配色（与 keyboardFollowNoteColor 无关，独立生效） */
+	public var keyboardBarUseNoteColor:Bool = false;
+
+	// ---- 消失效果 ----
+	/** 消失模式：'sudden' 到时长即回收（旧版行为）/ 'fade' 先渐隐再回收 */
+	public var keyboardBarDisappearMode:String = 'sudden';
+	/** 渐隐速度（越大越快） */
+	public var keyboardBarFadeSpeed:Float = 10;
+
+	// ---- 统计（KPS / TOT）----
+	public var keyboardStats:Bool = true;
+	/** 统计区高度（px；<=0 表示跟随按键大小） */
+	public var keyboardStatHeight:Int = 0;
+	/** 统计区方块透明度（默认与按键透明度一致 = 旧版观感） */
+	public var keyboardStatAlpha:Float = 0.8;
+	/** TOT 数值更新间隔（秒） */
+	public var keyboardTotInterval:Float = 0.05;
+	/** KPS 底色 */
+	public var keyboardStatKpsColor:String = 'WHITE';
+	/** TOT 底色 */
+	public var keyboardStatTotColor:String = 'WHITE';
+	/** 统计标题颜色（KPS / total 两个字） */
+	public var keyboardStatTitleColor:String = 'WHITE';
+	/** 统计数值颜色（KPS / total 的数字；逐块重写用下面两个 Text 字段） */
+	public var keyboardStatValueColor:String = 'WHITE';
+	/** KPS 块的文本颜色（空 = 用 keyboardStatValueColor） */
+	public var keyboardStatKpsTextColor:String = '';
+	/** total 块的文本颜色（空 = 用 keyboardStatValueColor） */
+	public var keyboardStatTotTextColor:String = '';
+	/**
+	 * 统计块宽度（占键盘反馈总宽度的百分比）。两个统计块共用同一个值 ——
+	 * ★ 定稿规则：统计区的高度 / 宽度 / 透明度都是全局的，两个块一起变；
+	 *   只有「颜色」才 KPS / total 各自独立。
+	 */
+	public var keyboardStatWidth:Float = 26;
+
+	// ---- 布局 ----
+	/** 整体纵向偏移（px） */
+	public var keyboardOffsetY:Float = 0;
+	/** 整体横向偏移（px） */
+	public var keyboardOffsetX:Float = 0;
+	/** 整体缩放 */
+	public var keyboardScale:Float = 1;
+	/** 在其它界面（如本设置界面）预览时使用的键数；0 = 自动（跟随当前曲目的 mania） */
+	public var keyboardPreviewKeys:Int = 10;
 	// Camera s
 	public var camZooms:Bool = true;
 	public var scoreZoom:Bool = true;
@@ -169,11 +347,25 @@ import lime.system.Display;
 
 	public var language:String = 'English';
 
-	public var storageFolder:String = 'NovaFlare Engine';
+	public var storageFolder:String = 'Different Creatingness Engine';
 
 	public var developerMode:Bool = false;
 	public var devConScale:Float = #if mobile 1.8 #else 1.5 #end;
 	public var deepDebug:Bool = false;
+
+	// 维护设置 - Lua 语法错误提示。
+	// ★ 只管"脚本报错"这一条通道（PlayState.addScriptErrorToDebug）：开启后 Lua 报错会像以前那样
+	//   一条条铺在屏幕左上角，关闭（默认）则只写进日志。
+	//   debugPrint / luaTrace / 引擎自身的缺 shader、缺视频等报错走的是 addTextToDebug，
+	//   不受这个开关影响，始终照常显示。
+	public var luaErrorOverlay:Bool = false;
+
+	// 维护设置 - HScript 语法错误提示（与上面那条各自独立，互不影响）。
+	// ★ 先澄清一件事：HScript 脚本自身的报错（Iris.error / Iris.warn）**本来就不上屏** ——
+	//   链路是 Iris.logLevel → Sys.println + 开发者控制台 + 1145 trace 客户端，里面没有
+	//   addTextToDebug。真正会铺到屏幕上的 HScript 红字只有 HScriptBase 里那几处脚本报错，
+	//   这个开关管的就是它们（PlayState.addHScriptErrorToDebug）。
+	public var hscriptErrorOverlay:Bool = false;
 
 	// Trace Console / LOG 悬浮按钮的位置与尺寸记忆（-1 = 未自定义，用默认位置）
 	public var consoleButtonX:Float = -1;
@@ -323,21 +515,72 @@ class ClientPrefs
 		'debug_2' => [EIGHT],
 		'fullscreen' => [F11]
 	];
+
+	/**
+	 * "没有就会让玩家连菜单都操作不了"的基础键位。
+	 *
+	 * 与 `MusicBeatState.switchState()` 原本用来判断"要不要重置键位"的那组完全一致。
+	 * 只有这几条被清空时 `repairMissingKeyBinds()` 才会兜底补回默认值 ——
+	 * 其它键位空了代表玩家**故意删掉**（键位界面长按 Backspace），必须尊重。
+	 */
+	static final BASIC_KEYS:Array<String> = ['ui_up', 'ui_down', 'ui_left', 'ui_right', 'accept', 'back'];
+
+	/**
+	 * Detect a controls file that contains only the essential menu bindings.
+	 * An empty new profile can otherwise load successfully and silently replace every
+	 * gameplay/default binding with NONE. Keep individual user-cleared bindings intact;
+	 * only treat the whole map as zeroed when every non-essential action is empty.
+	 */
+	static function isEffectivelyZeroedKeyBindMap(saved:Map<String, Array<FlxKey>>):Bool
+	{
+		if (saved == null) return false;
+		if (defaultKeys == null) loadDefaultKeys();
+		if (defaultKeys == null) return false;
+
+		for (name in defaultKeys.keys())
+		{
+			if (BASIC_KEYS.contains(name)) continue;
+			var binds:Array<FlxKey> = saved.get(name);
+			if (binds == null) continue;
+			for (key in binds)
+				if (key != NONE)
+					return false;
+		}
+		return true;
+	}
+
+	static function restoreCompiledKeyBinds():Void
+	{
+		if (defaultKeys == null) loadDefaultKeys();
+		if (defaultKeys == null) return;
+		keyBinds.clear();
+		for (name => binds in defaultKeys)
+			if (binds != null)
+				keyBinds.set(name, binds.copy());
+		repairMissingKeyBinds();
+		reloadVolumeKeys();
+	}
+
 	public static var defaultMobileBinds:Map<String, Array<FlxKey>> = null;
 	public static var defaultKeys:Map<String, Array<FlxKey>> = null;
 	public static var defaultButtons:Map<String, Array<FlxGamepadInputID>> = null;
 
 	public static function resetKeys(controller:Null<Bool> = null) // Null = both, False = Keyboard, True = Controller
 	{
-		if (controller != true)
-			for (key in keyBinds.keys())
-				if (defaultKeys.exists(key))
-				{
-					var arr = keyBinds.get(key);
-					arr.resize(0);
-					for (i in defaultKeys.get(key))
-						arr.push(i);
-				}
+		if (controller == true) return;
+
+		// Rebuild from the complete compiled defaults. Iterating the current map misses
+		// actions that were removed from it, leaving those bindings empty after reset.
+		if (defaultKeys == null) loadDefaultKeys();
+		if (defaultKeys == null) return;
+
+		for (key => defaults in defaultKeys)
+			if (defaults != null)
+				keyBinds.set(key, defaults.copy());
+
+		repairMissingKeyBinds();
+		reloadVolumeKeys();
+		saveSettings();
 	}
 
 	public static function clearInvalidKeys(key:String)
@@ -347,10 +590,246 @@ class ClientPrefs
 			keyBind.remove(NONE);
 	}
 
+	/**
+	 * 只补回"丢了 / 空了的键位"，**绝不整表清空**。
+	 *
+	 * ★ 修的是一条真实的"键位偶尔自己变回默认"路径（用户反馈：没碰过 R / Reset，
+	 *   键盘设置也会莫名其妙被重置）。
+	 *
+	 * 起因在 `MusicBeatState.switchState()`：它原本只要发现
+	 * `ui_up / ui_down / ui_left / ui_right / accept / back` 里**任何一条**是空的，
+	 * 就 `keyBinds.clear()` 再用编译默认值把**整张表**重填一遍。而"一条变空"很容易
+	 * 在正常使用中发生 —— 在键位界面里用【长按 Backspace 删除按键】删掉某条绑定后，
+	 * `clearInvalidKeys()` 会把 NONE 直接 `remove`，数组长度就变成 0。
+	 * 于是：
+	 *   · 玩家自己改过的**所有**键位被无声丢弃（效果和"点了 R 重置"一模一样）；
+	 *   · 紧接着任何一次 `saveSettings()`（离开设置界面、退出对局……）都会把这份
+	 *     默认表写进 `controls_v4.sol` —— 从此不可恢复。
+	 * 而这一切发生在**任意一次状态切换**里，玩家完全没碰过 R / Reset，
+	 * 所以体感就是"偶尔被重置"。
+	 *
+	 * 现在的语义严格收敛为：
+	 *   1) 整条**不在表里**的键位（旧存档 / 被别的代码 clear 过）→ 补回默认值；
+	 *   2) 空了的基础操作键位（`BASIC_KEYS`：ui 方向 + accept + back）→ 补回默认值，
+	 *      否则玩家连"退出这个界面"都按不出来，属于卡死级问题；
+	 *   3) **其它键位一个字都不动** —— 尤其是"玩家自己在键位界面长按 Backspace 删掉"的
+	 *      那一条，那是明确的用户意图，替他填回来就又变成"设置被重置"了。
+	 *
+	 * @return 实际补回的键位数量（0 = 什么都没改）
+	 */
+	public static function repairMissingKeyBinds():Int
+	{
+		if (keyBinds == null) return 0;
+
+		// `defaultKeys` 由 Main.hx 在启动时用编译默认值填充；万一是空的自救一次。
+		if (defaultKeys == null) loadDefaultKeys();
+		if (defaultKeys == null) return 0;
+
+		var repaired:Int = 0;
+
+		// 1) 整条丢失：补回默认（只补"表里根本没有"的键，不覆盖玩家改过的值）
+		var missing:Array<String> = [];
+		for (name in defaultKeys.keys())
+			if (!keyBinds.exists(name))
+				missing.push(name);
+		for (name in missing)
+		{
+			var def:Array<FlxKey> = defaultKeys.get(name);
+			if (def == null || def.length == 0) continue;
+			keyBinds.set(name, def.copy());
+			repaired++;
+		}
+
+		// 2) 空了的基础操作键位：兜底（只救这几条，见函数注释）
+		for (name in BASIC_KEYS)
+		{
+			var def:Array<FlxKey> = defaultKeys.get(name);
+			if (def == null || def.length == 0) continue;
+
+			var arr:Array<FlxKey> = keyBinds.get(name);
+			if (arr == null)
+			{
+				keyBinds.set(name, def.copy());
+				repaired++;
+				continue;
+			}
+
+			// 只剩 NONE（理论上 clearInvalidKeys 会摘掉，这里再兜一层）也算空
+			var isEmpty:Bool = (arr.length == 0);
+			if (!isEmpty)
+			{
+				isEmpty = true;
+				for (v in arr)
+					if (v != NONE)
+					{
+						isEmpty = false;
+						break;
+					}
+			}
+			if (!isEmpty) continue;
+
+			arr.resize(0);
+			for (v in def)
+				arr.push(v);
+			repaired++;
+		}
+
+		if (repaired > 0)
+		{
+			FlxG.log.warn('[ClientPrefs] repaired $repaired missing/empty key bind(s); all other binds were left untouched.');
+			reloadVolumeKeys();
+		}
+		return repaired;
+	}
+
 	public static function loadDefaultKeys()
 	{
 		defaultKeys = [for (key => value in keyBinds) key => value.copy()];
 	}
+
+	// ==================== 键盘反馈（KeyboardViewer）取值入口 ====================
+	//
+	// 说明：逐键颜色存成 keyboardKeyColor1..keyboardKeyColor10 这类独立字段（方便脚本按名读写），
+	// 这里用 Reflect 按 0 起的序号访问，避免在界面代码里写 10 个 switch 分支。
+	// v2 补的 keyboardKeyTextColorN / keyboardPressedColorN / keyboardPressedTextColorN /
+	// keyboardBarColorN 走同一套读写；**空串一律表示"回退到旧版的全局值"**。
+
+	/**
+	 * 取值来源开关。
+	 * 设置界面的「默认样式」那一排需要用 defaultData 来画，但下面这些入口都是静态的、
+	 * 默认读 data —— 打开这个开关即可把整组取值整体切到 defaultData。
+	 * ★ 只在画那一排期间打开，画完立刻复位；写入永远落回 data（见 perKeySet）。
+	 */
+	public static var previewUseDefault:Bool = false;
+
+	inline static function kbSrc():SaveVariables
+		return previewUseDefault ? defaultData : data;
+
+	/** 按「前缀 + 1 起序号」读一个逐键颜色字段 */
+	static function perKeyGet(prefix:String, idx:Int):String
+	{
+		if (idx < 0 || idx > 9) return '';
+		var v:Dynamic = Reflect.field(kbSrc(), prefix + (idx + 1));
+		return (v == null) ? '' : Std.string(v);
+	}
+
+	static function perKeySet(prefix:String, idx:Int, value:String):Void
+	{
+		if (idx < 0 || idx > 9) return;
+		Reflect.setField(data, prefix + (idx + 1), (value == null) ? '' : value);
+	}
+
+	inline static function colOr(raw:String, fallback:FlxColor):FlxColor
+		return (raw == null || raw == '') ? fallback : CoolUtil.colorFromString(raw);
+
+	/** 第 idx 个键位（0 起）的常态色原始串；'' = 未设置（用默认纯白） */
+	public static inline function getKeyboardKeyColorRaw(idx:Int):String return perKeyGet('keyboardKeyColor', idx);
+	public static inline function setKeyboardKeyColorRaw(idx:Int, v:String):Void perKeySet('keyboardKeyColor', idx, v);
+	/** 常态文本色 */
+	public static inline function getKeyboardKeyTextColorRaw(idx:Int):String return perKeyGet('keyboardKeyTextColor', idx);
+	public static inline function setKeyboardKeyTextColorRaw(idx:Int, v:String):Void perKeySet('keyboardKeyTextColor', idx, v);
+	/** 按下色 */
+	public static inline function getKeyboardPressedColorRaw(idx:Int):String return perKeyGet('keyboardPressedColor', idx);
+	public static inline function setKeyboardPressedColorRaw(idx:Int, v:String):Void perKeySet('keyboardPressedColor', idx, v);
+	/** 按下文本色 */
+	public static inline function getKeyboardPressedTextColorRaw(idx:Int):String return perKeyGet('keyboardPressedTextColor', idx);
+	public static inline function setKeyboardPressedTextColorRaw(idx:Int, v:String):Void perKeySet('keyboardPressedTextColor', idx, v);
+	/** 长条颜色 */
+	public static inline function getKeyboardBarColorRaw(idx:Int):String return perKeyGet('keyboardBarColor', idx);
+	public static inline function setKeyboardBarColorRaw(idx:Int, v:String):Void perKeySet('keyboardBarColor', idx, v);
+	/** 描边颜色 */
+	public static inline function getKeyboardKeyBorderColorRaw(idx:Int):String return perKeyGet('keyboardKeyBorderColor', idx);
+	public static inline function setKeyboardKeyBorderColorRaw(idx:Int, v:String):Void perKeySet('keyboardKeyBorderColor', idx, v);
+
+	/** 跟随曲目配色时，第 idx 个键位取到的颜色（箭头配色表的 inner 色，按表长循环） */
+	public static function keyboardNotePaletteColor(idx:Int):FlxColor
+	{
+		var d:SaveVariables = kbSrc();
+		var table:Array<Array<FlxColor>> = (d.keyboardFollowNotePalette == 'Pixel') ? d.arrowRGBPixel : d.arrowRGB;
+		if (table == null || table.length == 0) table = d.arrowRGB;
+		if (table == null || table.length == 0) return FlxColor.WHITE;
+
+		var n:Int = table.length;
+		var row:Array<FlxColor> = table[((idx % n) + n) % n];
+		if (row == null || row.length == 0) return FlxColor.WHITE;
+		return row[0];
+	}
+
+	/** 键盘反馈第 idx 个键位最终使用的常态色（已处理「跟随曲目配色」） */
+	public static function keyboardLaneColor(idx:Int):FlxColor
+	{
+		if (kbSrc().keyboardFollowNoteColor) return keyboardNotePaletteColor(idx);
+		return colOr(getKeyboardKeyColorRaw(idx), FlxColor.WHITE);
+	}
+
+	/** 描边色：逐键优先，空则跟随该键常态色（= 旧版观感） */
+	public static function keyboardKeyBorder(idx:Int):FlxColor
+		return colOr(getKeyboardKeyBorderColorRaw(idx), keyboardLaneColor(idx));
+
+	/** 常态文本色：逐键优先，空则回退全局 keyboardTextColor */
+	public static function keyboardKeyText(idx:Int):FlxColor
+		return colOr(getKeyboardKeyTextColorRaw(idx), keyboardText());
+
+	/** 按下色：逐键优先，空则用该键常态色（旧版观感） */
+	public static function keyboardPress(idx:Int):FlxColor
+		return colOr(getKeyboardPressedColorRaw(idx), keyboardLaneColor(idx));
+
+	/** 按下文本色：逐键优先，空则按高亮亮度自动反色 */
+	public static function keyboardPressText(idx:Int):FlxColor
+		return colOr(getKeyboardPressedTextColorRaw(idx), autoContrast(keyboardPress(idx)));
+
+	/** 键盘反馈第 idx 个键位长条的颜色：逐键优先，其次看 keyboardBarColorMode */
+	public static function keyboardBarLaneColor(idx:Int):FlxColor
+	{
+		var d:SaveVariables = kbSrc();
+		if (d.keyboardBarUseNoteColor) return keyboardNotePaletteColor(idx);
+
+		var per:String = getKeyboardBarColorRaw(idx);
+		if (per != null && per != '') return CoolUtil.colorFromString(per);
+
+		return switch (d.keyboardBarColorMode)
+		{
+			case 'Key': keyboardLaneColor(idx);
+			case 'Custom': colOr(d.keyboardBarColor, FlxColor.WHITE);
+			default: colOr(d.keyboardBGColor, FlxColor.WHITE); // 'BG'：旧版行为
+		}
+	}
+
+	/** 键盘反馈按键底色 */
+	public static function keyboardBG():FlxColor
+		return colOr(kbSrc().keyboardBGColor, FlxColor.WHITE);
+
+	/** 键盘反馈按键文字色（逐键未设时的全局回退值） */
+	public static function keyboardText():FlxColor
+		return colOr(kbSrc().keyboardTextColor, FlxColor.BLACK);
+
+	/** 统计块（0 = KPS，1 = total）的常态底色 */
+	public static function keyboardStatColor(idx:Int):FlxColor
+	{
+		var d:SaveVariables = kbSrc();
+		var raw:String = (idx == 0) ? d.keyboardStatKpsColor : d.keyboardStatTotColor;
+		return colOr(raw, FlxColor.WHITE);
+	}
+
+	/** 统计块文本色：逐块优先，空则回退 keyboardStatValueColor */
+	public static function keyboardStatText(idx:Int):FlxColor
+	{
+		var d:SaveVariables = kbSrc();
+		var raw:String = (idx == 0) ? d.keyboardStatKpsTextColor : d.keyboardStatTotTextColor;
+		if (raw == null || raw == '') raw = d.keyboardStatValueColor;
+		return colOr(raw, FlxColor.WHITE);
+	}
+
+	/** 按一个颜色的亮度挑黑/白文字，避免深色高亮上黑字看不见 */
+	public static function autoContrast(c:FlxColor):FlxColor
+	{
+		var luminance:Float = (0.299 * c.red + 0.587 * c.green + 0.114 * c.blue) / 255;
+		return luminance > 0.55 ? FlxColor.BLACK : FlxColor.WHITE;
+	}
+
+	/** 旧接口：按下时键位文字用什么颜色（= 常态色的自动反色） */
+	public static function keyboardPressedTextColor(idx:Int):FlxColor
+		return autoContrast(keyboardLaneColor(idx));
 
 	public static function saveSettings()
 	{
@@ -373,10 +852,19 @@ class ClientPrefs
 
 		// Placing this in a separate save so that it can be manually deleted without removing your Score and stuff
 		var save:FlxSave = new FlxSave();
-		save.bind('controls_v4', CoolUtil.getSavePath());
-		save.data.keyboard = keyBinds;
-
-		save.flush();
+		// ★ 必须看 bind 的返回值并且自己兜底 data：
+		//   `FlxSave.bind()` 会先 destroy()（把 data 置 null），只有读取成功才会重新填上。
+		//   键位文件一旦读不出来（写到一半被杀进程 / 旧版本写进了无法反序列化的类型），
+		//   `save.data` 就还是 null，于是 `save.data.keyboard = keyBinds` 在 hxcpp 上是
+		//   空指针写入（EXCEPTION_ACCESS_VIOLATION），而且这里还只是"保存设置"这一步。
+		var bound:Bool = save.bind('controls_v4', CoolUtil.getSavePath(), recoverUnreadableControlsSave);
+		if (bound && save.data != null)
+		{
+			save.data.keyboard = keyBinds;
+			save.flush();
+		}
+		else
+			FlxG.log.warn('[ClientPrefs] controls_v4 could not be bound; key binds were NOT written to disk.');
 		FlxG.log.add("Settings saved!");
 	}
 
@@ -509,6 +997,33 @@ class ClientPrefs
 		return {};
 	}
 
+	/**
+	 * 键位存档（`controls_v4.sol`）读取失败的恢复解析器。
+	 *
+	 * 为什么单独有一份：`funkin.sol` 早就带了 `recoverUnreadableSave`，但键位是存在
+	 * 另一个文件里的，之前这里既没看 `bind()` 的返回值、也没处理 `data == null`：
+	 *   · 读失败 → `save.data` 保持 null → 键位**静默**用回编译默认值
+	 *     （用户看到的"键位莫名其妙被重置成 ASKL"）；
+	 *   · 随后任意一次 `saveSettings()` 里 `save.data.keyboard = …` 又是对着 null 写入，
+	 *     在 hxcpp 上直接 EXCEPTION_ACCESS_VIOLATION。
+	 * 现在：留一份 `controls_v4.sol.unreadable` 备份、日志里说清楚、返回空容器让流程继续。
+	 */
+	public static function recoverUnreadableControlsSave(raw:String, error:Exception):Null<Dynamic>
+	{
+		FlxG.log.warn('[ClientPrefs] Key bind save (controls_v4) could not be read ($error) - keeping a backup; this run keeps the compiled default binds.');
+
+		#if sys
+		try
+		{
+			if (raw != null && raw.length > 0)
+				sys.io.File.saveContent('controls_v4.sol.unreadable', raw);
+		}
+		catch (e:Dynamic) {}
+		#end
+
+		return {};
+	}
+
 	public static function loadPrefs()
 	{
 		// A failed `FlxG.save.bind()` leaves `data` null; repair it before touching it.
@@ -562,17 +1077,44 @@ class ClientPrefs
 			if (defaultKeys == null)
 				loadDefaultKeys();
 
+			// Preference-version migrations reset general settings, but key binds live in
+			// their own save and must survive unrelated preference changes.
 			keyBinds.clear();
 			for (name => keys in defaultKeys)
 				keyBinds.set(name, keys.copy());
 
 			var controlSave:FlxSave = new FlxSave();
-			controlSave.bind('controls_v4', CoolUtil.getSavePath());
-			if (controlSave != null && controlSave.data != null)
+			var controlsBound:Bool = controlSave.bind('controls_v4', CoolUtil.getSavePath(), recoverUnreadableControlsSave);
+			if (controlsBound && controlSave.data != null)
 			{
-				controlSave.data.keyboard = defaultKeys;
+				// A profile can be migrated with a valid-looking map whose every gameplay
+				// binding is NONE (for example, a newly-created app save directory). Do not
+				// preserve that mass-clear as if it were an intentional per-key edit.
+				if (isEffectivelyZeroedKeyBindMap(controlSave.data.keyboard))
+				{
+					restoreCompiledKeyBinds();
+					FlxG.log.warn('[ClientPrefs] controls_v4 contained only essential menu binds; restored compiled defaults.');
+				}
+				else if (controlSave.data.keyboard != null)
+				{
+					// Merge saved controls over compiled defaults. This keeps newly added actions
+					// available while preserving every known binding the player already changed.
+					var savedControls:Map<String, Array<FlxKey>> = controlSave.data.keyboard;
+					for (control => keys in savedControls)
+						if (keyBinds.exists(control) && keys != null)
+						{
+							var arr:Array<FlxKey> = keyBinds.get(control);
+							arr.resize(0);
+							for (key in keys)
+								arr.push(key);
+						}
+				}
+				repairMissingKeyBinds();
+				controlSave.data.keyboard = keyBinds;
 				controlSave.flush();
 			}
+			else
+				FlxG.log.warn('[ClientPrefs] controls_v4 could not be bound during preference migration; existing key bind data was not overwritten.');
 			reloadVolumeKeys();
 		}
 		else
@@ -600,23 +1142,36 @@ class ClientPrefs
 			else modsData = [];
 
 			var save:FlxSave = new FlxSave();
-			save.bind('controls_v4', CoolUtil.getSavePath());
-			if (save != null && save.data != null)
+			// ★ 和 funkin.sol 一样带上恢复解析器：键位文件损坏时不要"静默回退到默认键位"，
+			//   否则用户会遇到"键位莫名其妙变回 ASKL"，而且下一次保存就把默认值写死回去。
+			//   这里至少留下一份 controls_v4.sol.unreadable 备份并在日志里说明原因。
+			var bound:Bool = save.bind('controls_v4', CoolUtil.getSavePath(), recoverUnreadableControlsSave);
+			if (bound && save.data != null)
 			{
 				if (save.data.keyboard != null)
 				{
 					var loadedControls:Map<String, Array<FlxKey>> = save.data.keyboard;
-					for (control => keys in loadedControls)
-						if (keyBinds.exists(control))
-						{
-							var arr = keyBinds.get(control);
-							arr.resize(0);
-							for (i in keys)
-								arr.push(i);
-						}
+					if (isEffectivelyZeroedKeyBindMap(loadedControls))
+					{
+						restoreCompiledKeyBinds();
+						save.data.keyboard = keyBinds;
+						save.flush();
+						FlxG.log.warn('[ClientPrefs] controls_v4 contained only essential menu binds; restored compiled defaults.');
+					}
+					else
+						for (control => keys in loadedControls)
+							if (keyBinds.exists(control) && keys != null)
+							{
+								var arr = keyBinds.get(control);
+								arr.resize(0);
+								for (i in keys)
+									arr.push(i);
+							}
 				}
 				reloadVolumeKeys();
 			}
+			else
+				FlxG.log.warn('[ClientPrefs] controls_v4 could not be read; key binds keep their compiled defaults for this run.');
 		}
 
 		#if mobile
@@ -690,7 +1245,7 @@ class ClientPrefs
 		#if sys
 		// Keep the saved preference as the default, while allowing repeatable
 		// render-path A/B tests without rewriting the user's save file.
-		final renderThreadOverride:String = Sys.getEnv('NOVAFLARE_RENDER_THREAD');
+		final renderThreadOverride:String = Sys.getEnv('DCE_RENDER_THREAD');
 		if (renderThreadOverride == '0')
 			useRenderThread = false;
 		else if (renderThreadOverride == '1')
@@ -698,9 +1253,15 @@ class ClientPrefs
 		#end
 		lime.graphics.opengl.GL.setMultiThreaded(useRenderThread);
 
+		#if mobile
+		MobileShaderConverter.setEnabled(data.autoShaderConversion);
+		MouseEffect.setUserEffectsEnabled(data.mouseTrailEffect);
+		#end
+
 		FlxG.updateFramerate = data.framerate;
 		FlxG.drawFramerate = data.drawFramerate;
-		FlxG.stage.application.window.lockRender = data.lockRender;
+		mobile.backend.MobileRefreshRate.apply(data.drawFramerate);
+		FlxG.stage.application.window.lockRender = #if android true #else data.lockRender #end;
 
 		var output:Array<Float> = [];
 		switch(data.resolution) {

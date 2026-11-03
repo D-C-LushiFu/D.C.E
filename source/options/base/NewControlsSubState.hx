@@ -429,7 +429,7 @@ class NewControlsSubState extends MusicBeatSubstate
 
 			if (FlxG.keys.justPressed.ANY || FlxG.keys.justReleased.ANY)
 			{
-				var keyPressed:Int = FlxG.keys.firstJustPressed();
+				var keyPressed:Int = general.backend.KeyBindingCapture.firstKey();
 				var keyReleased:Int = FlxG.keys.firstJustReleased();
 				if (keyPressed > -1 && keyPressed != FlxKey.ESCAPE && keyPressed != FlxKey.BACKSPACE)
 				{

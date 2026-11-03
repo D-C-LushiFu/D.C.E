@@ -5,7 +5,7 @@ middleScroll => 将箭头居中放置
 flipChart => 铺面箭头翻转 ，左右键交换，上下键交换
 ghostTapping => 当没有箭头时按下不会判定为Miss
 guitarHeroSustains => 如果长箭断了，则无法再次触发
-noReset => 按 R 键会立刻死亡
+noReset => 开启后按下 Reset 键（默认 R）不会立刻死亡
 showKeybinds => 游戏开始时会在箭头上方显示各个箭头的键位
 
 

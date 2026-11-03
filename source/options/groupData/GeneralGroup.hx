@@ -4,6 +4,11 @@ import lime.graphics.opengl.GL;
 import general.shaders.ColorblindFilter;
 import lime.system.Display;
 
+#if mobile
+import general.objects.screen.MouseEffect;
+import general.shaders.MobileShaderConverter;
+#end
+
 class GeneralGroup extends OptionCata
 {
 	public function new(X:Float, Y:Float, width:Float, height:Float)
@@ -21,9 +26,11 @@ class GeneralGroup extends OptionCata
 		addOption(option);
 		option.onChange = onChangeDrawFramerate;
 
+		#if !android
 		var option:Option = new Option(this, 'lockRender', BOOL);
 		addOption(option);
 		option.onChange = onChangelockRender;
+		#end
 
 		var option:Option = new Option(this, 'renderThread', BOOL);
 		addOption(option);
@@ -48,6 +55,16 @@ class GeneralGroup extends OptionCata
 
 		var option:Option = new Option(this, 'shaders', BOOL);
 		addOption(option);
+
+		#if mobile
+		var option:Option = new Option(this, 'autoShaderConversion', BOOL);
+		addOption(option);
+		option.onChange = onChangeAutoShaderConversion;
+
+		var option:Option = new Option(this, 'mouseTrailEffect', BOOL);
+		addOption(option);
+		option.onChange = onChangeMouseEffects;
+		#end
 
 		var option:Option = new Option(this, 'cacheOnGPU', BOOL);
 		addOption(option);
@@ -130,7 +147,9 @@ class GeneralGroup extends OptionCata
 		FlxG.drawFramerate = ClientPrefs.data.drawFramerate;
 		FlxG.stage.application.window.frameRate = ClientPrefs.data.framerate;
 		FlxG.stage.application.window.drawFrameRate = ClientPrefs.data.drawFramerate;
-		FlxG.stage.application.window.lockRender = ClientPrefs.data.lockRender;
+		mobile.backend.MobileRefreshRate.apply(ClientPrefs.data.drawFramerate);
+		// Android always schedules rendering from the FPS cap independently of TPS.
+		FlxG.stage.application.window.lockRender = #if android true #else ClientPrefs.data.lockRender #end;
 	}
 
 	function onChangelockRender()
@@ -185,4 +204,16 @@ class GeneralGroup extends OptionCata
 	{
 		FlxG.autoPause = ClientPrefs.data.autoPause;
 	}
+
+	#if mobile
+	function onChangeAutoShaderConversion()
+	{
+		MobileShaderConverter.setEnabled(ClientPrefs.data.autoShaderConversion);
+	}
+
+	function onChangeMouseEffects()
+	{
+		MouseEffect.setUserEffectsEnabled(ClientPrefs.data.mouseTrailEffect);
+	}
+	#end
 }

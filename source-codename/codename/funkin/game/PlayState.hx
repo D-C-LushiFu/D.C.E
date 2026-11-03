@@ -35,6 +35,7 @@ import codename.funkin.menus.*;
 import codename.funkin.backend.week.WeekData;
 import codename.funkin.savedata.FunkinSave;
 import haxe.io.Path;
+import general.objects.screen.MouseEffect;
 
 using StringTools;
 
@@ -582,6 +583,8 @@ class PlayState extends MusicBeatState
 	@:noCompletion @:dox(hide) private var _startCountdownCalled:Bool = false;
 	@:noCompletion @:dox(hide) private var _endSongCalled:Bool = false;
 
+	@:noCompletion @:dox(hide) private static var _ONE_ARG:Array<Dynamic> = [null];
+
 	@:dox(hide)
 	var __vocalSyncTimer:Float = 1;
 
@@ -679,6 +682,11 @@ class PlayState extends MusicBeatState
 
 	@:dox(hide) override public function create()
 	{
+		MouseEffect.enterGameplay();
+		#if mobile
+		lime.system.System.allowScreenTimeout = false;
+		#end
+
 		Note.__customNoteTypeExists = [];
 
 		// SCRIPTING & DATA INITIALIZATION
@@ -850,6 +858,22 @@ class PlayState extends MusicBeatState
 		scripts.set("SONG", SONG);
 		scripts.load();
 		scripts.call("create");
+
+		#if android
+		// Thorns' built-in script adds a second, camera-wide filter after the
+		// Week 6 pixel-camera compatibility guard has already run. That filter
+		// produces an all-black camGame on Android's renderer, hiding both the
+		// stage and characters while leaving the HUD visible. Keep the script
+		// alive for its HScript Call events, but detach only its camera filter.
+		if (stage.stageFile == "school-evil" && SONG.meta.name.toLowerCase() == "thorns") {
+			var thornsScript = scripts.getByName("aberration.hx");
+			if (thornsScript != null) {
+				var thornsAberration = thornsScript.get("aberration");
+				if (thornsAberration != null)
+					camGame.removeShader(thornsAberration);
+			}
+		}
+		#end
 		#end
 
 		// HUD INITIALIZATION & CAMERA INITIALIZATION
@@ -1108,6 +1132,11 @@ class PlayState extends MusicBeatState
 	}
 
 	public override function destroy() {
+		MouseEffect.leaveGameplay();
+		#if mobile
+		lime.system.System.allowScreenTimeout = Options.screenTimeOut;
+		#end
+
 		var notNull = stage != null;
 		if (notNull) PlayState.instance.gameAndCharsCall("onStageDestroy", [stage]);
 		scripts.call("destroy");
@@ -1214,6 +1243,9 @@ class PlayState extends MusicBeatState
 			MusicBeatState.skipTransIn = true;
 
 		if (event.cancelled) return;
+		#if mobile
+		lime.system.System.allowScreenTimeout = Options.screenTimeOut;
+		#end
 
 		if (paused)
 		{
@@ -1236,6 +1268,9 @@ class PlayState extends MusicBeatState
 	{
 		var event = gameAndCharsEvent("onSubstateClose", EventManager.get(StateEvent).recycle(subState));
 		if (event.cancelled) return;
+		#if mobile
+		lime.system.System.allowScreenTimeout = false;
+		#end
 
 		if (paused)
 		{
@@ -1310,7 +1345,7 @@ class PlayState extends MusicBeatState
 		paused = true;
 
 		// 1 / 1000 chance for Gitaroo Man easter egg
-		if (allowGitaroo && FlxG.random.bool(Flags.GITAROO_CHANCE))
+		if (!chartingMode && allowGitaroo && FlxG.random.bool(Flags.GITAROO_CHANCE))
 		{
 			// gitaroo man easter egg
 			FlxG.switchState(new GitarooPause());
@@ -1407,11 +1442,12 @@ class PlayState extends MusicBeatState
 	@:dox(hide)
 	override public function update(elapsed:Float)
 	{
-		scripts.call("update", [elapsed]);
+		_ONE_ARG[0] = elapsed;
+		scripts.call("update", _ONE_ARG);
 
 		if (inCutscene) {
 			super.update(elapsed);
-			scripts.call("postUpdate", [elapsed]);
+			scripts.call("postUpdate", _ONE_ARG);
 			return;
 		}
 
@@ -1465,7 +1501,7 @@ class PlayState extends MusicBeatState
 		while(events.length > 0 && events.last().time <= Conductor.songPosition)
 			executeEvent(events.pop());
 
-		if (controls.PAUSE && startedCountdown && canPause)
+		if ((controls.PAUSE #if android || FlxG.android.justReleased.BACK #end) && startedCountdown && canPause)
 			pauseGame();
 
 		if (generatedMusic)
@@ -1501,7 +1537,7 @@ class PlayState extends MusicBeatState
 
 		super.update(elapsed);
 
-		scripts.call("postUpdate", [elapsed]);
+		scripts.call("postUpdate", _ONE_ARG);
 	}
 
 	override function draw() {
@@ -1663,6 +1699,9 @@ class PlayState extends MusicBeatState
 					cam.zoom = finalZoom;
 					if (cam == camHUD) defaultHudZoom = finalZoom;
 					else defaultCamZoom = finalZoom;
+				} else if (event.params[4] == "CLASSIC") {
+					if (cam == camHUD) defaultHudZoom = finalZoom;
+					else defaultCamZoom = finalZoom;
 				} else
 					eventsTween.set(name, FlxTween.tween(cam, {zoom: finalZoom}, (Conductor.stepCrochet / 1000) * event.params[3], {ease: CoolUtil.flxeaseFromString(event.params[4], event.params[5]), onUpdate: function(_) {
 						if (cam == camHUD) defaultHudZoom = cam.zoom;
@@ -1773,6 +1812,10 @@ class PlayState extends MusicBeatState
 		if (gameAndCharsEvent("onSongEnd", new CancellableEvent()).cancelled) return;
 		endingSong = true;
 		canPause = false;
+		#if TOUCH_CONTROLS
+		mobileControlsVisible = false;
+		if (hitbox != null) hitbox.visible = false;
+		#end
 
 		for (strumLine in strumLines.members) strumLine.vocals.stop();
 		inst.stop();
@@ -1806,6 +1849,10 @@ class PlayState extends MusicBeatState
 	 * Immediately switches to the next song, or goes back to the Story/Freeplay menu.
 	 */
 	public function nextSong() {
+		#if TOUCH_CONTROLS
+		mobileControlsVisible = false;
+		if (hitbox != null) hitbox.visible = false;
+		#end
 		if (isStoryMode) {
 			campaignScore += songScore;
 			campaignMisses += misses;

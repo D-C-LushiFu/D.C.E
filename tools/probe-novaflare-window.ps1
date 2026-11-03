@@ -9,7 +9,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Name,
 
-    [ValidateSet('None', 'Enter', 'Left', 'Right', 'Down', 'Up', 'S', 'W', 'Home', 'End', 'R', 'Minus', 'NumpadMinus', 'MouseLeft', 'Escape')]
+    [ValidateSet('None', 'Enter', 'Left', 'Right', 'Down', 'Up', 'S', 'W', 'Home', 'End', 'R', 'Space', 'F3', 'Minus', 'NumpadMinus', 'MouseLeft', 'Escape')]
     [string]$Key = 'None',
 
     [ValidateRange(1, 2000)]
@@ -38,7 +38,7 @@ Add-Type @'
 using System;
 using System.Runtime.InteropServices;
 
-public static class NovaFlareWindowProbeNative
+public static class DCEWindowProbeNative
 {
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT
@@ -86,23 +86,23 @@ if ($window -eq [IntPtr]::Zero) {
 }
 
 if ($Key -ne 'None' -or $CaptureMethod -eq 'Screen') {
-    [NovaFlareWindowProbeNative]::SetForegroundWindow($window) | Out-Null
+    [DCEWindowProbeNative]::SetForegroundWindow($window) | Out-Null
     Start-Sleep -Milliseconds 75
 }
 
 if ($Key -ne 'None') {
     for ($inputIndex = 0; $inputIndex -lt $Repeat; $inputIndex++) {
       if ($Key -eq 'MouseLeft') {
-        $inputRect = New-Object NovaFlareWindowProbeNative+RECT
-        if (-not [NovaFlareWindowProbeNative]::GetWindowRect($window, [ref]$inputRect)) {
+        $inputRect = New-Object DCEWindowProbeNative+RECT
+        if (-not [DCEWindowProbeNative]::GetWindowRect($window, [ref]$inputRect)) {
             throw "GetWindowRect failed before mouse input for process $TargetProcessId"
         }
-        [NovaFlareWindowProbeNative]::SetCursorPos(
+        [DCEWindowProbeNative]::SetCursorPos(
             $inputRect.Left + $MouseX, $inputRect.Top + $MouseY) | Out-Null
         Start-Sleep -Milliseconds 75
-        [NovaFlareWindowProbeNative]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
+        [DCEWindowProbeNative]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
         Start-Sleep -Milliseconds $KeyHoldMilliseconds
-        [NovaFlareWindowProbeNative]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
+        [DCEWindowProbeNative]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
       }
       else {
         $virtualKeys = @{
@@ -116,19 +116,21 @@ if ($Key -ne 'None') {
             Home   = 0x24
             End    = 0x23
             R      = 0x52
+            Space  = 0x20
+            F3     = 0x72
             Minus  = 0xBD
             NumpadMinus = 0x6D
             Escape = 0x1B
         }
-        $scanCode = [byte][NovaFlareWindowProbeNative]::MapVirtualKey([uint32]$virtualKeys[$Key], 0)
-        if ([NovaFlareWindowProbeNative]::GetForegroundWindow() -eq $window) {
+        $scanCode = [byte][DCEWindowProbeNative]::MapVirtualKey([uint32]$virtualKeys[$Key], 0)
+        if ([DCEWindowProbeNative]::GetForegroundWindow() -eq $window) {
             # Lime polls the physical keyboard state in some states (notably
             # the Freeplay chart browser), so prefer a real foreground key
             # transition whenever an interactive desktop is available.
-            [NovaFlareWindowProbeNative]::keybd_event(
+            [DCEWindowProbeNative]::keybd_event(
                 [byte]$virtualKeys[$Key], $scanCode, 0, [UIntPtr]::Zero)
             Start-Sleep -Milliseconds $KeyHoldMilliseconds
-            [NovaFlareWindowProbeNative]::keybd_event(
+            [DCEWindowProbeNative]::keybd_event(
                 [byte]$virtualKeys[$Key], $scanCode, 0x0002, [UIntPtr]::Zero)
         }
         else {
@@ -137,10 +139,10 @@ if ($Key -ne 'None') {
             # route tests can continue without changing the game runtime.
             $keyDownLParam = [IntPtr]([int64](1 -bor ([int64]$scanCode -shl 16)))
             $keyUpLParam = [IntPtr]([int64](1 -bor ([int64]$scanCode -shl 16) -bor 0xC0000000L))
-            [NovaFlareWindowProbeNative]::PostMessage(
+            [DCEWindowProbeNative]::PostMessage(
                 $window, 0x0100, [IntPtr]$virtualKeys[$Key], $keyDownLParam) | Out-Null
             Start-Sleep -Milliseconds $KeyHoldMilliseconds
-            [NovaFlareWindowProbeNative]::PostMessage(
+            [DCEWindowProbeNative]::PostMessage(
                 $window, 0x0101, [IntPtr]$virtualKeys[$Key], $keyUpLParam) | Out-Null
         }
       }
@@ -154,8 +156,8 @@ if ($PostKeyDelayMilliseconds -gt 0) {
     Start-Sleep -Milliseconds $PostKeyDelayMilliseconds
 }
 
-$rect = New-Object NovaFlareWindowProbeNative+RECT
-if (-not [NovaFlareWindowProbeNative]::GetWindowRect($window, [ref]$rect)) {
+$rect = New-Object DCEWindowProbeNative+RECT
+if (-not [DCEWindowProbeNative]::GetWindowRect($window, [ref]$rect)) {
     throw "GetWindowRect failed for process $TargetProcessId"
 }
 
@@ -181,7 +183,7 @@ if ($CaptureMethod -eq 'Screen') {
 else {
     $hdc = $graphics.GetHdc()
     try {
-        if (-not [NovaFlareWindowProbeNative]::PrintWindow($window, $hdc, 2)) {
+        if (-not [DCEWindowProbeNative]::PrintWindow($window, $hdc, 2)) {
             throw "PrintWindow failed for process $TargetProcessId"
         }
     }
@@ -201,7 +203,7 @@ finally {
 [pscustomobject]@{
     ProcessId = $TargetProcessId
     WindowHandle = $window
-    ForegroundWindow = [NovaFlareWindowProbeNative]::GetForegroundWindow()
+    ForegroundWindow = [DCEWindowProbeNative]::GetForegroundWindow()
     Key = $Key
     Repeat = $Repeat
     CaptureMethod = $CaptureMethod

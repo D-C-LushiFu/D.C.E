@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>D.C.E. · 键盘反馈设置 v2</title>
+<style>
+/* ============================================================
+   设计令牌
+   层级：预览舞台(主) > 设置面板(次) > 顶栏/底栏(容器)
+   间距：4 的倍数；组内 8，组间 22，区块 28
+   圆角：统一 10 / 卡片 12 / 胶囊 999
+   ============================================================ */
+:root{
+  --ink:#EDF2FA; --ink2:#A7B3C6; --ink3:#828EA1;
+  --acc:#7FB0FF; --acc-soft:rgba(127,176,255,.16); --acc-line:rgba(140,180,255,.55);
+  --mark:#8EC1FF; --mark-deep:#5C93E8; --ok:#6FDDA0; --warn:#FF9E5E;
+  --card:rgba(255,255,255,.045); --card2:rgba(255,255,255,.075);
+  --line:rgba(255,255,255,.085); --line2:rgba(255,255,255,.16);
+  --glass:rgba(11,15,22,.30); --glass2:rgba(13,18,26,.34);
+  --r:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:"Segoe UI Variable Text","Segoe UI","Microsoft YaHei UI",system-ui,sans-serif;
+  color:var(--ink); background:#05070b; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  -webkit-font-smoothing:antialiased;
+}
+/* 背景层：游戏截图 → 轻度压暗 → 暗角。
+   图片必须看得出来（之前压到 .52 再叠 .88 黑，等于全黑），
+   可读性交给面板自身那层 20~30% 的底色，而不是把背景抹平。 */
+body::before{
+  content:""; position:fixed; inset:-24px; z-index:0;
+  background:url("kfb-bg.png") center/cover no-repeat;
+  filter:saturate(.88) brightness(.80) blur(3px);
+}
+body::after{
+  content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(125% 92% at 50% 42%, rgba(7,10,16,.34) 0%, rgba(6,9,14,.70) 60%, rgba(4,6,10,.94) 100%),
+    linear-gradient(180deg, rgba(6,9,15,.26) 0%, rgba(6,9,15,.52) 100%);
+}
+/* 兜底：任何漏了容器的裸按钮也不至于退回浏览器默认外观 */
+button{
+  font-family:inherit; font-size:12.5px; color:var(--ink2); cursor:pointer;
+  border:1px solid var(--line); background:rgba(255,255,255,.04); border-radius:8px;
+}
+
+/* ============================ 窗口 ============================ */
+#app{
+  position:relative; z-index:1; width:1440px; height:810px; transform-origin:center;
+  display:grid; grid-template-rows:56px 1fr 68px;
+  border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,.10);
+  box-shadow:0 40px 120px rgba(0,0,0,.72), 0 0 0 1px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.07);
+  /* 背景图只当氛围：糊掉细节，剩下的色块不会跟界面文字抢注意力 */
+  background:rgba(7,10,16,.24); backdrop-filter:blur(12px) saturate(125%);
+}
+
+/* ---------------------------- 顶栏 ---------------------------- */
+.top{
+  display:flex; align-items:center; gap:12px; padding:0 16px 0 18px;
+  background:rgba(8,11,17,.34); border-bottom:1px solid var(--line);
+}
+.brand{display:flex; align-items:center; gap:11px}
+.logo{
+  width:30px; height:30px; border-radius:9px; flex:none;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:800; letter-spacing:.02em; color:#0A0F18;
+  background:linear-gradient(150deg,#BFD8FF,#7FB0FF 60%,#4E7FD6);
+  box-shadow:0 3px 10px rgba(90,140,230,.35), inset 0 1px 0 rgba(255,255,255,.6);
+}
+.bt{font-size:15.5px; font-weight:650; letter-spacing:.01em; line-height:1.15}
+.bs{font-size:10.5px; color:#8C98AB; letter-spacing:.09em; text-transform:uppercase; margin-top:1px}
+.spacer{flex:1}
+.chip{
+  display:inline-flex; align-items:center; gap:7px; height:26px; padding:0 11px;
+  border-radius:999px; border:1px solid var(--line); background:rgba(255,255,255,.045);
+  font-size:11.5px; color:var(--ink2); white-space:nowrap;
+}
+.chip b{color:var(--ink); font-weight:600}
+.chip .dt{width:6px; height:6px; border-radius:50%; background:var(--acc); box-shadow:0 0 8px var(--acc)}
+.chip.custom .dt{background:var(--mark); box-shadow:0 0 8px var(--mark)}
+.ghostbtn{height:30px; padding:0 13px; font-size:12.5px; border-radius:8px; color:var(--ink2)}
+.ghostbtn:hover{background:rgba(255,255,255,.09); color:#fff; border-color:var(--line2)}
+
+/* ============================ 主体 ============================ */
+#body{display:grid; grid-template-columns:60fr 40fr; min-height:0}
+
+/* ---------------------------- 左：预览舞台 ---------------------------- */
+#stage{
+  min-width:0; padding:20px 24px; display:flex; flex-direction:column; gap:16px;
+  background:rgba(9,12,18,.26); border-right:1px solid rgba(255,255,255,.14); position:relative;
+  overflow-y:auto; overflow-x:hidden;   /* 统计块调得很高时左栏可滚，绝不裁掉内容 */
+}
+#stage::-webkit-scrollbar{width:7px}
+#stage::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12); border-radius:4px}
+/* 舞台底纹：极淡网格，只在左区，制造"取景框"的空间感 */
+#stage::before{
+  content:""; position:absolute; inset:0; pointer-events:none; opacity:.5;
+  background-image:
+    linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px);
+  background-size:44px 44px;
+  mask-image:radial-gradient(110% 80% at 50% 40%, #000 0%, transparent 78%);
+}
+#stage > *{position:relative}
+/* 选中统计块时不显示三态卡 —— 它没有"被按下"和"长条"两种形态。
+   这时把两排预览整体居中，别让底部空出一大块 */
+#stage.no-tri{justify-content:center; gap:26px}
+#stage.no-tri .stage-h{position:absolute; top:20px; left:24px; right:24px}
+.stage-h{display:flex; align-items:center; gap:12px}
+.pill{
+  display:inline-flex; align-items:center; gap:6px; height:23px; padding:0 10px; border-radius:999px;
+  font-size:10.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  color:#CFE0FF; background:var(--acc-soft); border:1px solid rgba(140,180,255,.34);
+}
+.pill i{width:6px; height:6px; border-radius:50%; background:var(--acc); box-shadow:0 0 8px var(--acc); animation:blip 1.8s ease-in-out infinite}
+@keyframes blip{0%,100%{opacity:1}50%{opacity:.35}}
+.hintb{font-size:11.5px; color:var(--ink3); line-height:1.5}
+
+.sect{display:flex; flex-direction:column; gap:9px}
+.sect-h{display:flex; align-items:center; gap:10px}
+.sq{width:3px; height:13px; border-radius:2px; background:var(--acc); flex:none; box-shadow:0 0 8px rgba(127,176,255,.5)}
+.sect.ro .sq{background:var(--ink3); box-shadow:none}
+.stitle{font-size:12.5px; font-weight:650; letter-spacing:.02em}
+.snote{font-size:11px; color:var(--ink3)}
+.rule{flex:1; height:1px; background:linear-gradient(90deg,var(--line),transparent)}
+.tag{
+  font-size:10px; letter-spacing:.1em; text-transform:uppercase; padding:2px 7px; border-radius:5px;
+  color:var(--ink3); background:rgba(255,255,255,.05); border:1px solid var(--line);
+}
+.tag.edit{color:#CFE0FF; background:var(--acc-soft); border-color:rgba(140,180,255,.34)}
+
+.krow{display:grid; grid-template-columns:repeat(10,1fr); gap:8px; padding-top:19px}
+.key{
+  aspect-ratio:1/1; border-radius:11px; position:relative; flex:none;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--fill); border:2px solid var(--edge); color:var(--txt);
+  font-size:15px; font-weight:650; letter-spacing:.02em;
+  transition:transform .13s ease, box-shadow .13s ease;
+}
+.key.pick{cursor:pointer}
+.key.pick:hover{transform:translateY(-2px); box-shadow:0 8px 18px rgba(0,0,0,.42)}
+.key.sel{box-shadow:0 0 0 2px var(--mark), 0 0 0 4px rgba(142,193,255,.22), 0 0 30px rgba(142,193,255,.6), inset 0 0 16px rgba(142,193,255,.4)}
+.mark{
+  position:absolute; left:50%; top:-19px; transform:translateX(-50%); width:0; height:0;
+  border-left:10px solid transparent; border-right:10px solid transparent; border-top:14px solid var(--mark);
+  filter:drop-shadow(0 0 9px rgba(142,193,255,.95)) drop-shadow(0 2px 5px rgba(0,0,0,.6));
+}
+/* 只读对照：整排褪色，一眼能和下面可编辑的那排区分开 */
+.sect.ro .krow,.sect.ro .srow{opacity:.45; filter:grayscale(.35)}
+
+.srow{display:flex; gap:10px; justify-content:center; padding-top:22px}
+.stat{
+  border-radius:9px; display:flex; align-items:center; justify-content:center; gap:9px;
+  flex:none; font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+  background:var(--fill); border:2px solid var(--edge); color:var(--txt);
+  transition:transform .13s ease, box-shadow .13s ease;
+}
+.stat.pick{cursor:pointer}
+.stat.pick:hover{transform:translateY(-2px); box-shadow:0 8px 18px rgba(0,0,0,.42)}
+.stat.sel{box-shadow:0 0 0 2px var(--mark), 0 0 0 4px rgba(142,193,255,.22), 0 0 30px rgba(142,193,255,.6), inset 0 0 16px rgba(142,193,255,.4)}
+.stat .v{font-size:14.5px; font-weight:750; letter-spacing:.01em; text-transform:none; font-variant-numeric:tabular-nums}
+/* ---------------------------- 三态卡 ---------------------------- */
+/* 三态卡吃掉剩余高度：左侧不能出现"一大块空" */
+.tri{
+  /* flex-grow 1 + flex-shrink 0：空间够就撑满剩余，空间不够保持内容高度让左栏滚动 */
+  flex:1 0 auto; border-radius:12px; border:1px solid var(--line);
+  display:flex; flex-direction:column;
+  background:linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05); overflow:hidden;
+}
+.tri-h{
+  display:flex; align-items:center; gap:10px; padding:10px 15px; flex:none;
+  border-bottom:1px solid var(--line); font-size:11px; color:var(--ink3); letter-spacing:.05em;
+}
+.tri-h b{color:var(--ink); font-size:12.5px; font-weight:700; letter-spacing:0}
+.tri-g{flex:1; display:grid; grid-template-columns:repeat(3,1fr)}
+.cell{padding:12px; display:flex; flex-direction:column; align-items:center; justify-content:space-between; gap:10px; position:relative}
+.cell + .cell{border-left:1px solid var(--line)}
+.cap{font-size:10.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--ink3)}
+.cap b{color:var(--ink2); letter-spacing:0; text-transform:none; font-weight:600}
+.demo{
+  width:76px; height:76px; border-radius:14px; display:flex; align-items:center; justify-content:center;
+  font-size:19px; font-weight:700; transition:.15s ease;
+}
+.barwrap{height:104px; display:flex; align-items:flex-end; justify-content:center; position:relative; width:100%}
+.barwrap::after{content:""; position:absolute; left:14%; right:14%; bottom:0; height:1px; background:rgba(255,255,255,.16)}
+.bar{width:30px; border-radius:5px 5px 0 0}
+.na{font-size:11.5px; color:var(--ink3); height:104px; display:flex; align-items:center}
+
+/* ---------------------------- 右：设置面板 ---------------------------- */
+#pane{
+  min-width:0; padding:16px 18px; display:flex; flex-direction:column; gap:12px;
+  background:rgba(10,14,21,.42); overflow:hidden; position:relative;
+}
+.tabs{
+  position:relative; display:grid; grid-template-columns:repeat(4,1fr); flex:none;
+  padding:4px; height:40px; border-radius:11px; border:1px solid var(--line); background:rgba(0,0,0,.22);
+}
+.tabs .ind{
+  position:absolute; top:4px; bottom:4px; left:4px; border-radius:8px; pointer-events:none;
+  background:linear-gradient(180deg, rgba(127,176,255,.40), rgba(92,147,232,.28));
+  border:1px solid rgba(160,200,255,.85);
+  box-shadow:0 2px 14px rgba(90,140,230,.5), inset 0 1px 0 rgba(255,255,255,.18);
+  transition:transform .24s cubic-bezier(.4,0,.2,1);
+}
+.tabs button{
+  position:relative; z-index:1; border:none; background:transparent; border-radius:8px;
+  font-size:12.5px; color:var(--ink3); transition:color .15s ease;
+}
+.tabs button:hover{color:var(--ink2)}
+.tabs button.on{color:#fff; font-weight:650}
+
+.scroll{
+  flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding-right:6px; margin-right:-6px;
+  transition:padding-bottom .26s cubic-bezier(.4,0,.2,1);
+}
+/* 取色抽屉浮在列表上方，所以给列表底部留出等高的空位：
+   既不会被抽屉压住，内容再多也能滚出来看到 */
+.scroll.picking{padding-bottom:186px}
+.scroll::-webkit-scrollbar{width:7px}
+.scroll::-webkit-scrollbar-track{background:transparent}
+.scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12); border-radius:4px}
+.scroll::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.2)}
+
+.card{
+  border-radius:12px; border:1px solid var(--line); margin-bottom:4px;
+  background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.012));
+  overflow:hidden;
+}
+.card:last-child{margin-bottom:0}
+.card-h{
+  display:flex; align-items:center; gap:8px; padding:6px 13px 5px;
+  font-size:10.5px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:var(--ink3);
+  background:rgba(255,255,255,.028);
+  border-bottom:1px solid rgba(255,255,255,.05);
+}
+.card-h::before{content:""; width:3px; height:10px; border-radius:2px; background:var(--acc); opacity:.85}
+
+.row{
+  display:flex; align-items:center; gap:10px; min-height:40px; padding:0 10px 0 13px;
+  position:relative; cursor:pointer; border-top:1px solid rgba(255,255,255,.035);
+}
+.card-h + .row{border-top:none}
+.row::before{
+  content:""; position:absolute; left:0; top:7px; bottom:7px; width:2px; border-radius:2px;
+  background:var(--acc); opacity:0; transition:opacity .15s ease;
+}
+.row:hover{background:rgba(255,255,255,.035)}
+.row.sel{background:linear-gradient(90deg, var(--acc-soft), rgba(255,255,255,.02))}
+.row.sel::before{opacity:1}
+.row.sel .rn{color:#fff}
+.row.dim{opacity:.34; cursor:not-allowed}
+.row.dim:hover{background:transparent}
+
+/* 长条预览行：长条参数是全局的，放在这里保证任何时候都能看到真实形状 */
+.row.prow{min-height:130px; cursor:default; align-items:center}
+.row.prow:hover{background:transparent}
+.row.prow .rc{justify-content:flex-start; gap:18px}
+.lpv{
+  width:118px; height:112px; flex:none; padding:6px 8px; position:relative;
+  display:flex; align-items:flex-end; justify-content:center;
+  border-radius:10px; background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.06);
+}
+.lpv::after{content:""; position:absolute; left:8px; right:8px; bottom:6px; height:1px; background:rgba(255,255,255,.2)}
+.lpv i{display:block; width:34px; border-radius:5px 5px 0 0}
+.lmeta{font-size:11.5px; color:var(--ink3); font-variant-numeric:tabular-nums; letter-spacing:.02em}
+.lna{font-size:12px; color:var(--ink3)}
+.rn{flex:none; width:118px; font-size:12.5px; color:var(--ink2); line-height:1.3}
+.rc{flex:1; min-width:0; display:flex; align-items:center; gap:10px; justify-content:flex-end}
+.val{
+  font-size:12px; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:.02em;
+  min-width:44px; text-align:right;
+}
+.rst{
+  flex:none; width:24px; height:24px; padding:0; border-radius:7px; font-size:13px; line-height:1;
+  color:var(--ink3); background:transparent; border:1px solid transparent;
+  opacity:0; transition:.15s ease;
+}
+.row:hover .rst{opacity:1}
+.rst:hover{color:var(--warn); background:rgba(255,158,94,.12); border-color:rgba(255,158,94,.35)}
+
+/* 开关 */
+.sw{
+  width:40px; height:22px; padding:0; flex:none; border-radius:999px; position:relative;
+  border:1px solid var(--line2); background:rgba(255,255,255,.08); transition:.18s ease;
+}
+.sw i{
+  position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%;
+  background:#8E99AB; box-shadow:0 1px 3px rgba(0,0,0,.5); transition:.18s cubic-bezier(.4,0,.2,1);
+}
+.sw:hover{background:rgba(255,255,255,.13)}
+.sw.on{background:linear-gradient(180deg, rgba(127,176,255,.55), rgba(90,140,230,.42)); border-color:var(--acc-line)}
+.sw.on i{left:20px; background:#fff}
+
+/* 滑块 */
+.rng{
+  -webkit-appearance:none; appearance:none; flex:1; min-width:60px; height:22px;
+  background:transparent; outline:none; cursor:pointer; font-family:inherit;
+}
+.rng::-webkit-slider-runnable-track{
+  height:5px; border-radius:3px;
+  background:linear-gradient(90deg, var(--acc) 0 var(--p,50%), rgba(255,255,255,.14) var(--p,50%) 100%);
+}
+.rng::-webkit-slider-thumb{
+  -webkit-appearance:none; width:15px; height:15px; margin-top:-5px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 5px rgba(0,0,0,.55); transition:transform .12s ease;
+}
+.rng:hover::-webkit-slider-thumb{transform:scale(1.14)}
+.rng:active::-webkit-slider-thumb{transform:scale(1.24); box-shadow:0 0 0 4px rgba(127,176,255,.22)}
+
+/* 分段 */
+.seg{
+  display:inline-flex; gap:3px; padding:3px; border-radius:9px; flex-wrap:wrap; justify-content:flex-end;
+  background:rgba(0,0,0,.24); border:1px solid var(--line);
+}
+.seg button{
+  padding:4px 9px; font-size:11.5px; border-radius:6px; border:1px solid transparent;
+  background:transparent; color:var(--ink3); transition:.15s ease; white-space:nowrap;
+}
+.seg button:hover{color:var(--ink2); background:rgba(255,255,255,.06)}
+.seg button.on{
+  color:#fff; font-weight:600; background:var(--acc-soft); border-color:var(--acc-line);
+  box-shadow:0 1px 8px rgba(90,140,230,.25);
+}
+
+/* 颜色行 */
+.cwrap{display:inline-flex; align-items:center; gap:9px}
+.swatch{
+  width:22px; height:22px; border-radius:7px; flex:none; background:var(--c,#fff);
+  border:1px solid rgba(255,255,255,.42); box-shadow:inset 0 0 0 1px rgba(0,0,0,.55), 0 2px 7px rgba(0,0,0,.5);
+  transition:transform .13s ease;
+}
+.row:hover .swatch{transform:scale(1.08)}
+.acthint{font-size:11.5px; color:var(--mark); letter-spacing:.02em}
+
+/* ---------------------------- 取色器 ---------------------------- */
+/* 取色抽屉：浮动层，不参与 flex 布局，展开时不挤压上面的设置列表 */
+.picker{
+  position:absolute; left:18px; right:18px; bottom:16px; z-index:5;
+  height:0; overflow:hidden; opacity:0; border-radius:12px; border:1px solid transparent;
+  background:rgba(11,16,24,.97); backdrop-filter:blur(14px) saturate(140%);
+  box-shadow:0 18px 44px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.07);
+  transition:height .26s cubic-bezier(.4,0,.2,1), opacity .18s ease, border-color .2s ease;
+}
+.picker.on{height:172px; opacity:1; border-color:var(--line2)}
+.picker-in{padding:8px 14px 0; display:flex; flex-direction:column; gap:7px; height:172px}
+.pick-h{display:flex; align-items:center; gap:10px}
+.pick-h .lb{font-size:10.5px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:var(--ink3)}
+.pick-h .tg{font-size:12px; color:var(--ink2)}
+.pick-h .tg b{color:#fff; font-weight:600}
+.pick-body{display:flex; gap:12px; align-items:flex-start}
+.wheel{
+  width:100px; height:100px; border-radius:50%; position:relative; flex:none; cursor:crosshair;
+  background:conic-gradient(from -90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00);
+  border:1px solid rgba(255,255,255,.2); box-shadow:0 6px 20px rgba(0,0,0,.45), inset 0 0 0 1px rgba(0,0,0,.3);
+}
+.wheel::after{
+  content:""; position:absolute; inset:0; border-radius:50%; pointer-events:none;
+  background:radial-gradient(circle at 50% 50%, #fff 0%, rgba(255,255,255,.72) 26%, rgba(255,255,255,0) 74%);
+}
+.cdot{
+  position:absolute; width:13px; height:13px; border-radius:50%; border:2.5px solid #fff;
+  box-shadow:0 0 0 1px rgba(0,0,0,.75), 0 2px 6px rgba(0,0,0,.6);
+  transform:translate(-50%,-50%); pointer-events:none; z-index:2;
+}
+.bri{
+  width:15px; height:100px; border-radius:5px; flex:none; cursor:crosshair; position:relative;
+  background:linear-gradient(180deg,#fff,#000);
+  border:1px solid rgba(255,255,255,.2); box-shadow:0 6px 20px rgba(0,0,0,.4);
+}
+.bri .cdot{
+  left:50%; width:21px; height:5px; border-radius:3px; background:#fff; border:none;
+  box-shadow:0 0 0 2px rgba(0,0,0,.55), 0 1px 4px rgba(0,0,0,.6);
+}
+.palette{
+  flex:1; min-width:0; display:grid; grid-template-columns:repeat(8,1fr); gap:5px; align-content:start;
+}
+.palette i{
+  aspect-ratio:1/1; border-radius:6px; cursor:pointer; background:var(--c);
+  border:1px solid rgba(255,255,255,.16); transition:transform .12s ease, box-shadow .12s ease;
+}
+.palette i:hover{transform:scale(1.14); box-shadow:0 0 0 2px rgba(255,255,255,.55)}
+.pick-f{display:flex; align-items:center; gap:10px; margin-left:110px}
+.flbl{font-size:10.5px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:var(--ink3)}
+.hexwrap{
+  display:flex; align-items:center; gap:2px; height:30px; padding:0 11px; border-radius:8px;
+  background:rgba(0,0,0,.34); border:1px solid var(--line2);
+}
+.hexwrap span{color:var(--ink2); font-size:14px; font-weight:600}
+.hex{
+  width:76px; border:none; background:transparent; outline:none; color:var(--ink);
+  font-family:"Consolas","Cascadia Mono",monospace; font-size:14px; letter-spacing:.1em; text-transform:uppercase;
+}
+.hexwrap:focus-within{border-color:var(--acc-line); box-shadow:0 0 0 3px rgba(127,176,255,.14)}
+.hsv{font-size:12px; color:var(--ink2); font-variant-numeric:tabular-nums; letter-spacing:.04em}
+
+/* ---------------------------- 底栏 ---------------------------- */
+.foot{
+  position:relative; display:flex; align-items:center; justify-content:center;
+  background:rgba(8,11,17,.36); border-top:1px solid var(--line);
+}
+.fleft{position:absolute; left:18px; top:50%; transform:translateY(-50%); display:flex; align-items:center; gap:9px}
+.fright{position:absolute; right:18px; top:50%; transform:translateY(-50%); display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--ink2)}
+kbd{
+  display:inline-block; padding:2px 6px; border-radius:5px; font-family:inherit; font-size:10.5px;
+  color:var(--ink2); background:rgba(255,255,255,.06); border:1px solid var(--line2);
+  box-shadow:0 1px 0 rgba(0,0,0,.5);
+}
+.fmid{display:flex; align-items:center; gap:14px}
+.btn{
+  height:38px; min-width:158px; padding:0 22px; border-radius:10px; font-size:13.5px; font-weight:650;
+  font-family:inherit; transition:.15s ease;
+}
+.btn.ghost{background:rgba(255,255,255,.055); border-color:var(--line); color:var(--ink2)}
+.btn.ghost:hover{background:rgba(255,255,255,.11); color:#fff; border-color:var(--line2)}
+.btn.primary{
+  color:#06101F; border-color:transparent;
+  background:linear-gradient(180deg,#CFE0FF,#7FB0FF 55%,#5C93E8);
+  box-shadow:0 6px 20px rgba(80,130,225,.4), inset 0 1px 0 rgba(255,255,255,.7);
+}
+.btn.primary:hover{filter:brightness(1.08); box-shadow:0 8px 26px rgba(80,130,225,.52), inset 0 1px 0 rgba(255,255,255,.7)}
+.btn:active{transform:translateY(1px)}
+
+/* ---------------------------- 提示 ---------------------------- */
+#toast{
+  position:absolute; left:50%; bottom:86px; transform:translate(-50%,14px); z-index:20;
+  padding:10px 18px; border-radius:10px; font-size:12.5px; color:#fff; pointer-events:none;
+  background:rgba(12,16,24,.86); border:1px solid var(--line2); box-shadow:0 12px 34px rgba(0,0,0,.6);
+  opacity:0; transition:.22s ease;
+}
+#toast.on{opacity:1; transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- ======================= 顶栏 ======================= -->
+  <header class="top">
+    <div class="brand">
+      <div class="logo">DCE</div>
+      <div>
+        <div class="bt">键盘反馈设置</div>
+        <div class="bs">Keyboard Feedback</div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="chip" id="themeChip"><span class="dt"></span>主题 · <b id="themeName">默认</b></div>
+    <button class="ghostbtn" data-act="exit">返回</button>
+  </header>
+
+  <!-- ======================= 主体 ======================= -->
+  <main id="body">
+    <!-- ---------- 左：预览舞台 ---------- -->
+    <section id="stage">
+      <div class="stage-h">
+        <span class="pill"><i></i>实时预览</span>
+        <span class="hintb">上排＝<b style="color:#A7B3C6">默认样式</b>（只读）　下排＝<b style="color:#A7B3C6">自定样式</b>，点击按键或统计块单独调整</span>
+      </div>
+
+      <div class="sect ro">
+        <div class="sect-h">
+          <span class="sq"></span><span class="stitle">默认样式</span>
+          <span class="tag">只读</span><span class="rule"></span>
+        </div>
+        <div class="krow" id="rowDef"></div>
+        <div class="srow" id="statDef"></div>
+      </div>
+
+      <div class="sect">
+        <div class="sect-h">
+          <span class="sq"></span><span class="stitle">自定样式</span>
+          <span class="tag edit">可编辑</span><span class="rule"></span>
+        </div>
+        <div class="krow" id="rowCus"></div>
+        <div class="srow" id="statCus"></div>
+      </div>
+
+      <div class="tri">
+        <div class="tri-h">当前编辑目标 · <b id="triName">D</b>　<span>三种形态的实时效果</span></div>
+        <div class="tri-g" id="triG"></div>
+      </div>
+    </section>
+
+    <!-- ---------- 右：设置面板 ---------- -->
+    <aside id="pane">
+      <div class="tabs" id="tabs"><span class="ind" id="tabInd"></span></div>
+      <div class="scroll" id="list"></div>
+      <div class="picker" id="picker">
+        <div class="picker-in">
+          <div class="pick-h">
+            <span class="lb">取色</span>
+            <span class="tg" id="pickWhere">—</span>
+          </div>
+          <div class="pick-body">
+            <div class="wheel" data-act="wheel"><span class="cdot" id="wDot"></span></div>
+            <div class="bri" data-act="bri"><span class="cdot" id="bDot"></span></div>
+            <div class="palette" id="pal"></div>
+          </div>
+          <div class="pick-f">
+            <span class="flbl">HEX</span>
+            <span class="hexwrap"><span>#</span><input class="hex" id="hexIn" maxlength="6" spellcheck="false" autocomplete="off"></span>
+            <span class="hsv" id="hsvTxt">H 0° · S 0% · V 100%</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- ======================= 底栏 ======================= -->
+  <footer class="foot">
+    <div class="fleft"><span class="chip" id="whereChip"><span class="dt"></span>正在编辑 <b id="whereName">D</b></span></div>
+    <div class="fmid">
+      <button class="btn ghost" data-act="resetAll">恢复默认设置</button>
+      <button class="btn primary" data-act="save" id="btnSave">保存并退出</button>
+    </div>
+    <div class="fright"><kbd>ENTER</kbd> 保存 <kbd>ESC</kbd> 返回</div>
+  </footer>
+
+  <div id="toast"></div>
+</div>
+<input type="file" id="fileIn" accept=".json,application/json" hidden>
+
+<script>
+/* =========================================================================
+   0. 常量与默认值
+   ========================================================================= */
+const KEYS    = 10;
+const LETTERS = ['A','S','D','F','V','N','J','K','L',';'];
+const TKEYS   = [...Array(KEYS).keys()].map(i => 'k' + i);
+const TARGETS = TKEYS.concat(['kps','total']);
+const isStatTarget = t => t === 'kps' || t === 'total';
+const SHORT = { kps:'KPS', total:'Total' };
+const nameOf = t => isStatTarget(t) ? SHORT[t] : LETTERS[+t.slice(1)];
+
+/* 每个目标真正独立的只有「颜色」。
+   透明度 / 长条 / 统计区 / 配色来源都是整块键盘反馈共用的全局项 ——
+   统计区的高度宽度尤其必须两个一起变，只有颜色才各调各的。 */
+const DEF = () => ({
+  normalColor:'#FFFFFF', normalText:'#0A0A0A',
+  pressColor:'#FFFFFF', pressText:'#0A0A0A',
+  barColor:'#FFFFFF', barMode:'custom'
+});
+/* 「整体透明度」= 游戏里的 keyboardAlpha。它是一层系数：
+   键帽填充 = 0.30 × α，描边 = 0.80 × α —— 绝不能给整元素加 opacity，那会把文字一起冲淡。 */
+const DEF_OPT = () => ({
+  alpha:0.80,
+  barOn:true, barAlpha:1, barMax:70, barSpeed:1, barStay:500, barDis:true,
+  showStats:true, statHeight:34, statWidth:26, statAlpha:0.80,
+  followSong:false
+});
+
+/* 出场默认的完整配置（「默认样式」那一排只读对照用它，跟用户改了什么无关） */
+const DEF_FULL = () => Object.assign({}, DEF_OPT(), DEF());
+
+const THEMES = {
+  default : { normalColor:'#FFFFFF', normalText:'#0A0A0A', pressColor:'#FFFFFF', pressText:'#0A0A0A', barColor:'#FFFFFF' },
+  black   : { normalColor:'#3A3A46', normalText:'#FFFFFF', pressColor:'#E8ECF6', pressText:'#0A0A12', barColor:'#9AA2B4' },
+  fnf     : { normalColor:'#C24B99', normalText:'#FFFFFF', pressColor:'#00FFFF', pressText:'#04303A', barColor:'#12FA05' },
+  fnfpixel: { normalColor:'#E276FF', normalText:'#FFFFFF', pressColor:'#3DCAFF', pressText:'#032B3A', barColor:'#71E300' }
+};
+const THEME_NAME = { default:'默认', black:'黑', fnf:'FNF 标准', fnfpixel:'FNF 像素', custom:'自定义' };
+
+/* 跟随谱面 RGB 音符配色：预览里用它模拟"每个键吃不同音符色" */
+const SONG_COLORS = ['#C24B99','#00FFFF','#12FA05','#F9393F','#FFC94A','#3DCAFF','#E276FF','#71E300','#FF884E','#7FD8E8'];
+
+const PALETTE = ['#FFFFFF','#000000','#1B1B22','#C24B99','#00FFFF','#12FA05','#F9393F','#FFC94A',
+                 '#3DCAFF','#E276FF','#71E300','#FF884E','#1490A0','#6FDDA0','#A7B3C6','#5B6B8C'];
+
+/* =========================================================================
+   1. 设置结构（分类 → 分组卡片 → 行）
+   ========================================================================= */
+const TABS = [{id:'color',n:'颜色'},{id:'bar',n:'长条'},{id:'stat',n:'统计'},{id:'theme',n:'主题'}];
+
+const SCHEMA = {
+  color: [
+    { title:'整体', rows:[
+      { id:'alpha', n:'透明度', k:'num', min:0, max:1, step:.01, f:v=>Math.round(v*100)+'%',
+        tip:'整块键盘反馈的透明度；填充与描边都按它缩放' } ]},
+    { title:'常态', rows:[
+      { id:'normalColor', n:'常态颜色',       k:'col' },
+      { id:'normalText',  n:'常态文本颜色',   k:'col' } ]},
+    { title:'按下', rows:[
+      { id:'pressColor',  n:'按下颜色',       k:'col' },
+      { id:'pressText',   n:'按下文本颜色',   k:'col' } ]},
+    { title:'长条', rows:[
+      { id:'barColor',    n:'长条颜色',       k:'col' },
+      { id:'barMode',     n:'取色来源',       k:'seg', opts:[['custom','用长条颜色'],['normal','跟随常态色']],
+        tip:'选「跟随常态色」时，上面的长条颜色不生效' } ]}
+  ],
+  bar: [
+    { title:'预览', rows:[
+      { id:'__lbar', k:'preview' } ]},
+    { title:'显示', rows:[
+      { id:'barOn',    n:'显示长条',   k:'bool' },
+      { id:'barAlpha', n:'长条透明度', k:'num', min:0, max:1, step:.01, f:v=>Math.round(v*100)+'%' } ]},
+    { title:'形态与消失', rows:[
+      { id:'barMax',   n:'最多显示高度', k:'num', min:8, max:100, step:2,  f:v=>v+'px' },
+      { id:'barSpeed', n:'速度',         k:'num', min:.1, max:5,  step:.1, f:v=>v.toFixed(1)+'×' },
+      { id:'barStay',  n:'滞留时间',     k:'num', min:50, max:2000, step:50, f:v=>v+'ms' },
+      { id:'barDis',   n:'消隐',         k:'bool',
+        tip:'开启：到时间后慢慢淡出（渐隐）　关闭：到时间后直接消失' } ]}
+  ],
+  stat: [
+    { title:'统计区（KPS 与 Total 一起变）', rows:[
+      { id:'showStats',  n:'显示统计',     k:'bool' },
+      { id:'statHeight', n:'统计区高度',   k:'num', min:18, max:72, step:2, f:v=>v+'px',
+        tip:'两个统计块共用同一个高度' },
+      { id:'statWidth',  n:'统计区宽度',   k:'num', min:8,  max:60, step:1, f:v=>v+'%',
+        tip:'两个统计块共用同一个宽度（占预览宽度的百分比）' },
+      { id:'statAlpha',  n:'统计区透明度', k:'num', min:0, max:1, step:.01, f:v=>Math.round(v*100)+'%' } ]}
+  ],
+  theme: [
+    { title:'配色来源', rows:[
+      { id:'followSong', n:'跟随谱面 RGB 音符配色', k:'bool', tip:'开启后每个按键取所在音符的颜色' },
+      { id:'theme',      n:'主题', k:'seg', opts:[
+        ['default','默认'],['black','黑'],['fnf','FNF 标准'],['fnfpixel','FNF 像素'],['custom','自定义']] } ]},
+    { title:'迁移', rows:[
+      { id:'doExport', n:'导出为 JSON 文件', k:'act' },
+      { id:'doImport', n:'从 JSON 文件导入', k:'act' } ]}
+  ]
+};
+const rowsOf = tab => SCHEMA[tab].flatMap(g => g.rows);
+const specOf = id => { for (const t in SCHEMA) { const r = rowsOf(t).find(x => x.id === id); if (r) return r; } return null; };
+
+/* =========================================================================
+   2. 状态
+   ========================================================================= */
+let S = {
+  tab   : 'color',
+  target: 'k3',
+  row   : 'normalColor',
+  theme : 'default',
+  data  : {},
+  opt   : DEF_OPT()          /* 全局项：透明度 / 长条 / 统计区 / 配色来源 */
+};
+TARGETS.forEach(t => S.data[t] = DEF());
+/* 当前目标的独立配置（只有颜色） */
+const cur = () => S.data[S.target];
+/* 渲染预览时用的完整配置 = 全局项 + 该目标的颜色 */
+const fullCfg = key => Object.assign({}, S.opt, S.data[key]);
+
+/* 每个设置项到底住在哪：全局 S.opt / 当前目标 S.data / 主题 S.theme */
+const isGlobalRow = id => id in S.opt;
+const getVal = id => id === 'theme' ? S.theme : (isGlobalRow(id) ? S.opt[id] : cur()[id]);
+function setVal(id, v){
+  if (id === 'theme') { S.theme = v; return; }
+  if (isGlobalRow(id)) S.opt[id] = v; else cur()[id] = v;
+}
+const defOf = id => (id in DEF_OPT()) ? DEF_OPT()[id] : (id in DEF()) ? DEF()[id] : undefined;
+
+/* =========================================================================
+   3. 小工具
+   ========================================================================= */
+const $  = s => document.querySelector(s);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const rgba = (hex,a) => {
+  const n = parseInt(hex.slice(1),16);
+  return `rgba(${n>>16&255},${n>>8&255},${n&255},${clamp(a,0,1)})`;
+};
+const normHex = s => {
+  let t = String(s||'').trim().replace(/^#/,'');
+  if (!/^[0-9a-fA-F]{6}$/.test(t)) return null;
+  return '#' + t.toUpperCase();
+};
+function hexToHsv(hex){
+  const n = parseInt(hex.slice(1),16), r=(n>>16&255)/255, g=(n>>8&255)/255, b=(n&255)/255;
+  const mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn; let h=0;
+  if (d){ if(mx===r) h=60*(((g-b)/d)%6); else if(mx===g) h=60*((b-r)/d+2); else h=60*((r-g)/d+4); }
+  if (h<0) h+=360;
+  return { h, s: mx ? d/mx*100 : 0, v: mx*100 };
+}
+function hsvToHex(h,s,v){
+  s/=100; v/=100;
+  const c=v*s, x=c*(1-Math.abs(((h/60)%2)-1)), m=v-c;
+  let r=0,g=0,b=0;
+  if(h<60){r=c;g=x} else if(h<120){r=x;g=c} else if(h<180){g=c;b=x}
+  else if(h<240){g=x;b=c} else if(h<300){r=x;b=c} else {r=c;b=x}
+  const f=n => Math.round((n+m)*255).toString(16).padStart(2,'0');
+  return '#'+f(r)+f(g)+f(b);
+}
+const barHex = cfg => cfg.barMode === 'normal' ? cfg.normalColor : cfg.barColor;
+/* 消隐开关直接决定消失方式：开 = 渐隐（顶部淡出），关 = 到时间直接消失（实心） */
+function barBg(cfg){
+  const c = barHex(cfg), a = cfg.barAlpha;
+  if (cfg.barDis)
+    return `linear-gradient(180deg, ${rgba(c,0)} 0%, ${rgba(c,a*.35)} 38%, ${rgba(c,a)} 100%)`;
+  return rgba(c, a);
+}
+/* 跟随谱面色时逐键取色（开关是全局的） */
+const colOf = (cfg, i) => (cfg.followSong && i != null) ? SONG_COLORS[i % SONG_COLORS.length] : cfg.normalColor;
+
+let toastTimer = 0;
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('on'), 1500);
+}
+function markCustom(){
+  if (S.theme !== 'custom'){ S.theme = 'custom'; renderChip(); }
+}
+
+/* =========================================================================
+   4. 渲染 —— 顶栏 / 底栏
+   ========================================================================= */
+function renderChip(){
+  $('#themeName').textContent = THEME_NAME[S.theme] || '默认';
+  $('#themeChip').classList.toggle('custom', S.theme === 'custom');
+  $('#triName').textContent = nameOf(S.target);
+  $('#whereName').textContent = nameOf(S.target);
+}
+
+/* =========================================================================
+   5. 渲染 —— 左侧预览舞台
+   ========================================================================= */
+/* cfgOf 是「按下标取该键自己的配置」的函数 —— 绝不能所有键共用一份，
+   否则改一个键的颜色会让整排 10 个键一起变（看起来就是"被全局应用了"）。 */
+function keysHtml(cfgOf, pick){
+  let h = '';
+  for (let i = 0; i < KEYS; i++){
+    const cfg  = cfgOf(i);
+    const c    = colOf(cfg, i);
+    const sel  = pick && S.target === 'k' + i;
+    const attr = pick ? ` data-act="pick" data-id="k${i}"` : '';
+    h += `<div class="key${pick?' pick':''}${sel?' sel':''}"${attr}
+            style="--fill:${rgba(c,.30*S.opt.alpha)};--edge:${rgba(c,.80*S.opt.alpha)};--txt:${cfg.normalText}">
+            ${sel ? '<span class="mark"></span>' : ''}<span class="kl">${LETTERS[i]}</span></div>`;
+  }
+  return h;
+}
+/* 统计区：尺寸与透明度全局共用，只有颜色各用各的 */
+function statsHtml(pick, cfgOf){
+  if (!S.opt.showStats)
+    return `<div class="na" style="color:var(--ink3);font-size:11.5px">统计区已隐藏</div>`;
+  const get = cfgOf || (id => S.data[id]);
+  let h = '';
+  [['kps','KPS','128'],['total','Total','5820']].forEach(([id,lab,num]) => {
+    const cfg  = get(id);
+    const c    = cfg.normalColor;
+    const sel  = pick && S.target === id;
+    const attr = pick ? ` data-act="pick" data-id="${id}"` : '';
+    h += `<div class="stat${pick?' pick':''}${sel?' sel':''}"${attr}
+            style="width:${S.opt.statWidth}%;height:${S.opt.statHeight}px;opacity:${S.opt.statAlpha};
+                   --fill:${rgba(c,.30*S.opt.alpha)};--edge:${rgba(c,.80*S.opt.alpha)};--txt:${cfg.normalText}">
+            ${sel ? '<span class="mark"></span>' : ''}<span>${lab}</span><span class="v">${num}</span></div>`;
+  });
+  return h;
+}
+function triHtml(){
+  const cfg = fullCfg(S.target), cap = nameOf(S.target), a = S.opt.alpha;
+  const c   = cfg.normalColor;
+
+  const demo = style => `<div class="demo" style="${style}">${cap}</div>`;
+
+  const normalStyle = `background:${rgba(c,.30*a)};border:2px solid ${rgba(c,.80*a)};color:${cfg.normalText}`;
+  const pressStyle  = `background:${rgba(cfg.pressColor,clamp(a,0,1))};
+                       border:2px solid ${rgba(cfg.pressColor,clamp(a*1.25,0,1))};color:${cfg.pressText};
+                       box-shadow:0 0 22px ${rgba(cfg.pressColor,.35*a)}`;
+
+  const barCell = !S.opt.barOn
+    ? `<div class="na">长条已关闭</div>`
+    : `<div class="barwrap"><div class="bar" style="height:${clamp(S.opt.barMax,4,104)}px;background:${barBg(cfg)}"></div></div>`;
+
+  $('#triG').innerHTML = `
+    <div class="cell"><div class="cap">常态</div>${demo(normalStyle)}</div>
+    <div class="cell"><div class="cap">被按下</div>${demo(pressStyle)}</div>
+    <div class="cell"><div class="cap">长条 <b>${S.opt.barOn ? S.opt.barMax+'px' : '—'}</b></div>${barCell}</div>`;
+}
+function renderStage(){
+  $('#rowDef').innerHTML  = keysHtml(() => DEF_FULL(), false);
+  $('#statDef').innerHTML = statsHtml(false, () => DEF());
+  $('#rowCus').innerHTML  = keysHtml(i => fullCfg('k' + i), true);
+  $('#statCus').innerHTML = statsHtml(true);
+
+  /* 统计块没有"被按下"和"长条"两种形态 —— 选中它时整张三态卡不显示 */
+  const showTri = !isStatTarget(S.target);
+  document.querySelector('.tri').style.display = showTri ? 'flex' : 'none';
+  $('#stage').classList.toggle('no-tri', !showTri);
+  if (showTri) triHtml();
+}
+
+/* =========================================================================
+   6. 渲染 —— 右侧列表
+   ========================================================================= */
+function rowWhy(r){
+  if (r.k !== 'col') return '';
+  if (isStatTarget(S.target) && r.id !== 'normalColor' && r.id !== 'normalText')
+    return '统计块只使用「常态颜色」与「常态文本颜色」，此项对它无效';
+  if (r.id === 'barColor' && getVal('barMode') === 'normal')
+    return '「取色来源」当前是跟随常态色，长条颜色不生效';
+  return '';
+}
+function ctlHtml(r){
+  const v = getVal(r.id);
+  switch (r.k){
+    case 'bool': return `<button class="sw${v?' on':''}" data-act="bool" data-id="${r.id}"><i></i></button>`;
+    case 'num': {
+      const p = clamp((v - r.min) / (r.max - r.min) * 100, 0, 100);
+      return `<input class="rng" type="range" data-act="num" data-id="${r.id}"
+                min="${r.min}" max="${r.max}" step="${r.step}" value="${v}" style="--p:${p}%">
+              <span class="val">${r.f(v)}</span>`;
+    }
+    case 'col': return `<span class="cwrap"><span class="val">${String(v).toUpperCase()}</span>
+                <span class="swatch" style="--c:${v}"></span></span>`;
+    case 'seg': return `<span class="seg">${r.opts.map(([val,lab]) =>
+                  `<button class="${v===val?'on':''}" data-act="seg" data-id="${r.id}" data-v="${val}">${lab}</button>`).join('')}</span>`;
+    case 'act': return `<span class="acthint">执行 ›</span>`;
+    default   : return '';
+  }
+}
+/* 长条预览：不管当前编辑的是哪个键、哪一类，长条参数都是全局的，
+   所以这里始终能看到真实的形状、透明度与消隐效果 */
+function barPreviewRow(){
+  if (!S.opt.barOn)
+    return `<div class="row prow"><span class="rn">长条预览</span>
+              <span class="rc"><span class="lna">长条已关闭</span></span></div>`;
+  const cfg = fullCfg(S.target);
+  const hgt = clamp(S.opt.barMax, 4, 100);
+  return `<div class="row prow" title="长条参数是整块键盘反馈共用的，与当前编辑目标无关">
+            <span class="rn">长条预览</span>
+            <span class="rc"><span class="lpv">
+              <i style="height:${hgt}px;background:${barBg(cfg)}"></i>
+            </span><span class="lmeta">${S.opt.barMax}px · ${Math.round(S.opt.barAlpha*100)}% · ${S.opt.barDis?'渐隐':'直接消失'}</span></span>
+          </div>`;
+}
+function renderList(){
+  let h = '';
+  for (const g of SCHEMA[S.tab]){
+    h += `<div class="card"><div class="card-h">${g.title}</div>`;
+    for (const r of g.rows){
+      if (r.k === 'preview'){ h += barPreviewRow(); continue; }
+      const why = rowWhy(r);
+      h += `<div class="row${S.row===r.id?' sel':''}${why?' dim':''}"
+              data-act="row" data-id="${r.id}" title="${why || r.tip || ''}">
+              <span class="rn">${r.n}</span>
+              <span class="rc">${ctlHtml(r)}</span>
+              <button class="rst" data-act="reset" data-id="${r.id}" title="恢复该项默认值">↺</button>
+            </div>`;
+    }
+    h += `</div>`;
+  }
+  $('#list').innerHTML = h;
+}
+/* 局部刷新长条预览行（拖动长条滑块时用，避免重建整个列表） */
+function patchBarPreview(){
+  const row = $('#list').querySelector('.prow');
+  if (!row) return;
+  if (!S.opt.barOn){
+    const rc = row.querySelector('.rc');
+    if (rc) rc.innerHTML = `<span class="lna">长条已关闭</span>`;
+    return;
+  }
+  const bar = row.querySelector('.lpv i');
+  if (bar){
+    bar.style.height = clamp(S.opt.barMax, 4, 100) + 'px';
+    bar.style.background = barBg(fullCfg(S.target));
+  }
+  const meta = row.querySelector('.lmeta');
+  if (meta) meta.textContent = `${S.opt.barMax}px · ${Math.round(S.opt.barAlpha*100)}% · ${S.opt.barDis?'渐隐':'直接消失'}`;
+}
+/* 只改选中态：不重建 DOM，避免打断正在拖动的滑块 / 丢失焦点 */
+function selectRow(id){
+  S.row = id;
+  $('#list').querySelectorAll('.row').forEach(el => el.classList.toggle('sel', el.dataset.id === id));
+  renderPicker(true);
+}
+/* 局部刷新某一行的显示值（拖动滑块时用） */
+function patchRow(id){
+  const row = $('#list').querySelector(`.row[data-id="${id}"]`);
+  if (!row) return;
+  const spec = specOf(id), v = getVal(id);
+  const val = row.querySelector('.val');
+  if (val && spec) val.textContent = spec.f ? spec.f(v) : v;
+  const sw = row.querySelector('.swatch');
+  if (sw) sw.style.setProperty('--c', v);
+  const rng = row.querySelector('.rng');
+  if (rng) rng.style.setProperty('--p', clamp((v - spec.min)/(spec.max - spec.min)*100, 0, 100) + '%');
+}
+
+/* =========================================================================
+   7. 渲染 —— Tab / 取色器
+   ========================================================================= */
+function renderTabs(){
+  $('#tabs').innerHTML = '<span class="ind" id="tabInd"></span>' +
+    TABS.map(t => `<button class="${S.tab===t.id?'on':''}" data-act="tab" data-v="${t.id}">${t.n}</button>`).join('');
+  syncTabInd();
+}
+function syncTabInd(){
+  const tabs = $('#tabs'), ind = $('#tabInd');
+  if (!ind) return;
+  const i = Math.max(0, TABS.findIndex(t => t.id === S.tab));
+  const w = (tabs.clientWidth - 8) / TABS.length;
+  ind.style.width = w + 'px';
+  ind.style.transform = `translateX(${i * w}px)`;
+}
+const isColorRow = () => { const r = specOf(S.row); return !!(r && r.k === 'col' && S.tab === tabOf(S.row)); };
+function tabOf(id){ for (const t in SCHEMA) if (rowsOf(t).some(r => r.id === id)) return t; return ''; }
+
+function renderPicker(resetHex){
+  const on = isColorRow();
+  $('#picker').classList.toggle('on', on);
+  $('#list').classList.toggle('picking', on);   /* 给浮层让出底部空间 */
+  if (!on) return;
+  const v = String(getVal(S.row)).toUpperCase();
+  $('#pickWhere').innerHTML = `${nameOf(S.target)} · <b>${specOf(S.row).n}</b>`;
+  const hsv = hexToHsv(v);
+  const R = 42, ang = (hsv.h - 90) * Math.PI / 180, rad = R * (hsv.s / 100);
+  const wd = $('#wDot');
+  wd.style.left = (50 + Math.cos(ang) * rad) + 'px';
+  wd.style.top  = (50 + Math.sin(ang) * rad) + 'px';
+  wd.style.background = v;
+  const bd = $('#bDot');
+  bd.style.top = (clamp(1 - hsv.v/100, 0, 1) * 100) + 'px';
+  $('#hsvTxt').textContent = `H ${Math.round(hsv.h)}° · S ${Math.round(hsv.s)}% · V ${Math.round(hsv.v)}%`;
+  if (resetHex !== false && document.activeElement !== $('#hexIn')) $('#hexIn').value = v.slice(1);
+}
+
+/* =========================================================================
+   8. 全部重绘
+   ========================================================================= */
+function renderAll(){
+  renderChip(); renderStage(); renderList(); renderPicker(true); syncTabInd();
+}
+
+/* =========================================================================
+   9. 变更动作
+   ========================================================================= */
+function setValue(id, val){
+  setVal(id, val);
+  markCustom();
+}
+function pickTarget(id){
+  if (S.target === id) return;
+  S.target = id;
+  markCustom();
+  renderChip(); renderStage(); renderList(); renderPicker(true);
+}
+function switchTab(tab){
+  S.tab = tab;
+  /* 换分类后原来的选中行不存在 → 落到该分类第一个可编辑项，取色器该开就开 */
+  const rows = rowsOf(tab);
+  const first = rows.find(r => r.k === 'col') || rows.find(r => r.k === 'num' || r.k === 'bool') || rows[0];
+  S.row = first ? first.id : '';
+  renderTabs(); renderStage(); renderList(); renderPicker(true);
+}
+function applyTheme(name){
+  if (name === 'custom' || !THEMES[name]) return;
+  TARGETS.forEach(t => Object.assign(S.data[t], THEMES[name]));  /* 主题作用于全部目标 */
+}
+function setColor(hex){
+  const c = normHex(hex);
+  if (!c) return;
+  setVal(S.row, c);
+  markCustom();
+  patchRow(S.row);       /* 不重建列表：拖动色轮时不掉帧、不丢焦点 */
+  renderStage();
+  renderPicker(true);
+}
+function exportJson(){
+  const payload = { version:2, theme:S.theme, options:S.opt, targets:S.data };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'keyboard-feedback.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function importJson(text){
+  let obj;
+  try { obj = JSON.parse(text); } catch(e){ toast('JSON 解析失败'); return; }
+  const src = obj && obj.targets ? obj.targets : obj;
+  if (!src || typeof src !== 'object'){ toast('文件里没有 targets'); return; }
+
+  let n = 0;
+  TARGETS.forEach(t => {
+    if (!src[t]) return;
+    const base = DEF();
+    for (const k in base) if (k in src[t]) base[k] = src[t][k];
+    S.data[t] = base; n++;
+  });
+  /* 长条 / 统计 / 透明度：老文件的 version 1 把它们写在每个 target 里，这里一并收上来 */
+  const optSrc = (obj && obj.options) || src[S.target] || {};
+  const optBase = DEF_OPT();
+  for (const k in optBase){
+    if (k in optSrc) { optBase[k] = optSrc[k]; continue; }
+    for (const t of TARGETS) if (src[t] && k in src[t]) { optBase[k] = src[t][k]; break; }
+  }
+  S.opt = optBase;
+  S.theme = (obj && obj.theme) || 'custom';
+  renderAll();
+  toast(`已导入 ${n} 个目标`);
+}
+
+/* =========================================================================
+   10. 事件（全部走委托，重建 DOM 不会丢事件）
+   ========================================================================= */
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const act = el.dataset.act, id = el.dataset.id;
+
+  switch (act){
+    case 'tab':      switchTab(el.dataset.v); break;
+
+    case 'pick':     pickTarget(id); break;
+
+    case 'row':
+      if (el.classList.contains('dim')) break;
+      selectRow(id);
+      break;
+
+    case 'bool':
+      e.stopPropagation();
+      setValue(id, !getVal(id));
+      renderList(); renderStage();
+      break;
+
+    case 'seg': {
+      e.stopPropagation();
+      const v = el.dataset.v;
+      if (id === 'theme'){
+        /* 选主题本身不算"改动"：先把整套配色铺到全部目标，再认这个名字。
+           之后任何一处改动都会由 markCustom() 打回「自定义」。 */
+        applyTheme(v);
+        S.theme = v;
+        renderChip(); renderList(); renderStage(); renderPicker(true);
+      } else {
+        setValue(id, v);
+        renderList(); renderPicker(true);
+      }
+      break;
+    }
+
+    case 'reset': {
+      e.stopPropagation();
+      if (id === 'theme'){ S.theme = 'default'; applyTheme('default'); }
+      else {
+        const d = defOf(id);
+        if (d !== undefined){ setVal(id, d); markCustom(); }
+      }
+      renderList(); renderStage(); renderPicker(true);
+      break;
+    }
+
+    case 'wheel': {
+      const r = el.getBoundingClientRect();
+      const x = e.clientX - r.left - r.width/2;
+      const y = e.clientY - r.top  - r.height/2;
+      let h = Math.atan2(y, x) * 180 / Math.PI + 90; if (h < 0) h += 360;
+      const s = clamp(Math.hypot(x, y) / (r.width/2 - 10), 0, 1) * 100;
+      setColor(hsvToHex(h, s || 100, Math.max(hexToHsv(getVal(S.row)).v, 4)));
+      break;
+    }
+    case 'bri': {
+      const r = el.getBoundingClientRect();
+      const v = (1 - clamp((e.clientY - r.top) / r.height, 0, 1)) * 100;
+      const c = hexToHsv(getVal(S.row));
+      setColor(hsvToHex(c.h, c.s, v));
+      break;
+    }
+    case 'pal':      setColor(el.dataset.c); break;
+
+    case 'resetAll':
+      TARGETS.forEach(t => S.data[t] = DEF());
+      S.opt = DEF_OPT();
+      S.theme = 'default';
+      S.target = 'k3'; S.tab = 'color'; S.row = 'normalColor';
+      renderTabs(); renderAll();
+      toast('已恢复默认设置');
+      break;
+
+    case 'save':
+      exportJson();
+      el.textContent = '已导出 ✓';
+      setTimeout(() => { el.textContent = '保存并退出'; }, 1300);
+      break;
+
+    case 'exit':   toast('原型：游戏内此处返回选项列表'); break;
+    case 'export': exportJson(); break;
+    case 'import': $('#fileIn').click(); break;
+  }
+});
+
+/* 滑块：input 期间只做局部刷新，绝不重建列表 */
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (el.classList && el.classList.contains('rng')){
+    const id = el.dataset.id, spec = specOf(id);
+    if (!spec) return;
+    const v = parseFloat(el.value);
+    if (Number.isNaN(v)) return;
+    setVal(id, v);
+    markCustom();
+    el.style.setProperty('--p', clamp((v - spec.min)/(spec.max - spec.min)*100, 0, 100) + '%');
+    const val = el.parentElement.querySelector('.val');
+    if (val) val.textContent = spec.f(v);
+    renderStage();
+    patchBarPreview();     /* 只动长条预览那一行，绝不 renderList（会打断拖动） */
+    return;
+  }
+  if (el.id === 'hexIn'){
+    const c = normHex(el.value);
+    if (c) setColor(c);
+  }
+});
+/* 松开滑块时重建一次列表，让依赖项（如置灰状态）跟上 */
+document.addEventListener('change', e => {
+  if (e.target.classList && e.target.classList.contains('rng')){ renderList(); renderPicker(true); }
+  if (e.target.id === 'fileIn' && e.target.files && e.target.files[0]){
+    const fr = new FileReader();
+    fr.onload = () => importJson(String(fr.result));
+    fr.readAsText(e.target.files[0]);
+    e.target.value = '';
+  }
+});
+
+/* 主题 / 迁移这两类行不绑按钮，用行内点击直接派发 */
+document.addEventListener('click', e => {
+  const row = e.target.closest('.row[data-id="doExport"], .row[data-id="doImport"]');
+  if (!row) return;
+  if (row.dataset.id === 'doExport') exportJson();
+  else $('#fileIn').click();
+});
+
+/* 快捷键 */
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'Enter')  { exportJson(); const b = $('#btnSave'); b.textContent = '已导出 ✓'; setTimeout(()=>b.textContent='保存并退出', 1300); }
+  if (e.key === 'Escape') toast('原型：游戏内此处返回选项列表');
+});
+
+/* 色板 */
+$('#pal').innerHTML = PALETTE.map(c => `<i data-act="pal" data-c="${c}" style="--c:${c}"></i>`).join('');
+
+/* =========================================================================
+   11. 缩放适配 + 启动
+   ========================================================================= */
+function fit(){
+  /* 只缩小、不放大：窗口比 1440x810 大时保持 1:1，避免把界面拉糊 */
+  const s = Math.min(1, innerWidth / 1440, innerHeight / 810);
+  $('#app').style.transform = `scale(${s})`;
+  syncTabInd();
+}
+addEventListener('resize', fit);
+
+/* 允许用 #tab=bar&t=kps 之类的地址直接落到某个分类 / 某个目标（方便逐页核对） */
+(function(){
+  let m = /[#&]tab=(\w+)/.exec(location.hash);
+  if (m && TABS.some(t => t.id === m[1])){
+    S.tab = m[1];
+    const rows = rowsOf(S.tab), f = rows.find(r => r.k === 'col') || rows[0];
+    if (f) S.row = f.id;
+  }
+  m = /[#&]t=(\w+)/.exec(location.hash);
+  if (m && TARGETS.indexOf(m[1]) >= 0) S.target = m[1];
+})();
+
+try { renderTabs(); renderAll(); fit(); }
+catch(err){
+  document.title = 'BOOT ERROR ▸ ' + err.message;
+  document.body.insertAdjacentHTML('afterbegin',
+    `<pre style="position:fixed;inset:0;z-index:99999;margin:0;padding:14px;background:#120608;color:#FF9E9E;font:12px/1.6 Consolas,monospace;white-space:pre-wrap">${err.stack}</pre>`);
+}
+
+/* =========================================================================
+   12. 自检（地址栏加 #selftest 才运行）
+   —— 专门盯"控件样式丢失 / 切分类没同步 / 点了没反应"这几类回归
+   ========================================================================= */
+addEventListener('error', ev => {
+  if (!ev.message) return;
+  toast('脚本错误：' + ev.message);
+  if (location.hash === '#selftest') document.title = 'JS ERROR ▸ ' + ev.message;
+});
+
+if (location.hash === '#selftest'){
+  const res = [];
+  document.title = 'SELFTEST RUNNING';
+  setTimeout(async () => {
+   const q = s => document.querySelectorAll(s);
+   const ok = (n, c) => res.push((c ? 'PASS  ' : 'FAIL  ') + n);
+   const fire = (el, type) => el.dispatchEvent(new MouseEvent(type || 'click', { bubbles:true }));
+   const tabBtn = id => document.querySelector(`[data-act="tab"][data-v="${id}"]`);
+   const box = el => el.getBoundingClientRect();
+   const mid = el => box(el).left + box(el).width / 2;
+   try {
+
+    /* 1. 四个分类都要能出卡片、出行、每行都要有控件 */
+    TABS.forEach(t => {
+      fire(tabBtn(t.id));
+      let empty = 0;
+      q('#list .row').forEach(r => { if (!r.querySelector('.rc').children.length) empty++; });
+      const hi = document.querySelector('.tabs button.on');
+      ok(`分类「${t.n}」卡片${q('#list .card').length} 行${q('#list .row').length} 空控件${empty} 高亮=${hi&&hi.dataset.v}`,
+         q('#list .card').length > 0 && q('#list .row').length > 0 && empty === 0 && hi && hi.dataset.v === t.id);
+    });
+
+    /* 2. 开关真能翻值 */
+    fire(tabBtn('bar'));
+    let sw = document.querySelector('.row[data-id="barOn"] .sw');
+    const before = S.opt.barOn;
+    fire(sw);
+    ok(`开关 barOn ${before}→${S.opt.barOn}`, S.opt.barOn === !before && document.querySelector('.row[data-id="barOn"] .sw').classList.contains('on') === !before);
+    fire(document.querySelector('.row[data-id="barOn"] .sw'));   /* 还原，后面还要看长条 */
+
+    /* 3. 滑块真能改值、文本真能跟着走 */
+    sw = document.querySelector('.row[data-id="barMax"] .rng');
+    sw.value = 88; sw.dispatchEvent(new Event('input', { bubbles:true }));
+    const txt = document.querySelector('.row[data-id="barMax"] .val').textContent;
+    ok(`滑块 barMax → ${S.opt.barMax} / 文本「${txt}」`, S.opt.barMax === 88 && txt.indexOf('88') === 0);
+
+    /* 4. ★ 长条设置必须当场反映到预览：预览行 + 三态卡 + 消隐方式 */
+    const pvBar = document.querySelector('.prow .lpv i');
+    const triBar = document.querySelector('#triG .barwrap .bar');
+    const pvH = pvBar && parseFloat(pvBar.style.height);
+    const triH = triBar && parseFloat(triBar.style.height);
+    ok(`长条预览高度 预览行=${pvH} 三态卡=${triH}（应为 88）`, pvH === 88 && triH === 88);
+
+    const fadeOn = (pvBar.style.background || '').indexOf('gradient') >= 0;
+    fire(document.querySelector('.row[data-id="barDis"] .sw'));    /* 关掉消隐 → 直接消失 */
+    const solid = (document.querySelector('.prow .lpv i').style.background || '');
+    ok(`消隐开关：开=渐隐(${fadeOn}) / 关=实心(${solid.indexOf('gradient') < 0})`,
+       fadeOn && solid.indexOf('gradient') < 0 && S.opt.barDis === false);
+    fire(document.querySelector('.row[data-id="barDis"] .sw'));    /* 还原 */
+
+    ok('消隐类型分段已移除', !document.querySelector('.row[data-id="barFade"]'));
+
+    /* 5. 分类切换后选中行要自动落到可编辑项，取色器要出来 */
+    fire(tabBtn('color'));
+    const selRow = document.querySelector('#list .row.sel');
+    ok(`切到颜色：选中行=${selRow && selRow.dataset.id}，取色器=${$('#picker').classList.contains('on')}`,
+       selRow && selRow.dataset.id === 'normalColor' && $('#picker').classList.contains('on'));
+
+    /* 6. ★ 改一个键的颜色只能改那一个键，不能整排一起变 */
+    pickTarget('k3');
+    const keep = TKEYS.map(t => S.data[t].normalColor);
+    setColor('#FF3B30');
+    const after = TKEYS.map(t => S.data[t].normalColor);
+    const changed = after.filter((c,i) => c !== keep[i]).length;
+    const otherKeys = TKEYS.filter(t => t !== 'k3').map(t => S.data[t].normalColor);
+    const painted = [...document.querySelectorAll('#rowCus .key')].map(k => k.style.getPropertyValue('--edge'));
+    ok(`改 K(k3) 色：#FF3B30，实际变动 ${changed} 个键；预览里 ${new Set(painted).size} 种描边色（应为 2）`,
+       changed === 1 && otherKeys.every(c => c === '#FFFFFF') && new Set(painted).size === 2);
+    setColor('#FFFFFF');
+
+    /* 7. ★ 统计区：高度宽度两个一起变，颜色才各自独立 */
+    fire(tabBtn('stat'));
+    fire(document.querySelector('.row[data-id="statHeight"] .rng'));
+    pickTarget('kps'); fire(tabBtn('stat'));
+    const hR = document.querySelector('.row[data-id="statHeight"] .rng');
+    hR.value = 60; hR.dispatchEvent(new Event('input', { bubbles:true }));
+    const wR = document.querySelector('.row[data-id="statWidth"] .rng');
+    wR.value = 40; wR.dispatchEvent(new Event('input', { bubbles:true }));
+    const st = [...document.querySelectorAll('#statCus .stat')].map(e => e.style.height + '/' + e.style.width);
+    ok(`统计区尺寸 ${st.join(' 与 ')}（两块必须一模一样）`,
+       st.length === 2 && st[0] === st[1] && st[0] === '60px/40%');
+
+    pickTarget('kps');
+    fire(tabBtn('color'));
+    const gray = [...document.querySelectorAll('#list .row.dim')].map(e => e.dataset.id);
+    setColor('#00FFFF');
+    const kpsC = S.data.kps.normalColor, totC = S.data.total.normalColor;
+    ok(`统计块颜色独立：KPS=${kpsC} / Total=${totC}；统计页灰掉 ${gray.length} 项`,
+       kpsC === '#00FFFF' && totC === '#FFFFFF' && gray.length > 0);
+
+    /* 8. ★ 选中统计块时三态卡要收起来 */
+    pickTarget('kps');
+    const triHidden = document.querySelector('.tri').style.display === 'none';
+    pickTarget('k3');
+    const triShown = document.querySelector('.tri').style.display !== 'none';
+    ok(`三态卡：选中统计块时隐藏=${triHidden}，选中按键时显示=${triShown}`, triHidden && triShown);
+
+    /* 9. 主题切换要立刻生效，并且改任何东西都归到「自定义」 */
+    fire(tabBtn('theme'));
+    fire(document.querySelector('.row[data-id="theme"] .seg button[data-v="fnf"]'));
+    const applied = TARGETS.every(t => S.data[t].normalColor === '#C24B99');
+    ok(`主题 FNF 生效（全部目标正常态色=${S.data.k0.normalColor}）`, applied && S.theme === 'fnf');
+    fire(tabBtn('color'));
+    setColor('#12FA05');
+    ok(`改动后主题归自定义（theme=${S.theme}）`, S.theme === 'custom');
+
+    /* 10. 预览结构 */
+    ok(`预览 10K：默认${q('#rowDef .key').length} 自定${q('#rowCus .key').length} 选中${q('#rowCus .key.sel').length} 箭头${q('#rowCus .mark').length}`,
+       q('#rowDef .key').length === 10 && q('#rowCus .key').length === 10 && q('#rowCus .key.sel').length === 1 && q('#rowCus .mark').length === 1);
+
+    /* 8. 每个控件类都得真的吃到了 CSS（不是浏览器默认外观） */
+    const probe = (tab, list) => {
+      fire(tabBtn(tab));
+      list.forEach(([sel, name]) => {
+        const el = document.querySelector(sel);
+        if (!el) { ok(`样式 ${name}（${tab}）：元素不存在`, false); return; }
+        const cs = getComputedStyle(el);
+        const fontOK = cs.fontFamily.indexOf('Segoe') >= 0 || cs.fontFamily.indexOf('ui') >= 0;
+        ok(`样式 ${name}：border=${cs.borderStyle} radius=${cs.borderTopLeftRadius} font=${cs.fontFamily.slice(0,20)}`, fontOK);
+      });
+    };
+    probe('theme', [['.tabs button','tabs'], ['.seg button','seg'], ['.sw','sw'], ['.rst','rst'], ['.btn','btn'], ['.chip','chip']]);
+    probe('stat',  [['.rng','rng'], ['.hexwrap','hexwrap']]);
+
+    /* 9. 布局量测：不许溢出、不许错位 */
+    const hb = document.querySelector('.hintb');
+    ok(`顶部提示 ${Math.round(hb.scrollWidth)}/${Math.round(hb.clientWidth)} 不溢出`, hb.scrollWidth <= hb.clientWidth + 1);
+
+    fire(tabBtn('color'));            /* 颜色这一页行数最多，取色抽屉也在这页展开 */
+    const pk = $('#picker');
+    pk.style.transition = 'none';     /* 量测期间关掉过渡，否则量到的是动画中间态 */
+    $('#list').style.transition = 'none';
+    fire(tabBtn('color'));
+    await new Promise(r => setTimeout(r, 60));
+    const list = $('#list'), lastCard = list.lastElementChild;
+    /* 抽屉是浮层：内容只要不钻进抽屉底下就算看得见 */
+    const clear = Math.round(box(pk).top - box(lastCard).bottom);
+    ok(`列表可视 ${list.clientHeight}，最后一张卡距取色抽屉 ${clear}px（负数=被抽屉压住）`,
+       list.scrollHeight <= list.clientHeight + 1 && clear >= 0);
+
+    /* 容器到底有没有被内容撑爆（撑爆的话 #app 的 overflow:hidden 会从底部切掉东西） */
+    const appB = box($('#app')), bodyB = box($('#body')), stageB = box($('#stage'));
+    const paneB = box($('#pane')), pickB = box($('#picker'));
+    ok(`窗口 ${Math.round(appB.top)}..${Math.round(appB.bottom)} | body ${Math.round(bodyB.top)}..${Math.round(bodyB.bottom)} | ` +
+       `左栏高 ${Math.round(stageB.height)} | 面板 ${Math.round(paneB.top)}..${Math.round(paneB.bottom)} | 取色 ${Math.round(pickB.top)}..${Math.round(pickB.bottom)}`,
+       paneB.bottom <= appB.bottom - 60 && stageB.bottom <= appB.bottom - 60 && pickB.bottom <= appB.bottom - 60);
+
+    /* 色板必须排成整齐的网格：每行格数一致、格子等大 */
+    const pal = [...document.querySelectorAll('.palette i')];
+    const rows = {};
+    pal.forEach(el => { const t = Math.round(box(el).top); (rows[t] = rows[t] || []).push(Math.round(box(el).width)); });
+    const rowInfo = Object.values(rows).map(r => `${r.length}×${r[0]}`);
+    ok(`色板 ${pal.length} 格，排布 ${rowInfo.join(' + ')}`,
+       rowInfo.every(r => /^(\d+)×(\d+)$/.test(r)) &&
+       new Set(Object.values(rows).map(r => r.length)).size === 1 &&
+       new Set(pal.map(e => Math.round(box(e).width))).size === 1);
+
+    const cells = [...document.querySelectorAll('#triG .cell')];
+    const off = cells.map(c => {
+      const inner = c.querySelector('.demo') || c.querySelector('.barwrap') || c.querySelector('.na');
+      return inner ? Math.round(mid(inner) - mid(c)) : 999;
+    });
+    ok(`三态卡三格内容相对格中心的偏移 = ${off.join(' / ')} px`, off.every(v => Math.abs(v) <= 2));
+
+    const srow = document.querySelector('#statCus'), sts = [...srow.querySelectorAll('.stat')];
+    const soff = Math.round((box(sts[0]).left + box(sts[1]).right) / 2 - mid(srow));
+    ok(`统计条居中偏移 ${soff}px，两块宽 ${Math.round(box(sts[0]).width)}/${Math.round(box(sts[1]).width)}`,
+       Math.abs(soff) <= 2 && Math.abs(box(sts[0]).width - box(sts[1]).width) <= 1);
+
+    const kw = [...document.querySelectorAll('#rowCus .key')].map(k => Math.round(box(k).width));
+    ok(`10K 键宽 ${kw[0]}px 全部一致`, new Set(kw).size === 1);
+
+    const tabs = [...document.querySelectorAll('.tabs button')];
+    ok(`Tab 等宽 ${Math.round(box(tabs[0]).width)}px`, new Set(tabs.map(t => Math.round(box(t).width))).size === 1);
+
+    const btns = [...document.querySelectorAll('.fmid .btn')];
+    const bw = btns.map(b => Math.round(box(b).width));
+    ok(`底部按钮等宽等高 ${bw.join('/')}`, bw[0] === bw[1] && Math.round(box(btns[0]).height) === Math.round(box(btns[1]).height));
+
+    /* 11. 恢复默认 / 导入 也要真的把界面刷回来 */
+    S.data.k0.normalColor = '#123456'; S.opt.barMax = 99; S.theme = 'custom';
+    renderAll();
+    fire(document.querySelector('[data-act="resetAll"]'));
+    ok(`恢复默认：键色=${S.data.k0.normalColor} 长条=${S.opt.barMax} 主题=${S.theme} 预览底色=${getComputedStyle(document.querySelector('#rowCus .key')).backgroundColor}`,
+       S.data.k0.normalColor === '#FFFFFF' && S.opt.barMax === 70 && S.theme === 'default' &&
+       getComputedStyle(document.querySelector('#rowCus .key')).backgroundColor.indexOf('255, 255, 255') >= 0);
+
+    /* 新格式：颜色在 targets，长条/统计在 options */
+    importJson(JSON.stringify({ version:2, theme:'fnf', options:{ barMax:42, statWidth:33 },
+                                targets:{ k5:{ normalColor:'#FF884E' } } }));
+    ok(`导入 v2：k5=${S.data.k5.normalColor} 长条=${S.opt.barMax} 统计宽=${S.opt.statWidth} 其余键=${S.data.k0.normalColor}`,
+       S.data.k5.normalColor === '#FF884E' && S.opt.barMax === 42 && S.opt.statWidth === 33 && S.data.k0.normalColor === '#FFFFFF');
+
+    /* 老格式（v1，长条参数散在每个 target 里）也要能读进来 */
+    importJson(JSON.stringify({ version:1, theme:'fnf',
+                                targets:{ k5:{ normalColor:'#71E300', barMax:64, statHeight:50 } } }));
+    ok(`导入 v1（旧存档）：k5=${S.data.k5.normalColor} 长条=${S.opt.barMax} 统计高=${S.opt.statHeight}`,
+       S.data.k5.normalColor === '#71E300' && S.opt.barMax === 64 && S.opt.statHeight === 50);
+
+   } catch(err){
+     const msg = (err && err.message) ? err.message : String(err);
+     res.push('FAIL  自检脚本抛错：' + msg);
+     document.title = 'SELFTEST ERR ▸ ' + msg;
+   }
+   try {
+    /* 11. 极端数值下左栏也不许把三态卡裁掉（宁可滚） */
+    S.opt.statHeight = 72; S.opt.statWidth = 60; S.opt.barMax = 100; renderAll();
+    const stg = $('#stage'), triEl = document.querySelector('.tri');
+    const triClip = triEl.scrollHeight - triEl.clientHeight;
+    ok(`统计块拉满(72px) + 统计宽 60% + 长条 100px：三态卡裁掉 ${triClip}px，左栏内容 ${stg.scrollHeight}/可视 ${stg.clientHeight}`,
+       triClip <= 1);
+    S.opt.statHeight = 34; S.opt.statWidth = 26; S.opt.barMax = 70; renderAll();
+
+    const fails = res.filter(r => r.indexOf('FAIL') === 0).length;
+    document.title = `SELFTEST ${fails === 0 ? 'ALL PASS' : fails + ' FAIL'} (${res.length})`;
+    const pre = document.createElement('pre');
+    pre.id = 'selftest';
+    pre.style.cssText = 'position:fixed;inset:0;z-index:9999;margin:0;padding:16px;overflow:auto;background:rgba(0,0,0,.93);font:12px/1.6 Consolas,monospace;white-space:pre-wrap';
+    pre.textContent = res.join('\n') + `\n\n===== ${fails === 0 ? 'ALL PASS' : fails + ' FAIL'} / ${res.length} =====`;
+    pre.style.color = fails === 0 ? '#8BE08A' : '#FF9E9E';
+    document.body.appendChild(pre);
+   } catch(e2){ document.title = 'SELFTEST TAIL ERR ▸ ' + e2.message; }
+  }, 120);
+}
+</script>
+</body>
+</html>

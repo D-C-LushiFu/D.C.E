@@ -40,18 +40,23 @@ class WarningState extends MusicBeatState {
 	public override function update(elapsed:Float) {
 		super.update(elapsed);
 
-		if (controls.ACCEPT && transitioning) {
+		var confirm = controls.ACCEPT;
+		#if TOUCH_CONTROLS
+		confirm = confirm || mobile.funkin.backend.utils.TouchUtil.justPressed;
+		#end
+		if (!confirm) return;
+
+		if (transitioning) {
 			FlxG.camera.stopFX(); FlxG.camera.visible = false;
 			goToTitle();
+			return;
 		}
 
-		if (controls.ACCEPT && !transitioning) {
-			transitioning = true;
-			CoolUtil.playMenuSFX(CONFIRM);
-			FlxG.camera.flash(FlxColor.WHITE, 1, function() {
-				FlxG.camera.fade(FlxColor.BLACK, 2.5, false, goToTitle);
-			});
-		}
+		transitioning = true;
+		CoolUtil.playMenuSFX(CONFIRM);
+		FlxG.camera.flash(FlxColor.WHITE, 1, function() {
+			FlxG.camera.fade(FlxColor.BLACK, 2.5, false, goToTitle);
+		});
 	}
 
 	private function goToTitle() {

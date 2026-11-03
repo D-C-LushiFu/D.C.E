@@ -1,15 +1,6 @@
 package developer.display;
 
-/*
-	author: beihu235
-	bilibili: https://b23.tv/SnqG443
-	github: https://github.com/beihu235
-	youtube: https://youtube.com/@beihu235?si=NHnWxcUWPS46EqUt
-	discord: @beihu235
-
-	thanks Chiny help me adjust data
-	github: https://github.com/dmmchh
- */
+/* author: D.C.LushiFu */
 
 import openfl.events.Event;
 
@@ -31,7 +22,7 @@ class FPSViewer extends Sprite
 	public static var fpsShow:FPSCounter;
 	public static var extraShow:ExtraCounter;
 
-	public var isHiding = true;
+	public var isHiding = false;
 
 	function create()
 	{
@@ -43,11 +34,13 @@ class FPSViewer extends Sprite
 		addChild(extraShow);
 		extraShow.update();
 
-		extraShow.alpha = 0;
-		extraShow.graphMonitor.setRenderingEnabled(false);
-
 		addEventListener(Event.ENTER_UPDATE, update);
 		addEventListener(Event.ENTER_FRAME, draw);
+
+		// 默认显示「新版」展开态（Update/Draw/Memory 详情 + 图形监视），
+		// 点击左上角可折叠回「旧版」轻量数字。由 hide() 按 isHiding 统一
+		// 初始化两个计数器的 alpha 与 graphMonitor 渲染/输入开关。
+		hide();
 	}
 
 	public var canPress:Bool = true;

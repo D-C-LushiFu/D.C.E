@@ -6,10 +6,10 @@ import openfl.filters.ShaderFilter;
 import flixel.tweens.FlxEase;
 import flixel.tweens.FlxTween;
 import codename.funkin.backend.shaders.CustomShader;
-import openfl.filters.ShaderFilter;
 
 class UIWarningSubstate extends MusicBeatSubstate {
-	var camShaders:Array<FlxCamera> = [];
+	var cameraBlurFilters:Array<{camera:FlxCamera, filter:ShaderFilter}> = [];
+	var cameraBlurRemoved:Bool = false;
 	var blurShader:CustomShader = {
 		var _ = new CustomShader(Options.intensiveBlur ? "engine/editorBlur" : "engine/editorBlurFast");
 		if(!Options.intensiveBlur) {
@@ -28,6 +28,7 @@ class UIWarningSubstate extends MusicBeatSubstate {
 	var message:String;
 	var buttons:Array<WarningButton>;
 	var isError:Bool = true;
+	var backButtonIndex:Int = 0;
 
 	var titleSpr:UIText;
 	var messageSpr:UIText;
@@ -43,9 +44,9 @@ class UIWarningSubstate extends MusicBeatSubstate {
 	public override function create() {
 		for(c in FlxG.cameras.list) {
 			// Prevent adding a shader if it already has one
-			@:privateAccess if(c._filters != null) {
+			if(c.filters != null) {
 				var shouldSkip = false;
-				for(filter in c._filters) {
+				for(filter in c.filters) {
 					if(filter is ShaderFilter) {
 						var filter:ShaderFilter = cast filter;
 						if(filter.shader is CustomShader) {
@@ -61,8 +62,15 @@ class UIWarningSubstate extends MusicBeatSubstate {
 				if(shouldSkip)
 					continue;
 			}
-			camShaders.push(c);
-			c.addShader(blurShader);
+
+			// Replace the array instead of mutating it in place. FlxCamera caches
+			// the last applied array by identity, so push/remove on the same array
+			// can leave the OpenFL display object using stale filters.
+			var filter = new ShaderFilter(blurShader);
+			var filters = c.filters == null ? [] : c.filters.copy();
+			filters.push(filter);
+			c.filters = filters;
+			cameraBlurFilters.push({camera: c, filter: filter});
 		}
 
 		camera = warnCam = new FlxCamera();
@@ -120,21 +128,56 @@ class UIWarningSubstate extends MusicBeatSubstate {
 		CoolUtil.playMenuSFX(WARNING);
 	}
 
-	public override function destroy() {
-		super.destroy();
-		for(e in camShaders)
-			e.removeShader(blurShader);
-
-		FlxTween.cancelTweensOf(warnCam);
-		FlxG.cameras.remove(warnCam);
+	public override function update(elapsed:Float) {
+		#if mobile
+		if (controls.BACK && buttons.length > 0) {
+			var index = FlxMath.bound(backButtonIndex, 0, buttons.length - 1);
+			buttons[Std.int(index)].onClick(this);
+			close();
+			return;
+		}
+		#end
+		super.update(elapsed);
 	}
 
-	public function new(title:String, message:String, buttons:Array<WarningButton>, ?isError:Bool = true) {
+	function removeCameraBlur():Void
+	{
+		if (cameraBlurRemoved) return;
+		cameraBlurRemoved = true;
+
+		for (entry in cameraBlurFilters) {
+			if (entry == null || entry.camera == null || entry.camera.filters == null) continue;
+			var filters = entry.camera.filters.copy();
+			filters.remove(entry.filter);
+			entry.camera.filters = filters.length > 0 ? filters : null;
+		}
+		cameraBlurFilters = [];
+	}
+
+	public override function close():Void
+	{
+		// Remove immediately on Cancel/Back. Waiting for the deferred substate
+		// destroy leaves at least one rendered frame with the stale filter.
+		removeCameraBlur();
+		super.close();
+	}
+
+	public override function destroy() {
+		removeCameraBlur();
+		if (warnCam != null) {
+			FlxTween.cancelTweensOf(warnCam);
+			if (FlxG.cameras.list.contains(warnCam)) FlxG.cameras.remove(warnCam);
+		}
+		super.destroy();
+	}
+
+	public function new(title:String, message:String, buttons:Array<WarningButton>, ?isError:Bool = true, ?backButtonIndex:Int = 0) {
 		super();
 		this.title = title;
 		this.message = message;
 		this.buttons = buttons;
 		this.isError = isError;
+		this.backButtonIndex = backButtonIndex;
 	}
 }
 

@@ -184,10 +184,15 @@ class GitCommitMacro {
 		#else
 		try {
 			var process = new Process("git", ["status", "--porcelain"], false);
-			if (process.exitCode() != 0)
+			// Drain stdout before waiting for Git. Waiting first deadlocks once a
+			// dirty worktree produces more output than the anonymous pipe buffer.
+			var output = process.stdout.readAll().toString();
+			var exitCode = process.exitCode();
+			process.close();
+			if (exitCode != 0)
 				throw 'Could not fetch current branch';
 
-			return macro $v{process.stdout.readLine().toString() != ""};
+			return macro $v{output.length != 0};
 		} catch(e) {}
 		return macro $v{false}
 		#end

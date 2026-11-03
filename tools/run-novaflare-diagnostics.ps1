@@ -41,14 +41,14 @@ $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $runPath = [IO.Path]::GetFullPath($RunDirectory)
 if ([string]::IsNullOrWhiteSpace($Executable)) {
     $Executable = Join-Path $repo (
-        'export\release\windows\bin\NovaFlare Engine.exe')
+        'export\release\windows\bin\D.C.E.exe')
 }
 $executablePath = [IO.Path]::GetFullPath($Executable)
 $binDirectory = Split-Path -Parent $executablePath
-$processMonitor = Join-Path $repo 'tools\monitor-novaflare-process.ps1'
-$hardwareMonitor = Join-Path $repo 'tools\monitor-novaflare-hardware.ps1'
-$dumpTool = Join-Path $repo 'tools\capture-novaflare-process-dump.ps1'
-$frameConverter = Join-Path $repo 'tools\convert-novaflare-frame-log.ps1'
+$processMonitor = Join-Path $repo 'tools\monitor-dce-process.ps1'
+$hardwareMonitor = Join-Path $repo 'tools\monitor-dce-hardware.ps1'
+$dumpTool = Join-Path $repo 'tools\capture-dce-process-dump.ps1'
+$frameConverter = Join-Path $repo 'tools\convert-dce-frame-log.ps1'
 
 if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
     throw "Executable does not exist: $executablePath"
@@ -92,12 +92,12 @@ $manifestPath = Join-Path $runPath 'diagnostic-manifest.json'
     'HXCPP_NOVAGC_DIAGNOSTIC_LOG',
     'HXCPP_NOVAGC_TYPE_TELEMETRY',
     'NOVAGC_PERF_TRACE',
-    'NOVAFLARE_DIAGNOSTIC_DIR',
-    'NOVAFLARE_NATIVE_DUMP_DIR',
-    'NOVAFLARE_DIAGNOSTIC_SONG',
-    'NOVAFLARE_DIAGNOSTIC_DIFFICULTY',
-    'NOVAFLARE_DIAGNOSTIC_MOD',
-    'NOVAFLARE_DIAGNOSTIC_BOTPLAY'
+    'DCE_DIAGNOSTIC_DIR',
+    'DCE_NATIVE_DUMP_DIR',
+    'DCE_DIAGNOSTIC_SONG',
+    'DCE_DIAGNOSTIC_DIFFICULTY',
+    'DCE_DIAGNOSTIC_MOD',
+    'DCE_DIAGNOSTIC_BOTPLAY'
 ) | ForEach-Object {
     Remove-Item -LiteralPath "Env:$_" -ErrorAction SilentlyContinue
 }
@@ -105,8 +105,8 @@ $env:HXCPP_NOVAGC_CSV_LOG = $gcCsv
 $env:HXCPP_NOVAGC_JSON_LOG = $gcJson
 $env:HXCPP_NOVAGC_DIAGNOSTIC_LOG = $gcDiagnostics
 $env:NOVAGC_PERF_TRACE = '1'
-$env:NOVAFLARE_DIAGNOSTIC_DIR = $runPath
-$env:NOVAFLARE_NATIVE_DUMP_DIR = $dumpDirectory
+$env:DCE_DIAGNOSTIC_DIR = $runPath
+$env:DCE_NATIVE_DUMP_DIR = $dumpDirectory
 if ($EnableTypeTelemetry) {
     $env:HXCPP_NOVAGC_TYPE_TELEMETRY = '1'
 }
@@ -114,20 +114,20 @@ if ($Scenario -eq 'Gameplay') {
     if ([string]::IsNullOrWhiteSpace($GameplaySong)) {
         throw 'GameplaySong must not be empty for the Gameplay scenario.'
     }
-    $env:NOVAFLARE_DIAGNOSTIC_SONG = $GameplaySong
-    $env:NOVAFLARE_DIAGNOSTIC_DIFFICULTY =
+    $env:DCE_DIAGNOSTIC_SONG = $GameplaySong
+    $env:DCE_DIAGNOSTIC_DIFFICULTY =
         $GameplayDifficulty.ToString(
             [Globalization.CultureInfo]::InvariantCulture)
-    $env:NOVAFLARE_DIAGNOSTIC_MOD = $GameplayMod
-    $env:NOVAFLARE_DIAGNOSTIC_BOTPLAY =
+    $env:DCE_DIAGNOSTIC_MOD = $GameplayMod
+    $env:DCE_DIAGNOSTIC_BOTPLAY =
         if ($GameplayBotplay) { '1' } else { '0' }
 }
 
-if (-not ('NovaFlareDiagnosticInput.Native' -as [type])) {
+if (-not ('DCEDiagnosticInput.Native' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
-namespace NovaFlareDiagnosticInput {
+namespace DCEDiagnosticInput {
     public static class Native {
         [DllImport("user32.dll")]
         public static extern bool PostMessage(
@@ -247,10 +247,10 @@ try {
             $process.Refresh()
             $window = $process.MainWindowHandle
             if ($window -ne [IntPtr]::Zero) {
-                $down = [NovaFlareDiagnosticInput.Native]::PostMessage(
+                $down = [DCEDiagnosticInput.Native]::PostMessage(
                     $window, 0x0100, [IntPtr]0x0d, [IntPtr]0x001c0001)
                 Start-Sleep -Milliseconds 100
-                $up = [NovaFlareDiagnosticInput.Native]::PostMessage(
+                $up = [DCEDiagnosticInput.Native]::PostMessage(
                     $window, 0x0101, [IntPtr]0x0d, [IntPtr]0xc01c0001)
                 $enteredScenario = $down -and $up
                 Write-Output "main_menu_input=$enteredScenario"
@@ -433,7 +433,7 @@ try {
     } -ErrorAction Stop | Where-Object {
         $_.Id -in @(1000, 1001, 1026) -and
         $_.TimeCreated.ToUniversalTime() -ge $startedUtc.AddSeconds(-2) -and
-        $_.Message -like '*NovaFlare Engine*'
+        $_.Message -like '*D.C.E.*'
     } | Select-Object TimeCreated, Id, ProviderName, LevelDisplayName, Message)
 }
 catch {}

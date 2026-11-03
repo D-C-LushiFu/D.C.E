@@ -24,7 +24,12 @@ class TraceInterceptor {
 		Iris.logLevel = customLogLevel;
 		#end
 
+		// Omit inbound editor/debug sockets in local runtime tests. Define
+		// EDITOR_TEST_NO_INBOUND_SERVERS for those builds; normal builds keep
+		// remote trace and mobile-key editor services available.
+		#if !EDITOR_TEST_NO_INBOUND_SERVERS
 		TraceServer.start(1145);
+		#end
 		ConsoleToggleButton.show();
 	}
 

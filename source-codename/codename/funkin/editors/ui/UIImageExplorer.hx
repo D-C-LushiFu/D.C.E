@@ -60,10 +60,17 @@ class UIImageExplorer extends UIFileExplorer {
 		directoryBG.members.push(directoryTextBox);
 
 		if (image != null) {
-			var fullImagePath:String = '${Path.normalize(Sys.getCwd())}/${Paths.image(image)}'.replace('/', '\\');
+			var imageAsset = Paths.image(image);
+			var fullImagePath:String = Assets.exists(imageAsset) ? Assets.getPath(imageAsset) : null;
+			if (fullImagePath == null || fullImagePath.length == 0) {
+				var relativeAsset = imageAsset.startsWith("assets/") ? imageAsset.substr("assets/".length) : imageAsset;
+				fullImagePath = Path.join([Paths.getAssetsRoot(), relativeAsset]);
+			}
+			fullImagePath = Path.normalize(fullImagePath);
 			var noExt = Path.withoutExtension(fullImagePath);
-			if (FileSystem.exists('$noExt\\spritemap1.png'))
-				fullImagePath = '$noExt\\spritemap1.png';
+			var firstSpritemap = Path.join([noExt, 'spritemap1.png']);
+			if (FileSystem.exists(firstSpritemap))
+				fullImagePath = firstSpritemap;
 	
 			if (FileSystem.exists(fullImagePath))
 				loadFile(fullImagePath);
@@ -114,7 +121,7 @@ class UIImageExplorer extends UIFileExplorer {
 					break;
 				}
 			}
-		} else if(allowAtlases && Path.extension(fileName) == "png") {
+		} else if(allowAtlases && Path.extension(fileName).toLowerCase() == "png") {
 			// check if the spritemap json files point to the image
 			files = FileSystem.readDirectory(directoryPath);
 			var hasAnimationJson:Bool = false;
@@ -166,7 +173,7 @@ class UIImageExplorer extends UIFileExplorer {
 		// GATHER ANIMATIONS/DATA FILES!!!
 		var frames:FlxFramesCollection = null;
 		if (isAtlas) {
-			var dataPath:String = '$directoryPath/Animation.json'.replace('/', '\\');
+			var dataPath:String = Path.join([directoryPath, 'Animation.json']);
 
 			if (FileSystem.exists(dataPath)) {
 				var dataPathFile:String = File.getContent(dataPath);
@@ -203,7 +210,6 @@ class UIImageExplorer extends UIFileExplorer {
 				var info = FileSystem.stat(spritemapPath);
 				size += info.size;
 
-				spritemapPath = spritemapPath.replace('/', '\\');
 				imageFiles.set(Path.withoutDirectory(spritemapPath), sys.io.File.getBytes(spritemapPath));
 			}
 

@@ -68,6 +68,9 @@ class Song
 	 */
 	public static function convert(songJson:Dynamic):Void
 	{
+		if (songJson == null)
+			return;
+
 		if (songJson.gfVersion == null)
 		{
 			songJson.gfVersion = songJson.player3;
@@ -78,19 +81,27 @@ class Song
 		if (songJson.events == null)
 		{
 			songJson.events = [];
+			if (songJson.notes != null)
 			for (secNum in 0...songJson.notes.length)
 			{
 				var sec:SwagSection = songJson.notes[secNum];
+				if (sec == null || sec.sectionNotes == null) continue;
 
 				var i:Int = 0;
 				var notes:Array<Dynamic> = sec.sectionNotes;
 				var len:Int = notes.length;
 				while (i < len)
 				{
-					var note:Array<Dynamic> = notes[i];
-					if (note[1] < 0)
+					var note:Dynamic = notes[i];
+					if (note == null || !Std.isOfType(note, Array) || note.length < 2)
 					{
-						songJson.events.push([note[0], [[note[2], note[3], note[4]]]]);
+						i++;
+						continue;
+					}
+					if ((Std.isOfType(note[1], Int) || Std.isOfType(note[1], Float)) && note[1] < 0)
+					{
+						songJson.events.push([note[0], [[note.length > 2 ? note[2] : null, note.length > 3 ? note[3] : null,
+							note.length > 4 ? note[4] : null]]]);
 						notes.remove(note);
 						len = notes.length;
 					}
@@ -106,6 +117,8 @@ class Song
 
 		for (section in sectionsData)
 		{
+			// ★ 防御：坏谱面可能含 null 小节，裸取字段在 cpp 目标会原生崩溃
+			if (section == null) continue;
 			var beats:Null<Float> = cast section.sectionBeats;
 			if (beats == null || Math.isNaN(beats))
 			{
@@ -114,9 +127,11 @@ class Song
 					Reflect.deleteField(section, 'lengthInSteps');
 			}
 
+			if (section.sectionNotes == null)
+				section.sectionNotes = [];
 			for (note in section.sectionNotes)
 			{
-				if (!Std.isOfType(note[3], String) && note[3] != null)
+				if (note != null && Std.isOfType(note, Array) && note.length > 3 && !Std.isOfType(note[3], String) && note[3] != null)
 					note[3] = Note.defaultNoteTypes[note[3]];
 			}
 		}
@@ -124,6 +139,8 @@ class Song
 
 	private static function fixMissingFields(songJson:Dynamic):Void
 	{
+		if (songJson.notes == null) songJson.notes = [];
+		if (songJson.events == null) songJson.events = [];
 		if (songJson.song == null) songJson.song = 'Unknown';
 		if (songJson.player2 == null) songJson.player2 = 'dad';
 		if (songJson.speed == null) songJson.speed = 1;
@@ -148,6 +165,7 @@ class Song
 			for (secNum in 0...songJson.notes.length)
 			{
 				var sec:SwagSection = songJson.notes[secNum];
+				if (sec == null || sec.sectionNotes == null) continue;
 
 				var i:Int = 0;
 				var notes:Array<Dynamic> = sec.sectionNotes;
@@ -203,7 +221,7 @@ class Song
 
 	static var _lastPath:String;
 
-	public static function getChart(jsonInput:String, ?folder:String):SwagSong
+	public static function getChart(jsonInput:String, ?folder:String, ?updateEngineState:Bool = true):SwagSong
 	{
 		if (folder == null)
 			folder = jsonInput;
@@ -220,7 +238,11 @@ class Song
 		#end
 		rawData = Assets.getText(_lastPath);
 
-		return rawData != null ? parseJSON(rawData, jsonInput) : null;
+		if (rawData == null)
+			return null;
+		// Auxiliary charts (such as events.json) contribute data to the current
+		// song, but must not replace that song's detected/selected engine version.
+		return updateEngineState ? parseJSON(rawData, jsonInput) : parseChart(rawData).song;
 	}
 
 	/**
@@ -233,8 +255,28 @@ class Song
 	 */
 	public static function parseJSON(rawData:String, ?nameForError:String = null, ?convertTo:String = 'psych_v1'):SwagSong
 	{
+		var parsed = parseChart(rawData);
+		var forcedVersion:String = forceEngineVersion;
+		applyFormatState(parsed.detectedFormat);
+		// A forced engine is a one-chart override (used by Change Ver / the editor).
+		// Persist the choice in the parsed chart format, then clear the global override
+		// so later songs can auto-detect instead of inheriting a stale engine.
+		if (forcedVersion != null && forcedVersion.length > 0)
+		{
+			parsed.song.format = forcedVersion == 'Pe-1.0.4' ? 'psych_v1' : 'Pe-0.7.3';
+			forceEngineVersion = null;
+		}
+		return parsed.song;
+	}
+
+	/** Normalize a chart without mutating gameplay globals; safe for preview workers. */
+	public static function parseChart(rawData:String):{song:SwagSong, detectedFormat:String}
+	{
 		var parsedJson:Dynamic = Json.parse(rawData);
+		if (parsedJson == null)
+			throw 'Chart JSON root must be an object';
 		var hasWrapper:Bool = Reflect.hasField(parsedJson, 'song');
+		var wrapperFormat:String = Reflect.field(parsedJson, 'format');
 
 		if (hasWrapper)
 		{
@@ -246,14 +288,25 @@ class Song
 		var songJson:SwagSong = cast parsedJson;
 
 		// Detect original format: check format field first, wrapper as fallback
-		var fmt:String = songJson.format;
-		if (fmt != null && fmt.startsWith('psych_v1'))
-			detectedFormat = 'Pe-1.0.x';
+		var fmt:String = songJson.format != null ? songJson.format : wrapperFormat;
+		var chartFormat:String;
+		if (fmt == 'psych_v1_convert' || fmt == 'Pe-0.7.3')
+			chartFormat = 'Pe-0.7.3';
+		else if (fmt != null && fmt.startsWith('psych_v1'))
+			chartFormat = 'Pe-1.0.x';
 		else
-			detectedFormat = hasWrapper ? 'Pe-0.7.3' : 'Pe-1.0.x';
+			chartFormat = hasWrapper ? 'Pe-0.7.3' : 'Pe-1.0.x';
 		if (fmt == null || fmt.length == 0)
-			songJson.format = detectedFormat;
+			songJson.format = chartFormat;
 
+		convert(songJson);
+		fixMissingFields(songJson);
+		return {song: songJson, detectedFormat: chartFormat};
+	}
+
+	public static function applyFormatState(chartFormat:String):Void
+	{
+		detectedFormat = chartFormat;
 		// Auto-detect engine version from chart format, or use forced override
 		// Both engines are supported natively at runtime (PlayState interprets notes accordingly)
 		if (forceEngineVersion != null && forceEngineVersion.length > 0)
@@ -265,12 +318,6 @@ class Song
 			chartEngineVersion = (detectedFormat == 'Pe-1.0.x') ? 'Pe-1.0.4' : 'Pe-0.7.3';
 		}
 
-		// Always normalize (events, gfVersion, note types) but never convert note lanes
-		convert(songJson);
-
-		fixMissingFields(songJson);
-
-		return songJson;
 	}
 
 	public static function castVersion(songJson:SwagSong):SwagSong

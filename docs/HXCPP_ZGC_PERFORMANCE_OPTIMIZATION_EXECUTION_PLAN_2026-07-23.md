@@ -1,14 +1,14 @@
 # hxcpp NovaGC/ZGC 性能优化完整执行计划
 
 > 日期：2026-07-23  
-> 项目：NovaFlare Engine  
+> 项目：D.C.E.  
 > 目标平台：Windows / hxcpp  
 > 对照组：项目原有 Generational Immix、OpenJDK 26 Generational ZGC  
 > 文档性质：后续实施、验收和回退的唯一主计划，不代表下列优化已经完成
 
 ## 1. 最终目标
 
-本计划要解决的不是单次 GC 日志是否好看，而是 NovaGC/ZGC 在 NovaFlare 实际游戏负载下的综合表现：
+本计划要解决的不是单次 GC 日志是否好看，而是 NovaGC/ZGC 在 D.C.E. 实际游戏负载下的综合表现：
 
 1. 缩小 NovaGC 与项目原有 Immix 的主线程 Update 吞吐差距。
 2. 保留移动式、精确、分代 GC 的正确性，不使用永久关闭移动或永久关闭自动 GC 作为最终方案。
@@ -684,7 +684,7 @@ soft-max 调度修改后又针对性重编并通过：
 
 严格 legacy 构建已生成：
 
-`export/legacy-gc/windows/bin/NovaFlare Engine.exe`
+`export/legacy-gc/windows/bin/D.C.E.exe`
 
 SHA-256：`E8AC6BCB85889B88B79717ED51271CF96B57BB2573137B886D00B9202BD09BC1`。
 
@@ -848,12 +848,12 @@ HotSpot ZGC 的正常 colored pointer 屏障是编译器配合的极短路径，
 
 对应工具：
 
-- `tools/run-novaflare-diagnostics.ps1`：统一启动、自动交互、持续采样、卡死判断、错误抽取和 manifest。
-- `tools/capture-novaflare-process-dump.ps1`：使用 `MiniDumpWriteDump` 抓取 Triage 或 Full dump。
-- `tools/convert-novaflare-frame-log.ps1`：把进程内 Haxe 帧计数日志转换为稳定 CSV。
-- `tools/monitor-novaflare-frame-rate.ps1`：仅作可选高频外部监视；无法证明计数器有效时必须失败关闭，不能再输出伪造大数。
+- `tools/run-dce-diagnostics.ps1`：统一启动、自动交互、持续采样、卡死判断、错误抽取和 manifest。
+- `tools/capture-dce-process-dump.ps1`：使用 `MiniDumpWriteDump` 抓取 Triage 或 Full dump。
+- `tools/convert-dce-frame-log.ps1`：把进程内 Haxe 帧计数日志转换为稳定 CSV。
+- `tools/monitor-dce-frame-rate.ps1`：仅作可选高频外部监视；无法证明计数器有效时必须失败关闭，不能再输出伪造大数。
 
-Haxe `CrashHandler` 还必须把报告写入本次运行目录，并同时打印到标准输出；Windows 原生 runtime 必须在设置了 `NOVAFLARE_NATIVE_DUMP_DIR` 时安装未处理异常过滤器。正式性能结论只接受上述证据链产生的有效样本。
+Haxe `CrashHandler` 还必须把报告写入本次运行目录，并同时打印到标准输出；Windows 原生 runtime 必须在设置了 `DCE_NATIVE_DUMP_DIR` 时安装未处理异常过滤器。正式性能结论只接受上述证据链产生的有效样本。
 
 ## 28. 第二批主线程热路径优化
 
@@ -1008,7 +1008,7 @@ Haxe 帧日志同时新增绝对时间字段：
 wall_time_ms=<Unix epoch milliseconds>
 ```
 
-`tools/convert-novaflare-frame-log.ps1` 已兼容新旧两种日志格式。这样 GC 的 `timestamp_us`、Haxe 帧窗口、ETW 相对时间和进程 UTC 样本可以精确对齐，不再依赖人工估算启动偏移。
+`tools/convert-dce-frame-log.ps1` 已兼容新旧两种日志格式。这样 GC 的 `timestamp_us`、Haxe 帧窗口、ETW 相对时间和进程 UTC 样本可以精确对齐，不再依赖人工估算启动偏移。
 
 证据：
 
@@ -1261,7 +1261,7 @@ JDK ZGC 与项目 NovaGC 的关键差异：
 - 编译：`2774/2774`
 - 构建成功：是
 - 精确 ABI 检查：通过
-- 正式 EXE：`export/release/windows/bin/NovaFlare Engine.exe`
+- 正式 EXE：`export/release/windows/bin/D.C.E.exe`
 - EXE 大小：`135102464` bytes
 - EXE SHA-256：
   `FEE1AB607F726AB66D2464C3410FAD189D6E83D0A31ED335ADBB747DB4FFEC14`
@@ -1974,7 +1974,7 @@ Full；对应中段/尾部最大帧稳定在约 31–34 ms。
 
 新增：
 
-- `tools/monitor-novaflare-hardware.ps1`；
+- `tools/monitor-dce-hardware.ps1`；
 - process CSV 的 foreground/visible/iconic/cloaked/窗口矩形；
 - CPU `Processor Performance`、Utility；
 - 目标 PID GPU Engine、Dedicated/Shared memory；
@@ -2336,7 +2336,7 @@ JDK 默认 SoftMax 为 MaxHeap 的 90%，`ZDirector` 综合 SoftMax 容量、分
 - precise ABI：通过；
 - 没有触发全量游戏编译；
 - 正式 EXE：
-  `export/release/windows/bin/NovaFlare Engine.exe`
+  `export/release/windows/bin/D.C.E.exe`
 - SHA-256：
   `264D8AB43596BE8176C149EA0A7DC4F5A6CE57B570071EDB440E173941C91647`。
 

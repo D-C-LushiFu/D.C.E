@@ -33,13 +33,13 @@ class StageEditorConfirmSubstate extends MusicBeatSubstate
 		bg.screenCenter();
 		add(bg);
 
-		var txt:FlxText = new FlxText(0, bg.y + 26, 430, _message, 16);
+		var txt:FlxText = new EditorText(0, bg.y + 26, 430, _message, 16);
 		txt.screenCenter(X);
 		txt.alignment = CENTER;
 		txt.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 16, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(txt);
 
-		var hint:FlxText = new FlxText(0, bg.y + 78, 430, '空格 / Enter / Y - 确认     X / Esc - 取消', 12);
+		var hint:FlxText = new EditorText(0, bg.y + 78, 430, '空格 / Enter / Y - 确认     X / Esc - 取消', 12);
 		hint.screenCenter(X);
 		hint.alignment = CENTER;
 		hint.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 12, 0xFF9A9A9A, CENTER);

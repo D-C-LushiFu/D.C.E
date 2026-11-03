@@ -856,8 +856,6 @@ void main() {
 	}
 }
 
-// Boing! by ThaeHan
-
 class FuckingTriangleEffect extends Effect
 {
 	public var shader:ShaderFilter = new ShaderFilter(new FuckingTriangle());

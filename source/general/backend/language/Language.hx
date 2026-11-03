@@ -31,6 +31,19 @@ class Language
 			group.updateLang();
 	}
 
+	/** Reload one language group without reparsing every translated menu. */
+	public static function refreshGroup(type:String):Void
+	{
+		check();
+		var group = groups.get(type);
+		if (group == null)
+		{
+			group = new CustomLangGroup(type);
+			groups.set(type, group);
+		}
+		group.updateLang();
+	}
+
 	static function discoverGroups()
 	{
 		var basePath = Paths.getPath('language') + '/' + ClientPrefs.data.language;

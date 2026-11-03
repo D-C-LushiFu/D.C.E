@@ -862,7 +862,7 @@ final class CoolUtil
 	 * @param url
 	 */
 	@:noUsing public static inline function openURL(url:String) {
-		#if linux
+		#if (linux && !mobile)
 		// generally `xdg-open` should work in every distro
 		var cmd = Sys.command("xdg-open", [url]);
 		// run old command JUST IN CASE it fails, which it shouldn't
@@ -879,12 +879,12 @@ final class CoolUtil
 	public static inline function browsePath(path:String) {
 		var formattedPath:String = Path.normalize(path);
 
-		#if windows
+		#if (windows && !mobile)
 		formattedPath = formattedPath.replace("/", "\\");
 		Sys.command("explorer", [formattedPath]);
-		#elseif mac
+		#elseif (mac && !mobile)
 		Sys.command("open", [formattedPath]);
-		#elseif linux
+		#elseif (linux && !mobile)
 		var cmd = Sys.command("xdg-open", [formattedPath]);
 		if (cmd != 0) cmd = Sys.command("/usr/bin/xdg-open", [formattedPath]);
 		#end

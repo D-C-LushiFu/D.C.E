@@ -1,7 +1,9 @@
 package codename.funkin.editors.ui;
 
 import haxe.io.Bytes;
+#if !mobile
 import lime.ui.FileDialog;
+#end
 
 class UIFileExplorer extends UISliceSprite {
 	public var uploadButton:UIButton;
@@ -25,9 +27,18 @@ class UIFileExplorer extends UISliceSprite {
 		if (onFile != null) this.onFile = onFile;
 
 		uploadButton = new UIButton(x + 8, y+ 8, null, function () {
+			#if mobile
+			var owner:flixel.FlxState = FlxG.state;
+			@:privateAccess
+			while (owner.subState != null
+				&& !(owner._requestSubStateReset && owner._requestedSubState == null))
+				owner = owner.subState;
+			owner.openSubState(new MobileFilePickerSubstate(this.fileType, loadFile));
+			#else
 			var fileDialog = new FileDialog();
 			fileDialog.onSelect.add(loadFile);
 			fileDialog.browse(OPEN, this.fileType);
+			#end
 		}, bWidth - 16, bHeight - 16);
 		members.push(uploadButton);
 

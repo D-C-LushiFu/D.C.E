@@ -5,7 +5,7 @@ middleScroll => 箭头居中
 flipChart => 铺面翻转
 ghostTapping => 无键误触不算Miss
 guitarHeroSustains => 长键断连不可续
-noReset => R键直接死亡
+noReset => 按下Reset不死亡
 showKeybinds => 显示键位
 
 

@@ -110,15 +110,15 @@ $threadEdgesPattern = [Text.RegularExpressions.Regex]::new(
     '^THREAD_CALLER_EDGES TID=(\d+)$',
     [Text.RegularExpressions.RegexOptions]::Compiled)
 $engineLeafPattern = [Text.RegularExpressions.Regex]::new(
-    '^\s*(\d+)\s+.*novaflare engine\.exe\+0x([0-9a-fA-F]+)\s*$',
+    '^\s*(\d+)\s+.*dce engine\.exe\+0x([0-9a-fA-F]+)\s*$',
     [Text.RegularExpressions.RegexOptions]::Compiled -bor
     [Text.RegularExpressions.RegexOptions]::IgnoreCase)
 $engineEdgePattern = [Text.RegularExpressions.Regex]::new(
-    '^\s*(\d+)\s+.*novaflare engine\.exe\+0x([0-9a-fA-F]+)\s+<-\s+(.+)$',
+    '^\s*(\d+)\s+.*dce engine\.exe\+0x([0-9a-fA-F]+)\s+<-\s+(.+)$',
     [Text.RegularExpressions.RegexOptions]::Compiled -bor
     [Text.RegularExpressions.RegexOptions]::IgnoreCase)
 $engineCallerPattern = [Text.RegularExpressions.Regex]::new(
-    'novaflare engine\.exe\+0x([0-9a-fA-F]+)\s*$',
+    'dce engine\.exe\+0x([0-9a-fA-F]+)\s*$',
     [Text.RegularExpressions.RegexOptions]::Compiled -bor
     [Text.RegularExpressions.RegexOptions]::IgnoreCase)
 

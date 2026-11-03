@@ -28,7 +28,7 @@ class FunkTrail extends FlxTrail
    */
   public function new(target:FlxSprite, ?graphic:FlxGraphicAsset, length:Int = 10, delay:Float = 0.1, alpha:Float = 0.4, diff:Float = 0.05)
   {
-    // NovaFlare's selected FlxTrail still measures delay in rendered frames.
+    // D.C.E.'s selected FlxTrail still measures delay in rendered frames.
     // Disable its own capture cadence and reproduce FNF's pinned seconds-based
     // behavior locally, without replacing the engine-wide haxelib class.
     super(target, graphic, length, 0x3FFFFFFF, alpha, diff);

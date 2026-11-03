@@ -112,8 +112,39 @@ class CharacterEditorState extends MusicBeatState
 		super();
 	}
 
+	public var documentHistory:EditorDocumentHistory;
+	 override public function editorMobileModalOpen():Bool
+		return super.editorMobileModalOpen() || (menuBar != null && menuBar.activeMenu >= 0);
+
+	function historyRead():String
+	{
+		return EditorDocumentHistory.jsonSnapshot({animations: character.animationsArray, image: character.imageFile,
+			scale: character.jsonScale, sing_duration: character.singDuration, healthicon: character.healthIcon,
+			position: character.positionArray, camera_position: character.cameraPosition,
+			flip_x: character.originalFlipX, no_antialiasing: character.noAntialiasing,
+			healthbar_colors: character.healthColorArray, vocals_file: character.vocalsFile,
+			_editor_isPlayer: character.isPlayer, _editor_name: _char});
+	}
+	function historyRestore(snapshot:String):Void
+	{
+		var data:Dynamic = haxe.Json.parse(snapshot);
+		_char = data._editor_name;
+		character.isPlayer = data._editor_isPlayer == true;
+		character.loadCharacterFile(cast data);
+		curAnim = 0;
+		reloadAnimList();
+		reloadCharacterOptions();
+		check_player.checked = character.isPlayer;
+		updateCharacterPositions();
+		updatePointerPos();
+		updateHealthBar();
+	}
+
 	override function create()
 	{
+		// ★ 十三轮：编辑器统一走高分辨率设计（文字 1:1 光栅化 = 清晰）；
+		//   离开时由 EditorInputStyle 的 stateSwitched 钩子自动还原 1280×720。
+		EditorInputStyle.enterHiRes();
 		if (ClientPrefs.data.cacheOnGPU)
 			Paths.clearStoredMemory();
 
@@ -227,12 +258,21 @@ class CharacterEditorState extends MusicBeatState
 			Paths.clearUnusedMemory();
 
 		super.create();
+		documentHistory = new EditorDocumentHistory(historyRead, historyRestore, () -> EditorDocumentHistory.inputFocused([animationInputText, animationNameInputText, animationIndicesInputText, imageInputText, healthIconInputText, vocalsInputText], menuBar), camHUD);
+		documentHistory.onSave = saveCharacter;
+		add(documentHistory);
+
 	}
 
 	// ============ 动画列表（屏幕右侧，可滚动/可点击，保留高亮与 offset 显示） ============
-	static final ANIM_LIST_Y:Int = 68; // 顶栏 + 状态栏下方
-	static final ANIM_LIST_W:Int = 300;
-	static final ANIM_LIST_ROW_H:Int = 20;
+	static var ANIM_LIST_Y(get, never):Int;
+	static function get_ANIM_LIST_Y():Int return EditorInputStyle.si(68);
+	static var ANIM_LIST_W(get, never):Int;
+	static function get_ANIM_LIST_W():Int return EditorInputStyle.si(300);
+	static function set_ANIM_LIST_W(v:Int):Int return v;
+	static var ANIM_LIST_ROW_H(get, never):Int;
+	static function get_ANIM_LIST_ROW_H():Int return EditorInputStyle.si(20);
+	static function set_ANIM_LIST_ROW_H(v:Int):Int return v;
 	static final ANIM_LIST_VISIBLE:Int = 20;
 
 	var animListX:Float = 10; // 运行时计算（屏幕右侧）
@@ -294,7 +334,7 @@ class CharacterEditorState extends MusicBeatState
 			uiLayer.add(selBg);
 			animListSelBgs.push(selBg);
 
-			var t:FlxText = new FlxText(animListX + 6, ANIM_LIST_Y + i * ANIM_LIST_ROW_H, ANIM_LIST_W - 10, '', 14);
+			var t:FlxText = new EditorText(animListX + 6, ANIM_LIST_Y + i * ANIM_LIST_ROW_H, ANIM_LIST_W - 10, '', 14);
 			t.setFormat(null, 14, 0xFFC9CDD4, LEFT, NONE, 0x00000000);
 			t.scrollFactor.set();
 			t.cameras = [camHUD];
@@ -572,6 +612,11 @@ class CharacterEditorState extends MusicBeatState
 	 */
 	function doExitEditor():Void
 	{
+		documentHistory.confirmDiscard(exitAfterConfirmation);
+	}
+
+	function exitAfterConfirmation():Void
+	{
 		FlxG.mouse.visible = false;
 		if (!_goToPlayState)
 		{
@@ -651,19 +696,8 @@ class CharacterEditorState extends MusicBeatState
 	/** 添加/更新当前动画（原 Add/Update 按钮逻辑） */
 	function addUpdateCurrentAnimation():Void
 	{
-		var indices:Array<Int> = [];
-		var indicesStr:Array<String> = animationIndicesInputText.text.trim().split(',');
-		if (indicesStr.length > 1)
-		{
-			for (i in 0...indicesStr.length)
-			{
-				var index:Int = Std.parseInt(indicesStr[i]);
-				if (indicesStr[i] != null && indicesStr[i] != '' && !Math.isNaN(index) && index > -1)
-				{
-					indices.push(index);
-				}
-			}
-		}
+		var indices:Array<Int> = EditorInputValidation.frameIndices(animationIndicesInputText.text);
+		if (indices == null) return;
 
 		var lastAnim:String = (character.animationsArray[curAnim] != null) ? character.animationsArray[curAnim].anim : '';
 		var lastOffsets:Array<Int> = [0, 0];
@@ -822,12 +856,15 @@ class CharacterEditorState extends MusicBeatState
 			if (Assets.exists(path))
 			#end
 			{
-				_char = intended;
-				check_player.checked = character.isPlayer;
-				addCharacter();
-				reloadCharacterOptions();
-				reloadCharacterDropDown();
-				updatePointerPos();
+				documentHistory.confirmDiscard(function() {
+					_char = intended;
+					check_player.checked = character.isPlayer;
+					addCharacter();
+					reloadCharacterOptions();
+					reloadCharacterDropDown();
+					updatePointerPos();
+					documentHistory.resetTimeline();
+				}, reloadCharacterDropDown);
 			}
 		else
 		{
@@ -1057,6 +1094,7 @@ class CharacterEditorState extends MusicBeatState
 
 	override function update(elapsed:Float)
 	{
+		if (documentHistory != null && documentHistory.blocksInput()) { super.update(elapsed); return; }
 		super.update(elapsed);
 
 		// ===== 顶栏状态栏更新（只显示变化，内部有缓存）=====
@@ -1088,7 +1126,7 @@ class CharacterEditorState extends MusicBeatState
 			menuBar.statusBar.setZoom(FlxMath.roundDecimal(FlxG.camera.zoom, 2) + 'x');
 		}
 
-		if (animationInputText.hasFocus || animationNameInputText.hasFocus || animationIndicesInputText.hasFocus || imageInputText.hasFocus
+		if ((menuBar != null && menuBar.isInputOverlayActive()) || animationInputText.hasFocus || animationNameInputText.hasFocus || animationIndicesInputText.hasFocus || imageInputText.hasFocus
 			|| healthIconInputText.hasFocus || vocalsInputText.hasFocus)
 		{
 			ClientPrefs.toggleVolumeKeys(false);
@@ -1242,12 +1280,7 @@ class CharacterEditorState extends MusicBeatState
 				character.offset.set(0, 0);
 				changedOffset = true;
 			}
-			else if (FlxG.keys.justPressed.Z && undoOffsets != null)
-			{
-				character.offset.x = undoOffsets[0];
-				character.offset.y = undoOffsets[1];
-				changedOffset = true;
-			}
+
 			else if (FlxG.keys.justPressed.S)
 			{
 				// Ctrl+S 快速保存角色
@@ -1322,7 +1355,7 @@ class CharacterEditorState extends MusicBeatState
 		}
 
 		// ===== 动画列表交互：滚轮滚动 + 拖拽滚动 + 点击选中（松开时判定；菜单展开时让位给菜单）=====
-		var menuOpen:Bool = (menuBar != null && menuBar.activeMenu >= 0);
+		var menuOpen:Bool = (menuBar != null && menuBar.activeMenu >= 0) || mobile.objects.EditorMobileKeys.pointerOverButton();
 		var mp:FlxPoint = FlxG.mouse.getViewPosition(camHUD);
 		var mX:Float = mp.x;
 		var mY:Float = mp.y;
@@ -1430,14 +1463,7 @@ class CharacterEditorState extends MusicBeatState
 		}
 		else if (FlxG.keys.justPressed.ESCAPE || virtualPad.buttonB.justPressed)
 		{
-			FlxG.mouse.visible = false;
-			if (!_goToPlayState)
-			{
-				MusicBeatState.switchState(new developer.editors.MasterEditorMenu());
-				FlxG.sound.playMusic(Paths.music('freakyMenu'));
-			}
-			else
-				MusicBeatState.switchState(new PlayState());
+			doExitEditor();
 			return;
 		}
 	}
@@ -1621,9 +1647,11 @@ class CharacterEditorState extends MusicBeatState
 
 	function onSaveComplete(_):Void
 	{
+		var history = documentHistory;
+		if (history != null) history.markSaved();
 		if (_file == null)
 			return;
-		_file.removeEventListener(Event.COMPLETE, onSaveComplete);
+		_file.removeEventListener(#if desktop Event.SELECT #else Event.COMPLETE #end, onSaveComplete);
 		_file.removeEventListener(Event.CANCEL, onSaveCancel);
 		_file.removeEventListener(IOErrorEvent.IO_ERROR, onSaveError);
 		_file = null;
@@ -1637,7 +1665,7 @@ class CharacterEditorState extends MusicBeatState
 	{
 		if (_file == null)
 			return;
-		_file.removeEventListener(Event.COMPLETE, onSaveComplete);
+		_file.removeEventListener(#if desktop Event.SELECT #else Event.COMPLETE #end, onSaveComplete);
 		_file.removeEventListener(Event.CANCEL, onSaveCancel);
 		_file.removeEventListener(IOErrorEvent.IO_ERROR, onSaveError);
 		_file = null;
@@ -1650,7 +1678,7 @@ class CharacterEditorState extends MusicBeatState
 	{
 		if (_file == null)
 			return;
-		_file.removeEventListener(Event.COMPLETE, onSaveComplete);
+		_file.removeEventListener(#if desktop Event.SELECT #else Event.COMPLETE #end, onSaveComplete);
 		_file.removeEventListener(Event.CANCEL, onSaveCancel);
 		_file.removeEventListener(IOErrorEvent.IO_ERROR, onSaveError);
 		_file = null;
@@ -1659,6 +1687,8 @@ class CharacterEditorState extends MusicBeatState
 
 	function saveCharacter()
 	{
+		var history = documentHistory;
+		if (history != null) history.prepareSave();
 		if (_file != null)
 			return;
 

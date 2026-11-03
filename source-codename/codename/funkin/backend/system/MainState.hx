@@ -28,9 +28,14 @@ class MainState extends FlxState {
 	public static var initiated:Bool = false;
 	public override function create() {
 		super.create();
+		final isExplicitModReload:Bool = initiated;
 		if (!initiated) {
 			Main.loadGameSettings();
 		}
+
+		#if mobile
+		if (Main.framerateSprite != null) Main.framerateSprite.setScale();
+		#end
 
 		initiated = true;
 
@@ -96,7 +101,8 @@ class MainState extends FlxState {
 
 			for (addon in FileSystem.readDirectory(path)) {
 				if (!FileSystem.isDirectory(path + addon)) {
-					if (Flags.ALLOWED_ZIP_EXTENSIONS.contains(Path.extension(addon))) addon = Path.withoutExtension(addon);
+					var extension = Path.extension(addon);
+					if (extension != null && Flags.ALLOWED_ZIP_EXTENSIONS.contains(extension.toLowerCase())) addon = Path.withoutExtension(addon);
 					else continue;
 				}
 
@@ -117,6 +123,12 @@ class MainState extends FlxState {
 		#end
 		codename.funkin.backend.scripting.Script.staticVariables.clear();
 
+		// At this point the old state, asset libraries and global scripts no
+		// longer hold the previous mod. Collect once for an explicit mod reload,
+		// but avoid the much more expensive heap compaction.
+		if (isExplicitModReload)
+			MemoryUtil.clearMajor(false);
+
 		#if MOD_SUPPORT
 		for (addon in _lowPriorityAddons)
 			loadLib(addon.path, ltrim(addon.name, "[LOW]"));
@@ -134,6 +146,10 @@ class MainState extends FlxState {
 
 		for (addon in _highPriorityAddons)
 			loadLib(addon.path, ltrim(addon.name, "[HIGH]"));
+		#end
+
+		#if TOUCH_CONTROLS
+		mobile.funkin.backend.utils.MobileData.init();
 		#end
 
 		Flags.reset();
@@ -159,7 +175,7 @@ class MainState extends FlxState {
 		CoolUtil.safeAddAttributes(codenamechain.CodeNameMode.getTempRoot(), NativeAPI.FileAttribute.HIDDEN);
 		#end
 
-		for (lib in ModsFolder.getLoadedModsLibs()) {
+		for (lib in ModsFolder.getLoadedModsLibs(true)) {
 			if (!(lib is ZipFolderLibrary)) continue;
 			if (cast(lib, ZipFolderLibrary).PRELOAD_VIDEOS) cast(lib, ZipFolderLibrary).precacheVideos();
 		}

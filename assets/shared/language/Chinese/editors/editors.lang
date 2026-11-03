@@ -1,5 +1,15 @@
 # ===== 编辑器主菜单（主菜单按 7 进入） =====
 chartEditor => 编谱器
+cameraEditor => 相机编辑器 (Beta)
+cameraEditorSongBrowserTitle => 选择本模组的曲目
+cameraEditorNoSongs => 当前模组没有找到可用的曲目谱面。
+cameraEditorFolderReadFailed => 无法读取该曲目的难度谱面。
+cameraEditorSelectDifficulty => 请选择要预览的难度：
+cameraEditorOpenDifficulty => 打开难度
+cameraEditorOpenSong => 选择曲目
+cameraEditorBackToSongs => 返回曲目列表
+cameraEditorDialogBusy => 请先完成当前文件对话框。
+cameraEditorLoadFailed => 无法载入此谱面。
 characterEditor => 角色编辑器
 stageEditor => 舞台编辑器
 weekEditor => 章节编辑器
@@ -11,3 +21,23 @@ noteSplashDebug => 音符溅射调试
 # ===== Mod 目录提示（底部状态条） =====
 noModDirectory => < 未加载 Mod 目录 >
 loadedModDirectory => < 已加载 Mod 目录:
+
+# ===== 通用确认弹窗（各编辑器共用；具体编辑器可在自己的语言组里覆盖同名键） =====
+confirm_unsaved_title => 未保存的更改
+confirm_unsaved_message => 当前编辑器还有未保存的修改，退出后这些改动将会丢失。确定要放弃修改并退出吗？
+confirm_btn_confirm => 放弃并退出
+confirm_btn_cancel => 取消
+confirm_hint => Enter / Y 确认  |  Esc 取消
+confirm_hint_touch => 轻点按钮进行选择
+
+history_undo => 撤销
+history_redo => 重做
+history_open => 历史记录
+history_opened => 打开文档
+history_changed => 编辑数据
+history_saved => 无待保存修改
+history_unsaved => 有未保存修改
+history_discard => 有未保存的修改。放弃这些修改并继续？
+history_imported => 导入配置
+
+history_save => 保存

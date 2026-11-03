@@ -7,12 +7,15 @@ class DebugOptions extends TreeMenuScreen {
 		#if windows
 		add(new TextOption(getNameID("showConsole"), getDescID("showConsole"), () -> codename.funkin.backend.utils.NativeAPI.allocConsole()));
 		#end
+		#if !mobile
 		add(new Checkbox(getNameID("editorsResizable"), getDescID("editorsResizable"), "editorsResizable"));
 		add(new Checkbox(getNameID("bypassEditorsResize"), getDescID("bypassEditorsResize"), "bypassEditorsResize"));
+		#end
 		add(new Checkbox(getNameID("editorSFX"), getDescID("editorSFX"), "editorSFX"));
 		add(new Checkbox(getNameID("editorCharterPrettyPrint"), getDescID("editorCharterPrettyPrint"), "editorCharterPrettyPrint"));
 		add(new Checkbox(getNameID("editorCharacterPrettyPrint"), getDescID("editorCharacterPrettyPrint"), "editorCharacterPrettyPrint"));
 		add(new Checkbox(getNameID("editorStagePrettyPrint"), getDescID("editorStagePrettyPrint"), "editorStagePrettyPrint"));
+		add(new Checkbox(getNameID("charterSwapEventSides"), getDescID("charterSwapEventSides"), "charterSwapEventSides"));
 		add(new Checkbox(getNameID("intensiveBlur"), getDescID("intensiveBlur"), "intensiveBlur"));
 		add(new Checkbox(getNameID("charterAutoSaves"), getDescID("charterAutoSaves"), "charterAutoSaves"));
 		add(new NumOption(getNameID("charterAutoSaveTime"), getDescID("charterAutoSaveTime"), 60, 60*10, 1, "charterAutoSaveTime"));

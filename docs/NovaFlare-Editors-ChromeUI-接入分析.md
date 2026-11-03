@@ -1,6 +1,6 @@
-# NovaFlare 自绘 Chrome UI 接入方式分析（ChartingState vs StageEditorState vs CharacterEditorState）
+# D.C.E. 自绘 Chrome UI 接入方式分析（ChartingState vs StageEditorState vs CharacterEditorState）
 
-> 工程根：`C:\Users\Admin1\Desktop\FNF-NovaFlare-Engine-1.2.1`
+> 工程根：`C:\Users\Admin1\Desktop\FNF-D.C.E.-1.2.1`
 > 行号以 read/grep 工具为准（LF 计行，含空行）；下表中 `ChartingState`=ChartingState.hx、`MB`=ChartEditorMenuBar.hx、`SB`=ChartEditorStatusBar.hx、`CES`=CharacterEditorState.hx、`CMB`=CharacterEditorMenuBar.hx、`SES`=StageEditorState.hx、`SMB`=StageEditorMenuBar.hx、`WCM`=WindowChromeManager.hx、`WCB`=WindowControlBar.hx、`MP`=ModInfoPopup.hx、`lang:charting`=assets/shared/language/Chinese/charting/charting.lang。
 
 **实际文件行数**（read 工具口径）：ChartingState.hx=5316、ChartEditorMenuBar.hx=2446、StageEditorState.hx=4404、StageEditorMenuBar.hx=2492、CharacterEditorState.hx=1679、CharacterEditorMenuBar.hx=2425、ChartEditorStatusBar.hx=103、CharacterEditorStatusBar.hx=96、StageEditorStatusBar.hx=95。
@@ -12,7 +12,7 @@
 三个编辑器（Chart/Character/Stage）共用同一套“自绘 Chrome”架构，由三条代码线构成，且三个 MenuBar 是同一份模板复制衍生（证据：`SMB:22-35` 头注释仍写着“角色编辑器顶栏菜单”+ “Ghost 透明度 slider”，属复制残留；`SMB` 与 `MB` 的常量/字段/函数名几乎逐行同构）：
 
 1. **系统标题栏隐藏（全局自动）** —— 由 `WindowChromeManager` 在 flixel `preStateCreate`/`postStateSwitch` 信号里统一处理，任何编辑器**不需要写一行代码**就能隐藏系统栏（见 §6）。
-2. **编辑器自带常驻窗口条 `EditorChromeUI`** —— 是 `WindowControlBar` 的 `CONSTANT` 模式子类（EditorChromeUI.hx:15-20），钉在顶栏右上角 `[图标 NovaFlare Engine] │ 恢复默认 - □ ×`；点击标题触发 `modInfoPopup`（`onTitleClick`）。三个编辑器各自 new 一份。
+2. **编辑器自带常驻窗口条 `EditorChromeUI`** —— 是 `WindowControlBar` 的 `CONSTANT` 模式子类（EditorChromeUI.hx:15-20），钉在顶栏右上角 `[图标 D.C.E.] │ 恢复默认 - □ ×`；点击标题触发 `modInfoPopup`（`onTitleClick`）。三个编辑器各自 new 一份。
 3. **顶栏菜单栏 + 底部状态栏（Adobe 风格）** —— 每个编辑器一个 `XxxEditorMenuBar`（内含 `XxxEditorStatusBar`），菜单行由 `registerWidget` 注册的**隐藏原生 FlxUI 控件作数据源** + 自绘外观组成；菜单点击/开关全部自绘命中判定。
 
 差异最大的维度（下文逐节展开）：

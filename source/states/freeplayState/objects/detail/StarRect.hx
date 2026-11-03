@@ -6,11 +6,7 @@ typedef StarRectColorStop = {
 };
 
 class StarRect extends FlxSpriteGroup{
-    public var bg:Rect;
-    private var star:Star;
-    public var text:FlxText;
-
-    private var _colorStops:Array<StarRectColorStop> = [
+    static final DEFAULT_COLOR_STOPS:Array<StarRectColorStop> = [
         {value: 0, color: 0x7FFFFB},
         {value: 0.166, color: 0x83ff7F},
         {value: 0.33, color: 0xFFF17F},
@@ -19,6 +15,12 @@ class StarRect extends FlxSpriteGroup{
         {value: 0.833, color: 0x4444FE},
         {value: 1, color: 0x21202C},
     ];
+
+    public var bg:Rect;
+    private var star:Star;
+    public var text:FlxText;
+
+    private var _colorStops:Array<StarRectColorStop> = DEFAULT_COLOR_STOPS.copy();
 
     public function new(x:Float, y:Float, width:Float, height:Float){
         super(x, y);
@@ -65,17 +67,27 @@ class StarRect extends FlxSpriteGroup{
 
     public function getColorByValue(value:Float):FlxColor{
         if (_colorStops == null || _colorStops.length == 0) return bg.color;
-        if (_colorStops.length == 1) return _colorStops[0].color;
+        return colorFromStops(_colorStops, value);
+    }
 
-        var first = _colorStops[0];
+    /** Same rating palette used by the original Freeplay star display. */
+    public static function getRatingColor(rate:Float):FlxColor{
+        return colorFromStops(DEFAULT_COLOR_STOPS, rate / 10);
+    }
+
+    static function colorFromStops(stops:Array<StarRectColorStop>, value:Float):FlxColor{
+        if (stops == null || stops.length == 0) return 0xFFFFFFFF;
+        if (stops.length == 1) return stops[0].color;
+
+        var first = stops[0];
         if (value <= first.value) return first.color;
 
-        var last = _colorStops[_colorStops.length - 1];
+        var last = stops[stops.length - 1];
         if (value >= last.value) return last.color;
 
-        for (i in 0..._colorStops.length - 1){
-            var a = _colorStops[i];
-            var b = _colorStops[i + 1];
+        for (i in 0...stops.length - 1){
+            var a = stops[i];
+            var b = stops[i + 1];
             if (value <= b.value){
                 var denom = (b.value - a.value);
                 var t:Float = (denom == 0) ? 1 : (value - a.value) / denom;

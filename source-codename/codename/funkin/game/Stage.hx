@@ -52,8 +52,30 @@ class Stage extends FlxBasic implements IBeatReceiver {
 	public function setStagesSprites(script:Script)
 		for (k=>e in stageSprites) script.set(k, e);
 
-	public function prepareInfos(node:Access)
-		return  PlayState.instance == null ? null : XMLImportedScriptInfo.prepareInfos(node, PlayState.instance.scripts, (infos) -> xmlImportedScripts.push(infos));
+	public function prepareInfos(node:Access) {
+		if (PlayState.instance == null) return null;
+
+		var infos = XMLImportedScriptInfo.prepareInfos(node, PlayState.instance.scripts, (infos) -> xmlImportedScripts.push(infos));
+
+		#if CODENAME_ENGINE_COMPAT
+		// Week 6's optional pixel camera pass runs before the pause script creates
+		// any of its sprites. In the D.C.E.-hosted CNE renderer a failed camera
+		// pass therefore leaves both the school stage and its pause menu blank while
+		// their update/audio logic keeps running. Keep the original pixel artwork and
+		// menu logic, but skip only that optional camera post-process here.
+		if (infos != null
+			&& (stageFile == "school" || stageFile == "school-evil")
+			&& node.has.script
+			&& node.getAtt("script") == "pixel")
+		{
+			var pixelScript = infos.getScript();
+			if (pixelScript != null)
+				pixelScript.set("enableCameraHacks", false);
+		}
+		#end
+
+		return infos;
+	}
 
 	public function new(stage:String, ?state:FlxState, autoLoad:Bool = true) {
 		super();

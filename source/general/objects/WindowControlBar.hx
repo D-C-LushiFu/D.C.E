@@ -20,12 +20,14 @@ import general.backend.Paths;
 import general.backend.Mods;
 import general.backend.language.Language;
 import general.backend.device.Native;
+import developer.editors.EditorInputStyle;
+import developer.editors.EditorText;
 
 /**
  * 引擎自绘的“窗口控制条”（替代系统标题栏）。
  *
  * 两种模式：
- *  - CONSTANT（编辑器等）：常驻显示在界面顶栏右侧 —— [图标 NovaFlare Engine] │ - □ ×
+ *  - CONSTANT（编辑器等）：常驻显示在界面顶栏右侧 —— [图标 D.C.E.] │ - □ ×
  *  - AUTO_HIDE（所有普通界面）：平时完全隐藏，鼠标靠近窗口顶部时平滑滑入
  *    一条标题栏（含图标标题与 - □ × 与拖拽区），离开后自动滑出。
  *
@@ -38,8 +40,13 @@ import general.backend.device.Native;
  */
 class WindowControlBar extends FlxSpriteGroup
 {
-	public static final BAR_HEIGHT:Int = 36;
-	public static final BTN_W:Int = 46;
+	// ★ 十二轮：随编辑器设计分辨率缩放（720 设计 / 非编辑器场景 = 原值）
+	public static var BAR_HEIGHT(get, never):Int;
+	public static var BTN_W(get, never):Int;
+
+	static function get_BAR_HEIGHT():Int return EditorInputStyle.si(36);
+
+	static function get_BTN_W():Int return EditorInputStyle.si(46);
 
 	/**
 	 * AUTO_HIDE 条的「唤出触发带」（逻辑像素）：只有光标进入窗口顶部这么窄的
@@ -107,7 +114,7 @@ class WindowControlBar extends FlxSpriteGroup
 	var clickPendingX:Float = 0;
 	var clickPendingY:Float = 0;
 
-	// ===== 退出按钮（CONSTANT 模式：标题「NovaFlare Engine」左侧） =====
+	// ===== 退出按钮（CONSTANT 模式：标题「D.C.E.」左侧） =====
 	public var onExitClick:Void->Void = null;
 	var exitText:String = null;
 	var exitBg:FlxSprite;
@@ -247,7 +254,7 @@ class WindowControlBar extends FlxSpriteGroup
 		iconSpr.y = (BAR_HEIGHT - iconSpr.height) / 2;
 		add(iconSpr);
 
-		titleTxt = new FlxText(0, 0, 0, "NovaFlare Engine");
+		titleTxt = new EditorText(0, 0, 0, "D.C.E.");
 		titleTxt.setFormat(Assets.getFont("assets/fonts/montserrat.ttf").fontName, 13, 0xFFBDBDBD);
 		titleTxt.antialiasing = true;
 		titleTxt.y = (BAR_HEIGHT - titleTxt.height) / 2;
@@ -257,7 +264,7 @@ class WindowControlBar extends FlxSpriteGroup
 		sepLine.y = 6;
 		add(sepLine);
 
-		// ★ 退出按钮：CONSTANT 模式显示在「NovaFlare Engine」标题左侧（divider 左边）
+		// ★ 退出按钮：CONSTANT 模式显示在「D.C.E.」标题左侧（divider 左边）
 		//   默认不可见；调用 setExitButton() 后才会渲染并响应点击。
 		//   底色用「白色位图 + color/alpha 染色」而不是直接 bake 颜色：
 		//   二次确认的红色渐隐动画每帧只改 colorTransform，不重建位图。
@@ -265,7 +272,7 @@ class WindowControlBar extends FlxSpriteGroup
 		exitBg.visible = false;
 		applyExitVisual(1);
 		add(exitBg);
-		exitTxt = new FlxText(0, 0, 0, '');
+		exitTxt = new EditorText(0, 0, 0, '');
 		exitTxt.setFormat(Paths.font(uiLabelFontFileName()), 12, EXIT_TXT_NORMAL);
 		exitTxt.antialiasing = true;
 		exitTxt.visible = false;
@@ -289,7 +296,9 @@ class WindowControlBar extends FlxSpriteGroup
 		add(glyphGroup);
 	}
 
-	static inline final ICON_SIZE:Int = 18; // 条内图标显示尺寸
+	static var ICON_SIZE(get, never):Int; // 条内图标显示尺寸（★ 随设计分辨率缩放）
+
+	static function get_ICON_SIZE():Int return EditorInputStyle.si(18);
 
 	/**
 	 * 加载条上的引擎 / 模组图标：
@@ -343,7 +352,7 @@ class WindowControlBar extends FlxSpriteGroup
 		}
 
 		// 3) 官方小组图标
-		graphic = Paths.cacheBitmap(Paths.getSharedPath('images/menuExtend/CreditsState/groupIcon/NovaFlare Engine.png'));
+		graphic = Paths.cacheBitmap(Paths.getSharedPath('images/menuExtend/CreditsState/groupIcon/DCE.png'));
 		if (graphic != null)
 		{
 			iconSpr.loadGraphic(graphic);
@@ -433,7 +442,7 @@ class WindowControlBar extends FlxSpriteGroup
 	}
 
 	/**
-	 * 设置「NovaFlare Engine」标题左侧的退出按钮：
+	 * 设置「D.C.E.」标题左侧的退出按钮：
 	 *   label = 文案（null/空 → 隐藏按钮）
 	 *   cb    = 点击触发
 	 * AUTO_HIDE 模式始终隐藏（仅供编辑器 CONSTANT 模式使用）。
@@ -547,7 +556,7 @@ class WindowControlBar extends FlxSpriteGroup
 			sepLine.visible = true;
 
 			// 退出按钮：放在分隔线（divider）左侧 12 像素外
-			//   —— 编辑器退出按钮总是紧邻「NovaFlare Engine」左边
+			//   —— 编辑器退出按钮总是紧邻「D.C.E.」左边
 			if (exitTxt != null && exitText != null && exitText.length > 0)
 			{
 				var padL:Int = 14, padR:Int = 16;

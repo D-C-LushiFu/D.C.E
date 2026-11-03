@@ -20,7 +20,7 @@ import games.cutscenes.DialogueBoxPsych;
 import games.cutscenes.DialogueCharacter;
 
 /**
- * 对话立绘编辑器（NovaFlare 新版 UI）：
+ * 对话立绘编辑器（D.C.E. 新版 UI）：
  *  - Adobe 风格顶栏菜单（DialogueCharacterEditorMenuBar）+ 底部状态栏 + EditorChromeUI 窗口栏
  *  - 角色/双幽灵/气泡/打字文字预览保留，字段编辑收进顶栏菜单（原生 FlxUI 控件只作数据源）
  */
@@ -73,8 +73,24 @@ class DialogueCharacterEditorState extends MusicBeatState
 	var currentGhosts:Int = 0;
 	var transitioning:Bool = false;
 
+	public var documentHistory:EditorDocumentHistory;
+	 override public function editorMobileModalOpen():Bool
+		return super.editorMobileModalOpen() || (menuBar != null && menuBar.activeMenu >= 0);
+
+	function historyRead():String return EditorDocumentHistory.jsonSnapshot(character.jsonFile);
+	function historyRestore(snapshot:String):Void
+	{
+		character.jsonFile = cast haxe.Json.parse(snapshot);
+		reloadCharacter();
+		updateTextBox();
+		refreshAll();
+	}
+
 	override function create()
 	{
+		// ★ 十三轮：编辑器统一走高分辨率设计（文字 1:1 光栅化 = 清晰）；
+		//   离开时由 EditorInputStyle 的 stateSwitched 钩子自动还原 1280×720。
+		EditorInputStyle.enterHiRes();
 		persistentUpdate = persistentDraw = true;
 		camGame = initPsychCamera();
 		camGame.bgColor = FlxColor.fromHSL(0, 0, 0.5);
@@ -121,14 +137,14 @@ class DialogueCharacterEditorState extends MusicBeatState
 		hudGroup.add(box);
 
 		// 偏移数值文本（HUD 相机，顶栏下方）
-		offsetLoopText = new FlxText(10, 46, 0, '', 20);
+		offsetLoopText = new EditorText(10, 46, 0, '', 20);
 		offsetLoopText.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 20, FlxColor.RED, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		offsetLoopText.cameras = [camHUD];
 		offsetLoopText.scrollFactor.set();
 		add(offsetLoopText);
 		offsetLoopText.visible = false;
 
-		offsetIdleText = new FlxText(10, 76, 0, '', 20);
+		offsetIdleText = new EditorText(10, 76, 0, '', 20);
 		offsetIdleText.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 20, FlxColor.CYAN, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		offsetIdleText.cameras = [camHUD];
 		offsetIdleText.scrollFactor.set();
@@ -139,7 +155,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 		updateTextBox();
 
 		daText = new TypedAlphabet(DialogueBoxPsych.DEFAULT_TEXT_X, DialogueBoxPsych.DEFAULT_TEXT_Y, '', 0.05, false);
-		daText.setScale(0.7);
+		daText.setScale(0.7 / EditorInputStyle.uiScale);
 		daText.text = DEFAULT_TEXT;
 		hudGroup.add(daText);
 
@@ -172,6 +188,11 @@ class DialogueCharacterEditorState extends MusicBeatState
 		FlxG.mouse.visible = true;
 		refreshAll();
 		super.create();
+		documentHistory = new EditorDocumentHistory(historyRead, historyRestore, () -> EditorDocumentHistory.inputFocused([w_image, w_anim_name, w_loop_name, w_idle_name], menuBar), camHUD);
+		documentHistory.onDirtyChanged = (dirty) -> unsavedProgress = dirty;
+		documentHistory.onSave = saveCharacter;
+		add(documentHistory);
+
 	}
 
 	// ============ 顶栏菜单 ============
@@ -281,7 +302,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 				reloadCharacter();
 				updateTextBox();
 			case 'load_char', 'load':
-				loadCharacter();
+				documentHistory.confirmDiscard(loadCharacter);
 			case 'save_char', 'save':
 				saveCharacter();
 			case 'exit':
@@ -615,6 +636,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 
 	override function update(elapsed:Float)
 	{
+		if (documentHistory != null && documentHistory.blocksInput()) { super.update(elapsed); return; }
 		super.update(elapsed);
 		if(transitioning) return;
 
@@ -645,6 +667,7 @@ class DialogueCharacterEditorState extends MusicBeatState
 		}
 		catch (e:Dynamic) {}
 
+		typing = typing || (menuBar != null && menuBar.isInputOverlayActive());
 		if(!typing)
 		{
 			ClientPrefs.toggleVolumeKeys(true);
@@ -771,13 +794,13 @@ class DialogueCharacterEditorState extends MusicBeatState
 
 	function doExit():Void
 	{
-		if(!unsavedProgress)
+		if(!documentHistory.hasChanges())
 		{
 			MusicBeatState.switchState(new MasterEditorMenu());
 			FlxG.sound.playMusic(Paths.music('freakyMenu'));
 			transitioning = true;
 		}
-		else openSubState(new ConfirmationPopupSubstate(function() transitioning = true));
+		else openSubState(new ConfirmationPopupSubstate(function() transitioning = true, {langGroup: 'dialoguechar', danger: true}));
 	}
 
 	// ============ 载入 / 保存 ============
@@ -808,10 +831,11 @@ class DialogueCharacterEditorState extends MusicBeatState
 			var rawJson:String = File.getContent(fullPath);
 			if(rawJson != null)
 			{
-				var loadedChar:DialogueCharacterFile = cast Json.parse(rawJson);
-				if(loadedChar.dialogue_pos != null)
+				var loadedChar:DialogueCharacterFile = cast EditorInputValidation.parseJsonObject(rawJson);
+				if(loadedChar != null && Std.isOfType(loadedChar.dialogue_pos, String) && EditorInputValidation.objectArray(loadedChar.animations) && EditorInputValidation.numberPair(loadedChar.position) && EditorInputValidation.finiteNumber(loadedChar.scale) && Std.isOfType(loadedChar.image, String))
 				{
 					character.jsonFile = loadedChar;
+					documentHistory.resetTimeline();
 					curSelectedAnim = null;
 					reloadCharacter();
 					updateTextBox();
@@ -847,6 +871,8 @@ class DialogueCharacterEditorState extends MusicBeatState
 
 	function saveCharacter()
 	{
+		var history = documentHistory;
+		if (history != null) history.prepareSave();
 		var data:String = haxe.Json.stringify(character.jsonFile, "\t");
 		if (data.length > 0)
 		{
@@ -863,6 +889,8 @@ class DialogueCharacterEditorState extends MusicBeatState
 
 	function onSaveComplete(_):Void
 	{
+		var history = documentHistory;
+		if (history != null) history.markSaved();
 		_file.removeEventListener(#if desktop Event.SELECT #else Event.COMPLETE #end, onSaveComplete);
 		_file.removeEventListener(Event.CANCEL, onSaveCancel);
 		_file.removeEventListener(IOErrorEvent.IO_ERROR, onSaveError);

@@ -187,7 +187,7 @@ class EditorMobileKeyData
 		new EditorEntry('DialogueCharacterEditor', '对话立绘编辑器', 'developer.editors.DialogueCharacterEditorState', FlxDPadMode.DIALOGUE_PORTRAIT, FlxActionMode.DIALOGUE_PORTRAIT, S_DIALOGUE_CHAR),
 		new EditorEntry('MenuCharacterEditor', '菜单角色编辑器', 'developer.editors.MenuCharacterEditorState', FlxDPadMode.MENU_CHARACTER, FlxActionMode.MENU_CHARACTER, S_MENU_CHAR),
 		new EditorEntry('NoteSplashEditor', 'NoteSplash 编辑器', 'developer.editors.NoteSplashEditorState', FlxDPadMode.LEFT_FULL, FlxActionMode.NOTE_SPLASH_DEBUG, S_NOTE_SPLASH),
-		new EditorEntry('NoteSplashDebug', 'NoteSplash 调试', 'developer.editors.NoteSplashDebugState', FlxDPadMode.NOTE_SPLASH_DEBUG, FlxActionMode.NOTE_SPLASH_DEBUG, S_NOTE_SPLASH_DEBUG)
+		new EditorEntry('NoteSplashDebug', 'NoteSplash 调试', 'developer.editors.NoteSplashEditorState', FlxDPadMode.NOTE_SPLASH_DEBUG, FlxActionMode.NOTE_SPLASH_DEBUG, S_NOTE_SPLASH_DEBUG)
 	];
 
 	public static function fileNameOf(editorId:String):String
@@ -206,6 +206,7 @@ class EditorMobileKeyData
 	/** 通过引擎状态类名反查 Editor id（找不到返回 null） */
 	public static function editorIdOfClassName(className:String):String
 	{
+		if (className == 'developer.editors.WeekEditorFreeplayState') return 'WeekEditor';
 		for (entry in EDITORS)
 			if (entry.stateClassName == className)
 				return entry.id;
@@ -427,8 +428,8 @@ class EditorMobileKeyData
 
 					var def = new EMKButton();
 					def.name = name;
-					def.x = btn.x;
-					def.y = btn.y;
+					def.x = btn.x > FlxG.width / 2 ? btn.x - (FlxG.width - SCREEN_W) : btn.x;
+					def.y = btn.y > FlxG.height / 2 ? btn.y - (FlxG.height - SCREEN_H) : btn.y;
 					def.w = Std.int(btn.width);
 					def.h = Std.int(btn.height);
 					if (def.w < 20) def.w = 120;

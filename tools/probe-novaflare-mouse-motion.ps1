@@ -26,7 +26,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-public static class NovaFlareMouseMotionNative
+public static class DCEMouseMotionNative
 {
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT { public int Left, Top, Right, Bottom; }
@@ -89,8 +89,8 @@ if ($window -eq [IntPtr]::Zero) {
     throw "Process $TargetProcessId does not have a main window"
 }
 
-$rect = New-Object NovaFlareMouseMotionNative+RECT
-if (-not [NovaFlareMouseMotionNative]::GetWindowRect($window, [ref]$rect)) {
+$rect = New-Object DCEMouseMotionNative+RECT
+if (-not [DCEMouseMotionNative]::GetWindowRect($window, [ref]$rect)) {
     throw 'GetWindowRect failed before motion probe'
 }
 
@@ -98,7 +98,7 @@ New-Item -ItemType Directory -Path $RunDirectory -Force | Out-Null
 $screenshot = Join-Path $RunDirectory ($Name + '.png')
 $cpuStart = $process.TotalProcessorTime.TotalMilliseconds
 $stopwatch = [Diagnostics.Stopwatch]::StartNew()
-$motion = [NovaFlareMouseMotionNative]::MoveAsync($window, $DurationMilliseconds, $XPercent, $Drag.IsPresent)
+$motion = [DCEMouseMotionNative]::MoveAsync($window, $DurationMilliseconds, $XPercent, $Drag.IsPresent)
 
 Start-Sleep -Milliseconds ([Math]::Max(200, [int]($DurationMilliseconds / 2)))
 $width = $rect.Right - $rect.Left

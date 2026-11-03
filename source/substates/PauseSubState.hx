@@ -17,10 +17,7 @@ import games.backend.Replay;
 import games.backend.Song;
 
 /*
-	PauseSubState made by TieGuo, code optimized by Beihu.
-	it used at NF Engine
-	有一说一我感觉就是在屎山上加屎山，很无语 --beihu
-	别骂了 -- TieGuo
+	Nothing Beat some Shit 2 holoday --D.C.LushiFu
  */
 class PauseSubState extends MusicBeatSubstate
 {
@@ -895,7 +892,13 @@ class PauseSubState extends MusicBeatSubstate
 
 	override function destroy()
 	{
-		pauseMusic.destroy();
+		// ★ pauseMusic 是 static：destroy() 之后必须把静态引用也清掉，否则每暂停一次
+		//   都会留下一个已销毁的 FlxSound（连同它引用的音频对象）不被回收。
+		if (pauseMusic != null)
+		{
+			pauseMusic.destroy();
+			pauseMusic = null;
+		}
 		if (colorTween != null && colorTweenShadow != null)
 		{
 			colorTween.cancel();

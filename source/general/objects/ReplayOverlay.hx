@@ -20,7 +20,7 @@ class ReplayOverlay extends Sprite
 		super();
 
 		textField = new TextField();
-		textField.text = "NovaFlare Replay";
+		textField.text = "D.C.E. Replay";
 		textField.selectable = false;
 		textField.mouseEnabled = false;
 

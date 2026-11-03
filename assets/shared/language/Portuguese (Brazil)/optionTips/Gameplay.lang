@@ -5,7 +5,7 @@ middleScroll => Coloca sua pista no centro ou à direita
 flipChart => Inverter o gráfico durante o jogo
 ghostTapping => Alternar se pressionar uma direção sem seta conta como erro
 guitarHeroSustains => Notas longas não podem ser pressionadas se você errar
-noReset => Alternar o uso do R para reiniciar ao game over
+noReset => Ligado: apertar a tecla Reset (R por padrão) não mata mais na hora
 showKeybinds => Mostra a tecla atribuída a cada pista acima dos receptores quando uma música começa
 
 

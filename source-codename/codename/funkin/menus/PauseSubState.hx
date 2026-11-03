@@ -53,6 +53,8 @@ class PauseSubState extends MusicBeatSubstate
 
 		if (menuItems.contains("Exit to charter") && !PlayState.chartingMode)
 			menuItems.remove("Exit to charter");
+		if (controls.touchC)
+			menuItems.remove("Change Controls");
 
 		add(parentDisabler = new FunkinParentDisabler());
 
@@ -142,10 +144,15 @@ class PauseSubState extends MusicBeatSubstate
 
 		var upP = controls.UP_P;
 		var downP = controls.DOWN_P;
-		var scroll = FlxG.mouse.wheel;
+		var scroll = controls.touchC ? 0 : FlxG.mouse.wheel;
 
 		if (upP || downP || scroll != 0)  // like this we wont break mods that expect a 0 change event when calling sometimes  - Nex
 			changeSelection((upP ? -1 : 0) + (downP ? 1 : 0) - scroll);
+
+		if (controls.BACK) {
+			close();
+			return;
+		}
 
 		if (controls.ACCEPT)
 			selectOption();

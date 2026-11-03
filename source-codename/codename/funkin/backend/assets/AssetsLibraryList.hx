@@ -4,6 +4,7 @@ package codename.funkin.backend.assets;
 import codename.funkin.backend.assets.TranslatedAssetLibrary;
 #end
 import codename.funkin.backend.assets.IModsAssetLibrary;
+import codename.funkin.backend.assets.AssetSource;
 import lime.utils.AssetLibrary;
 import haxe.ds.Map;
 
@@ -35,13 +36,43 @@ class AssetsLibraryList extends AssetLibrary {
 
 	private var cacheLibraryTypePaths:Map<String, Map<String, AssetLibrary>> = [];
 	private var cacheTimeTypePaths:Map<String, Map<String, Float>> = [];
+	private var cacheLastLibraryPaths:Map<String, AssetLibrary> = [];
+	private var cacheLastLibraryTimes:Map<String, Float> = [];
+	private var cacheDirectoryEntries:Map<String, Array<String>> = [];
+	private var cacheDirectoryTimes:Map<String, Float> = [];
+	public var cacheGeneration(default, null):Int = 0;
 
 	private inline function getCacheTypeKey(type:Null<String>, source:AssetSource):String
 		return '${type == null ? "<null>" : type}|${source.toString()}';
+	private inline function getCachePathKey(id:String, source:AssetSource):String
+		return '${source.toString()}|$id';
+	private inline function getDirectoryCacheKey(kind:String, folder:String, source:AssetSource):String
+		return '$kind|${source.toString()}|${folder.toLowerCase()}';
 
 	private inline function clearExistsCache():Void {
+		#if MOD_SUPPORT
+		for (library in libraries) {
+			var cleanLibrary = getCleanLibrary(library);
+			if (cleanLibrary is ModsFolderLibrary)
+				cast(cleanLibrary, ModsFolderLibrary).invalidateLookupCaches();
+		}
+		#end
 		cacheLibraryTypePaths.clear();
 		cacheTimeTypePaths.clear();
+		cacheLastLibraryPaths.clear();
+		cacheLastLibraryTimes.clear();
+		cacheDirectoryEntries.clear();
+		cacheDirectoryTimes.clear();
+		cacheGeneration++;
+	}
+
+	public inline function invalidateLookupCaches():Void
+		clearExistsCache();
+
+	private inline function rememberLastLibrary(id:String, source:AssetSource, library:AssetLibrary, time:Float):Void {
+		var key = getCachePathKey(id, source);
+		cacheLastLibraryPaths.set(key, library);
+		cacheLastLibraryTimes.set(key, time);
 	}
 
 	public function removeLibrary(lib:AssetLibrary) {
@@ -69,7 +100,7 @@ class AssetsLibraryList extends AssetLibrary {
 		if (!id.startsWith("assets/") && existsSpecific('assets/$id', type, source))
 			return true;
 
-		// Prevent massive lags on repetitive usage. The NF integration includes
+		// Prevent massive lags on repetitive usage. The D.C.E. integration includes
 		// the source selector in the key so SOURCE, MODS and BOTH cannot collide.
 		final sec = haxe.Timer.stamp();
 		final cacheTypeKey = getCacheTypeKey(type, source);
@@ -84,15 +115,18 @@ class AssetsLibraryList extends AssetLibrary {
 		if (cacheTimePaths.exists(id)) {
 			final cacheSafetime = cacheTimePaths.get(id) + 6;
 			if (cacheLibraryPaths.exists(id)) {
-				if (sec < cacheSafetime) return true;
-
-				final cachedLibrary = cacheLibraryPaths.get(id);
-				if (!shouldSkipLib(cachedLibrary, source) && cachedLibrary.exists(id, type)) {
-					cacheTimePaths.set(id, sec);
+				if (sec < cacheSafetime) {
+					rememberLastLibrary(id, source, cacheLibraryPaths.get(id), sec);
 					return true;
 				}
 
+				// Once the TTL expires, rescan from the highest-priority library.
+				// Revalidating only the old hit would hide a newly added mod override
+				// forever as long as the lower-priority file still exists.
 				cacheLibraryPaths.remove(id);
+				var pathKey = getCachePathKey(id, source);
+				cacheLastLibraryPaths.remove(pathKey);
+				cacheLastLibraryTimes.remove(pathKey);
 			}
 			else if (sec < cacheSafetime) {
 				return false;
@@ -105,6 +139,7 @@ class AssetsLibraryList extends AssetLibrary {
 			if (shouldSkipLib(l, source)) continue;
 			if (l.exists(id, type)) {
 				cacheLibraryPaths.set(id, l);
+				rememberLastLibrary(id, source, l, sec);
 				return true;
 			}
 		}
@@ -115,6 +150,17 @@ class AssetsLibraryList extends AssetLibrary {
 		return existsSpecific(id, type, BOTH);
 
 	public function getSpecificPath(id:String, source:AssetSource = BOTH) {
+		var cacheKey = getCachePathKey(id, source);
+		var cachedLibrary = cacheLastLibraryPaths.get(cacheKey);
+		var cachedAt = cacheLastLibraryTimes.get(cacheKey);
+		if (cachedLibrary != null && cachedAt != null && haxe.Timer.stamp() < cachedAt + 6 && !shouldSkipLib(cachedLibrary, source)) {
+			var cachedPath = cachedLibrary.getPath(id);
+			if (cachedPath != null)
+				return cachedPath;
+		}
+		cacheLastLibraryPaths.remove(cacheKey);
+		cacheLastLibraryTimes.remove(cacheKey);
+
 		for(k=>e in libraries) {
 			if (shouldSkipLib(e, source)) continue;
 
@@ -132,6 +178,13 @@ class AssetsLibraryList extends AssetLibrary {
 		return getSpecificPath(id, BOTH);
 
 	public function getFiles(folder:String, source:AssetSource = BOTH):Array<String> {
+		var cacheKey = getDirectoryCacheKey("files", folder, source);
+		var now = haxe.Timer.stamp();
+		if (cacheDirectoryTimes.exists(cacheKey) && now < cacheDirectoryTimes.get(cacheKey) + 6) {
+			var cached = cacheDirectoryEntries.get(cacheKey);
+			if (cached != null) return cached.copy();
+		}
+
 		var content:Array<String> = [];
 		for(k=>l in libraries) {
 			if (shouldSkipLib(l, source)) continue;
@@ -147,10 +200,19 @@ class AssetsLibraryList extends AssetLibrary {
 			}
 			#end
 		}
+		cacheDirectoryEntries.set(cacheKey, content.copy());
+		cacheDirectoryTimes.set(cacheKey, now);
 		return content;
 	}
 
 	public function getFolders(folder:String, source:AssetSource = BOTH):Array<String> {
+		var cacheKey = getDirectoryCacheKey("folders", folder, source);
+		var now = haxe.Timer.stamp();
+		if (cacheDirectoryTimes.exists(cacheKey) && now < cacheDirectoryTimes.get(cacheKey) + 6) {
+			var cached = cacheDirectoryEntries.get(cacheKey);
+			if (cached != null) return cached.copy();
+		}
+
 		var content:Array<String> = [];
 		for(k=>l in libraries) {
 			if (shouldSkipLib(l, source)) continue;
@@ -166,6 +228,8 @@ class AssetsLibraryList extends AssetLibrary {
 			}
 			#end
 		}
+		cacheDirectoryEntries.set(cacheKey, content.copy());
+		cacheDirectoryTimes.set(cacheKey, now);
 		return content;
 	}
 
@@ -175,6 +239,18 @@ class AssetsLibraryList extends AssetLibrary {
 				var ass = getSpecificAsset('assets/$id', type, source);
 				if (ass != null) {
 					return ass;
+				}
+			}
+			var cacheTypeKey = getCacheTypeKey(type, source);
+			var cacheLibraryPaths = cacheLibraryTypePaths.get(cacheTypeKey);
+			var cacheTimePaths = cacheTimeTypePaths.get(cacheTypeKey);
+			if (cacheLibraryPaths != null && cacheTimePaths != null && cacheLibraryPaths.exists(id)
+				&& cacheTimePaths.exists(id) && haxe.Timer.stamp() < cacheTimePaths.get(id) + 6) {
+				var cachedLibrary = cacheLibraryPaths.get(id);
+				if (cachedLibrary != null && !shouldSkipLib(cachedLibrary, source)) {
+					var cachedAsset = cachedLibrary.getAsset(id, type);
+					if (cachedAsset != null)
+						return cachedAsset;
 				}
 			}
 			for(k=>l in libraries) {
@@ -223,6 +299,23 @@ class AssetsLibraryList extends AssetLibrary {
 		else this.base = base;
 		__defaultLibraries.push(this.base);
 
+		#if CODENAME_ENGINE_COMPAT
+		// Keep CNE-only packaged fallbacks outside D.C.E.'s default library,
+		// then mount them underneath the external CodeName asset folder.
+		var fallbackLibrary = Assets.getLibrary("codename_fallback");
+		if (fallbackLibrary != null) {
+			fallbackLibrary.tag = SOURCE;
+			__defaultLibraries.push(fallbackLibrary);
+		}
+		#if mobile
+		var mobileLibrary = Assets.getLibrary("codename_mobile");
+		if (mobileLibrary != null) {
+			mobileLibrary.tag = SOURCE;
+			__defaultLibraries.push(mobileLibrary);
+		}
+		#end
+		#end
+
 		#if sys
 
 		#if CODENAME_ENGINE_COMPAT
@@ -240,7 +333,7 @@ class AssetsLibraryList extends AssetLibrary {
 		}
 		#end
 
-		__defaultLibraries.push(ModsFolder.loadLibraryFromFolder('assets', rootDirectory, true, SOURCE));
+		__defaultLibraries.push(ModsFolder.loadLibraryFromFolder('assets', rootDirectory, true, null, SOURCE));
 
 		#end
 
@@ -269,7 +362,7 @@ class AssetsLibraryList extends AssetLibrary {
 
 		clearExistsCache();
 
-		libraries = [];
+		libraries.resize(0);
 
 		// adds default libraries in again
 		for (d in __defaultLibraries) addLibrary(d);

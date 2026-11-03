@@ -1,6 +1,7 @@
 package options.objects;
 
 import openfl.filters.GlowFilter;
+import states.freeplayState.objects.PhiPanel;
 
 import flixel.graphics.frames.FlxFilterFrames;
 
@@ -240,7 +241,13 @@ class Option extends FlxSpriteGroup
 			else fitDescWindow();
 		}
 
-		if (!allowUpdate) return;
+		if (!allowUpdate)
+		{
+			if (alreadyShowTip && OptionsState.instance != null) OptionsState.instance.clearTip(this);
+			alreadyShowTip = false;
+			overlopCheck = 0;
+			return;
+		}
 
 		var mouse = FlxG.mouse;
        
@@ -248,11 +255,13 @@ class Option extends FlxSpriteGroup
 			overlopCheck += elapsed;
 		} else {
 			overlopCheck = 0;
+			if (alreadyShowTip && OptionsState.instance != null)
+				OptionsState.instance.clearTip(this);
 			alreadyShowTip = false;
 		}
 
 		if (overlopCheck >= 0.2 && !alreadyShowTip) {
-			OptionsState.instance.changeTip(tips);
+			OptionsState.instance.showTip(this, tips);
 			alreadyShowTip = true;
 		}
 
@@ -285,9 +294,12 @@ class Option extends FlxSpriteGroup
 	{
 		baseBGAdd();
 
-		var clacHeight = baseBG.height - (baseTar.height + baseLine.height) - baseBG.mainRound * 2;
-		var clacWidth = baseBG.width * 0.4 - baseBG.mainRound;
-		boolButton = new BoolButton(baseBG.width * 0.6, baseTar.height + baseLine.height + baseBG.mainRound, clacWidth, clacHeight, this);
+		// A full-width row made the legacy 40%-width switch enormous.
+		var clacWidth = baseBG.width * 0.16;
+		var clacHeight = Math.max(18, (baseBG.height - baseTar.height - baseLine.height) * 0.58);
+		var clacX = baseBG.width - clacWidth - baseBG.width * 0.025;
+		var clacY = baseTar.height + baseLine.height + (baseBG.height - baseTar.height - baseLine.height - clacHeight) * 0.5;
+		boolButton = new BoolButton(clacX, clacY, clacWidth, clacHeight, this);
 		add(boolButton);
 	}
 
@@ -461,22 +473,13 @@ class Option extends FlxSpriteGroup
 	var stateButton:StateButton;
 	function addState()
 	{
-		var double = false; //还是小的比较好看
-
-		var calcWidth:Float = 0;
-		var calcHeight:Float = 0;
-
-		if (!double) calcWidth = follow.bg.realWidth * ((1 - (1 / 2 / 50 * 3)) / 2);
-		else calcWidth = follow.bg.realWidth * (1 - (1 / 2 / 50 * 2));
-
-		var calcHeight:Float = 0;
-		if (!double) calcHeight = calcWidth * 0.16;
-		else calcHeight = calcWidth * 0.1;
-
+		// State actions (for example Note Offset) are standalone, full-width buttons,
+		// not a normal setting row with a tiny action control on the right.
+		var calcWidth:Float = follow.bg.realWidth * (1 - (1 / 2 / 50 * 2));
+		var calcHeight:Float = calcWidth * 0.10;
 		stateButton = new StateButton(calcWidth, calcHeight, this);
 		add(stateButton);
-
-		saveHeight = stateButton.bg.height + inter;
+		saveHeight = calcHeight + inter;
 	}
 
 	/**
@@ -486,11 +489,11 @@ class Option extends FlxSpriteGroup
 	 *   用户报的「二级菜单里面的选项卡变黑色」除了组 alpha 会把 alpha 放大到 1
 	 *   之外，这个底色的起点本身也是黑的。这里改成极淡的白（0.05），和原型一致。
 	 */
-	inline static var CARD_ALPHA:Float = 0.05;
+	inline static var CARD_ALPHA:Float = 0.085;
 	/** 卡片里「变量名」下面那条 1px 分隔线（原型是 border，这里用线代替） */
 	inline static var CARD_LINE_ALPHA:Float = 0.10;
 
-	public var baseBG:Rect;
+	public var baseBG:PhiPanel;
 	var baseTar:FlxText;
 	var baseLine:Rect;
 	/** 描述文本（public：OptionsState 要在它上面做滚轮命中判定，见 descUnderMouse） */
@@ -498,38 +501,35 @@ class Option extends FlxSpriteGroup
 	var mult:Float = 1; //一些数据需要保持一致
 	function baseBGAdd(double:Bool = false)
 	{
-		if (double) mult = 2;
-		else mult = 1;
+		// 所有设置项都用内容区整行宽度；字号仍按旧半幅卡片的比例计算，
+		// 避免改成单列后文字和控件一起被放大。数值卡稍微高一些以容纳滑条。
+		mult = 2;
+		var calcWidth:Float = follow.bg.realWidth * (1 - (1 / 2 / 50 * 2));
+		var calcHeight:Float = calcWidth * (double ? 0.1 : 0.08);
 
-		var calcWidth:Float = 0;
-		if (!double) calcWidth = follow.bg.realWidth * ((1 - (1 / 2 / 50 * 3)) / 2);
-		else calcWidth = follow.bg.realWidth * (1 - (1 / 2 / 50 * 2));
-
-		var calcHeight:Float = 0;
-		if (!double) calcHeight = calcWidth * 0.16;
-		else calcHeight = calcWidth * 0.1;
-
-		baseBG = new Rect(0, 0, calcWidth, calcHeight, calcWidth / 75 / mult, calcWidth / 75 / mult, 0xFFFFFF, CARD_ALPHA);
+		// Match Freeplay's 15-degree silhouette on each settings row.
+		baseBG = new PhiPanel(0, 0, Std.int(calcWidth), Std.int(calcHeight), 0xFFFFFF);
+		baseBG.alpha = CARD_ALPHA;
 		add(baseBG);
 
-		baseTar = new FlxText(0, 0, 0, Language.get('Target', 'options') + ': ' + variable, Std.int(baseBG.width / 20 / mult));
-		baseTar.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(baseBG.width / 30 / mult), 0xffffff, LEFT, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
+		baseTar = new FlxText(0, 0, baseBG.width * 0.68, Language.get('Target', 'options') + ': ' + variable, Std.int(baseBG.width / 20 / mult));
+		baseTar.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(baseBG.width / 24 / mult), 0xffffff, RIGHT, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
         baseTar.antialiasing = ClientPrefs.data.antialiasing;
 		baseTar.borderStyle = NONE;
-		baseTar.x += baseBG.mainRound;
-		baseTar.alpha = 0.3;
+		baseTar.x = baseBG.width - baseTar.fieldWidth - baseBG.mainRound;
+		baseTar.alpha = 0.5;
+		baseTar.visible = false; //变量名只在顶栏显示；不加入列表项的绘制组
 		//baseTar.blend = ADD;
 		baseTar.active = false;
-		add(baseTar);
 
 		baseLine = new Rect(0, baseTar.height, baseBG.width, baseBG.width / 400 / mult, 0, 0, 0xFFFFFF, CARD_LINE_ALPHA);
+		baseLine.visible = false;
 		baseLine.active = false;
-		add(baseLine);
 
 		var calcWidth = baseBG.width * 0.58;
 		if (double) calcWidth = baseBG.width * 0.5;
 		baseDesc = new FlxText(0, baseTar.height + baseLine.height, calcWidth, description, Std.int(follow.width / 10));
-		baseDesc.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(baseBG.width / 25 / mult), 0xffffff, LEFT, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
+		baseDesc.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(baseBG.width / 14 / mult), 0xffffff, LEFT, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
         baseDesc.antialiasing = ClientPrefs.data.antialiasing;
 		baseDesc.borderStyle = NONE;
 		baseDesc.active = false;
@@ -690,19 +690,22 @@ class Option extends FlxSpriteGroup
 				
 			case STATE:
 				stateButton.stateName.text = description;
-				stateButton.stateName.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(stateButton.bg.width / 20), 0xffffff, CENTER, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
+				stateButton.stateName.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(stateButton.bg.width / 28), 0xffffff, CENTER, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
 				stateButton.stateName.borderStyle = NONE;
+				stateButton.refreshLabelLayout();
 			default:
 		}
 	}
 
 	function baseChangeLanguage() {
 		baseTar.text = Language.get('Target', 'options') + ': ' + variable;
-		baseTar.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(baseBG.width / 30 / mult), 0xffffff, LEFT, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
+		baseTar.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(baseBG.width / 24 / mult), 0xffffff, RIGHT, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
 		baseTar.borderStyle = NONE;
+		baseTar.fieldWidth = baseBG.width * 0.68;
+		baseTar.x = baseBG.width - baseTar.fieldWidth - baseBG.mainRound;
 
 		baseDesc.text = description;
-		baseDesc.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(baseBG.width / 25 / mult), 0xffffff, LEFT, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
+		baseDesc.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(baseBG.width / 14 / mult), 0xffffff, LEFT, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
 		baseDesc.borderStyle = NONE;
 		// ★ 换了语言 = 换了一段新描述，行数可能完全不同 → 重新量一次窗口。
 		//   注意只挂标记，**不要**在这里写 fieldHeight：此刻文本刚 set、textHeight
@@ -724,6 +727,7 @@ class Option extends FlxSpriteGroup
 
 	public var followX:Float = 0;  //optioncata位置
 	public var innerX:Float = 0; //这个option在optioncata内部位置
+	public var layoutBaseX:Float = 0; //跟随斜切列表布局前保存的行内边距
 	public var xOff:Float = 0; //用于图形在cata内部位移
 	var xTween:FlxTween = null;
 	// ★ 默认时长 0.5s：单条补间本身就是"一组动画"，卡在 0.5s 这条线上
@@ -739,6 +743,7 @@ class Option extends FlxSpriteGroup
 	public function initX(data:Float, innerData:Float, ?specData:Float = 0) {
 		followX = data;
 		innerX = innerData;
+		layoutBaseX = innerData;
 		if (type == TITLE) return;
 		this.x = followX + innerX;
 		if (specData != 0) { 
@@ -859,7 +864,7 @@ class Option extends FlxSpriteGroup
 		if (isAdd) {
 			var tween = FlxTween.tween(baseBG, {alpha: CARD_ALPHA}, time, {ease: FlxEase.expoIn});
 			alphaTween.push(tween);
-			var tween = FlxTween.tween(baseTar, {alpha: 0.3}, time, {ease: FlxEase.expoIn});
+			var tween = FlxTween.tween(baseTar, {alpha: 0.5}, time, {ease: FlxEase.expoIn});
 			alphaTween.push(tween);
 			var tween = FlxTween.tween(baseLine, {alpha: CARD_LINE_ALPHA}, time, {ease: FlxEase.expoIn});
 			alphaTween.push(tween);

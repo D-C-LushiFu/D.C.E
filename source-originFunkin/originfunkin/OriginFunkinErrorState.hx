@@ -7,7 +7,7 @@ import flixel.util.FlxColor;
 
 /**
  * Keeps a present-but-invalid originFunkin folder from silently starting the
- * normal NovaFlare frontend.
+ * normal D.C.E. frontend.
  */
 class OriginFunkinErrorState extends FlxState
 {
@@ -30,7 +30,7 @@ class OriginFunkinErrorState extends FlxState
 		var details:FlxText = new FlxText(80, 190, FlxG.width - 160,
 			'$message\n\nPlace the unmodified FNF 0.8.4 asset folders inside:\n'
 			+ '${OriginFunkinMode.assetsRoot}\n\n'
-			+ "Remove the originFunkin folder to start NovaFlare normally.");
+			+ "Remove the originFunkin folder to start D.C.E. normally.");
 		details.setFormat(null, 24, FlxColor.LIME, CENTER);
 		details.screenCenter(X);
 		add(details);

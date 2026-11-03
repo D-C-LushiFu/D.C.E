@@ -16,11 +16,17 @@ package codename.funkin.backend.utils;
  */
 final class NdllUtil {
 	#if NDLLS_SUPPORTED
-		#if windows   public static final os:String = "windows";   #end
-		#if linux     public static final os:String = "linux";     #end
-		#if macos     public static final os:String = "mac";       #end
-		#if android   public static final os:String = "android";   #end
-		#if ios       public static final os:String = "ios";       #end
+		#if android
+		public static final os:String = "android";
+		#elseif ios
+		public static final os:String = "ios";
+		#elseif windows
+		public static final os:String = "windows";
+		#elseif linux
+		public static final os:String = "linux";
+		#elseif (mac || macos)
+		public static final os:String = "mac";
+		#end
 	#end
 
 	/**

@@ -10,6 +10,10 @@ import openfl.utils.Assets;
 import openfl.utils.AssetType;
 import openfl.text.Font;
 
+#if mobile
+import general.shaders.MobileShaderConverter;
+#end
+
 #if sys
 import sys.FileSystem;
 #end
@@ -27,14 +31,14 @@ class OriginFunkinMode
 	public static var preparationError(default, null):Null<String>;
 	public static var mountedAssetCount(default, null):Int = 0;
 	public static var mountedLibraries(default, null):Array<String> = [];
-	public static var novaFlareIntroVideoPath(default, null):Null<String>;
+	public static var dceIntroVideoPath(default, null):Null<String>;
 	public static var noticeFontName(default, null):Null<String>;
 	public static var debugDisplay:FunkinDebugDisplay;
 	public static var registeredFontCount(default, null):Int = 0;
 
-	static inline final NOVAFLARE_INTRO_ASSET:String = "assets/videos/menuExtend/titleIntro.mp4";
-	static inline final NOVAFLARE_INTRO_LIBRARY_ASSET:String = "videos:assets/videos/menuExtend/titleIntro.mp4";
-	static inline final NOVAFLARE_NOTICE_FONT_ASSET:String = "assets/fonts/Lang-ZH.ttf";
+	static inline final DCE_INTRO_ASSET:String = "assets/videos/menuExtend/titleIntro.mp4";
+	static inline final DCE_INTRO_LIBRARY_ASSET:String = "videos:assets/videos/menuExtend/titleIntro.mp4";
+	static inline final DCE_NOTICE_FONT_ASSET:String = "assets/fonts/Lang-ZH.ttf";
 	static inline final OFFICIAL_ASSET_FILE_COUNT:Int = 2390;
 	static inline final OFFICIAL_ASSET_MIN_BYTES:Float = 1330000000.0;
 
@@ -60,7 +64,7 @@ class OriginFunkinMode
 		assetsAvailable = false;
 		assetsRoot = null;
 		preparationError = null;
-		novaFlareIntroVideoPath = null;
+		dceIntroVideoPath = null;
 		noticeFontName = null;
 
 		#if sys
@@ -82,7 +86,7 @@ class OriginFunkinMode
 			assetsAvailable = false;
 			assetsRoot = null;
 			preparationError = 'Unable to use the $FOLDER_NAME folder: ${describeError(error)}';
-			trace('[originFunkin] $preparationError Falling back to NovaFlare Engine.');
+			trace('[originFunkin] $preparationError Falling back to D.C.E.');
 		}
 		#end
 
@@ -127,7 +131,7 @@ class OriginFunkinMode
 
 		try
 		{
-			novaFlareIntroVideoPath = resolveNovaFlareIntroVideoPath();
+			dceIntroVideoPath = resolveDCEIntroVideoPath();
 			noticeFontName = resolveNoticeFontName();
 			validateLayout(assetsRoot);
 			mountedAssetCount = mountAssetLibraries(assetsRoot);
@@ -146,7 +150,12 @@ class OriginFunkinMode
 			}
 
 			debugDisplay = new FunkinDebugDisplay(10, 10, 0xFFFFFF);
-			funkin.save.Save.load();
+			final save = funkin.save.Save.load();
+			#if mobile
+			MobileShaderConverter.setEnabled(save.novaSettings == null
+				? true
+				: (save.novaSettings.autoShaderConversion ?? true));
+			#end
 			OriginFunkinConfig.markOriginEntered();
 
 			funkin.Preferences.fancyPreview = false;
@@ -172,7 +181,7 @@ class OriginFunkinMode
 
 	public static function getWindowTitle():String
 	{
-		return "NovaFlare Engine";
+		return "D.C.E.";
 	}
 
 	public static function reportRuntimeError(details:String):Void
@@ -246,13 +255,13 @@ class OriginFunkinMode
 
 	static function resolveNoticeFontName():Null<String>
 	{
-		if (!Assets.exists(NOVAFLARE_NOTICE_FONT_ASSET, AssetType.FONT))
+		if (!Assets.exists(DCE_NOTICE_FONT_ASSET, AssetType.FONT))
 		{
-			trace('[originFunkin] NovaFlare Chinese notice font is unavailable: $NOVAFLARE_NOTICE_FONT_ASSET');
+			trace('[originFunkin] D.C.E. Chinese notice font is unavailable: $DCE_NOTICE_FONT_ASSET');
 			return null;
 		}
 
-		var font:Font = Assets.getFont(NOVAFLARE_NOTICE_FONT_ASSET);
+		var font:Font = Assets.getFont(DCE_NOTICE_FONT_ASSET);
 		if (font == null || font.fontName == null || font.fontName.length == 0)
 		{
 			return null;
@@ -261,23 +270,23 @@ class OriginFunkinMode
 		return font.fontName;
 	}
 
-	static function resolveNovaFlareIntroVideoPath():Null<String>
+	static function resolveDCEIntroVideoPath():Null<String>
 	{
 		#if sys
-		if (FileSystem.exists(NOVAFLARE_INTRO_ASSET))
+		if (FileSystem.exists(DCE_INTRO_ASSET))
 		{
-			return FileSystem.fullPath(NOVAFLARE_INTRO_ASSET);
+			return FileSystem.fullPath(DCE_INTRO_ASSET);
 		}
 		#end
 
-		if (Assets.exists(NOVAFLARE_INTRO_LIBRARY_ASSET))
+		if (Assets.exists(DCE_INTRO_LIBRARY_ASSET))
 		{
-			return Assets.getPath(NOVAFLARE_INTRO_LIBRARY_ASSET);
+			return Assets.getPath(DCE_INTRO_LIBRARY_ASSET);
 		}
 
-		if (Assets.exists(NOVAFLARE_INTRO_ASSET))
+		if (Assets.exists(DCE_INTRO_ASSET))
 		{
-			return Assets.getPath(NOVAFLARE_INTRO_ASSET);
+			return Assets.getPath(DCE_INTRO_ASSET);
 		}
 
 		return null;
@@ -391,12 +400,15 @@ class OriginFunkinMode
 			}
 		}
 
-		// NovaFlare's normal runtime has one additional library whose layout is
-		// not part of FNF 0.8.4. Leaving it registered makes Polymod reject the
-		// official asset-library map before it can parse any core scripts.
-		if (Assets.getLibrary("week_assets") != null)
+		// Libraries owned by D.C.E./CNE are not part of FNF 0.8.4's asset
+		// layout. Leaving any of them registered makes Polymod reject the
+		// official asset-library map before it can parse core or mod scripts.
+		for (foreignLibrary in ["week_assets", "codename_fallback", "codename_mobile"])
 		{
-			Assets.unloadLibrary("week_assets");
+			if (Assets.getLibrary(foreignLibrary) != null)
+			{
+				Assets.unloadLibrary(foreignLibrary);
+			}
 		}
 
 		if (!Assets.exists("assets/data/introText.txt", AssetType.TEXT)

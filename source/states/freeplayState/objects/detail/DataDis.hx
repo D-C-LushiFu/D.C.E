@@ -23,6 +23,7 @@ class DataDis extends FlxSpriteGroup{
 	public var decimalPlaces:Int = 2;
 
 	public var enableColorByPercent:Bool = true;
+	public var showRange:Bool = true;
 	public var minColor:FlxColor = 0xFFAFFF8D;
 	public var maxColor:FlxColor = 0xFFFF7975;
 
@@ -92,7 +93,17 @@ class DataDis extends FlxSpriteGroup{
 		if (enableColorByPercent) {
 			lineDis.color = FlxColor.interpolate(minColor, maxColor, percent);
 		}
-		data.text = formatValue(v, allowDecimal) + '  [' + formatValue(minV, allowDecimal) + ' - ' + formatValue(maxV, allowDecimal) + ']';
+		data.text = showRange
+			? formatValue(v, allowDecimal) + '  [' + formatValue(minV, allowDecimal) + ' - ' + formatValue(maxV, allowDecimal) + ']'
+			: formatValue(v, allowDecimal);
+	}
+
+	public function setHybridStyle(labelSize:Int = 14, valueSize:Int = 22):Void
+	{
+		showRange = false;
+		text.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), labelSize, 0xFFB9BBC6, LEFT);
+		data.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), valueSize, FlxColor.WHITE, LEFT);
+		applyVisual(value, calcPercent(value, minValue, maxValue), minValue, maxValue, allowDecimal);
 	}
 
 	public function setColorRange(minColor:FlxColor, maxColor:FlxColor, ?applyNow:Bool = true) {

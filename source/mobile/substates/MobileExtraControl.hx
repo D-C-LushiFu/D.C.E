@@ -50,10 +50,30 @@ class MobileExtraControl extends MusicBeatSubstate
 	var optionWidth:Int = 80;
 	var optionHeight:Int = 30;
 
+	/**
+	 * ★ 重置必须"按住"才生效（秒）。默认 R 键 / 移动端虚拟 C 键。
+	 *
+	 * 以前这里是 `controls.RESET || virtualPad.buttonC.justPressed` —— **单点一下**就把
+	 * 4 个特殊键全部恢复成 Space/Space/Shift/Shift 并立即落盘。而 `controls.RESET` 读的是
+	 * FlxG.keys 的全局状态，那个状态会被移动端虚拟按键直接改写
+	 * （mobile.flixel.FlxTypedButton.handleInput 会把按钮 IDs 对应的键写成 PRESSED），
+	 * 所以在手机上"误触一下 C / 手指扫过虚拟键"就足以把特殊键设置清掉 ——
+	 * 用户反馈的"移动端按键设置偶尔被重置、我根本没点 Reset"就是这条。
+	 *
+	 * 现在与同族的 KeyBindsSubState 保持一致：长按 1.2s、界面显示进度、中途松手即取消。
+	 */
+	static inline var RESET_HOLD_TIME:Float = 1.2;
+	/** 进界面后的宽限期：此时长按不计数（防"打开界面时按键已经是按下状态"） */
+	static inline var RESET_INPUT_GRACE:Float = 0.35;
+
+	var resetHoldTime:Float = 0;
+	var resetArmed:Bool = true;
+	var resetGrace:Float = RESET_INPUT_GRACE;
+
 	override function create()
 	{
 		// ★ 关键：子状态的 cameras 必须是主相机（FlxG.camera），不能是最后一个相机
-		//   理由同 KeyBindsSubState：沉浸界面下最后相机 = chromeCam，自绘「NovaFlare Engine」条挂在它上面。
+		//   理由同 KeyBindsSubState：沉浸界面下最后相机 = chromeCam，自绘「D.C.E.」条挂在它上面。
 		//   与 chromeCam 共用会按 z-顺序被键盘选择 UI 盖住，改成主相机 → chromeCam 最后绘制 → 顶栏按钮始终可见。
 		cameras = [FlxG.camera];
 
@@ -149,7 +169,22 @@ class MobileExtraControl extends MusicBeatSubstate
 		var up = controls.UI_UP_P;
 		var down = controls.UI_DOWN_P;
 		var back = controls.BACK;
-		var reset = controls.RESET || (virtualPad != null && virtualPad.buttonC.justPressed);
+		// ★ 只有"真的显示且激活"的虚拟摇杆上的 C 才算数（桌面端整个 pad 是被隐藏的），
+		//   并且要按住 1.2s —— 单点一下不再重置（见 RESET_HOLD_TIME 的注释）。
+		var padResetHeld:Bool = virtualPad != null
+			&& virtualPad.exists
+			&& virtualPad.active
+			&& virtualPad.visible
+			&& virtualPad.buttonC != null
+			&& virtualPad.buttonC.pressed;
+		var resetHeld:Bool = padResetHeld || (!controls.controllerMode && controls.pressed('reset'));
+
+		if (resetGrace > 0)
+		{
+			resetGrace -= elapsed;
+			resetHeld = false;
+			resetHoldTime = 0;
+		}
 
 		if (left || right)
 		{
@@ -282,14 +317,40 @@ class MobileExtraControl extends MusicBeatSubstate
 				updateChoose();
 			}
 		}
-		if (reset)
+		// ★ 长按 RESET / 虚拟 C 才重置特殊键（单点不再触发）
+		if (resetHeld && resetArmed)
 		{
-			FlxG.sound.play(Paths.sound('cancelMenu'));
-			ClientPrefs.data.extraKeyReturn1 = ClientPrefs.defaultData.extraKeyReturn1;
-			ClientPrefs.data.extraKeyReturn2 = ClientPrefs.defaultData.extraKeyReturn2;
-			ClientPrefs.data.extraKeyReturn3 = ClientPrefs.defaultData.extraKeyReturn3;
-			ClientPrefs.data.extraKeyReturn4 = ClientPrefs.defaultData.extraKeyReturn4;
-			resetTitle();
+			resetHoldTime += elapsed;
+			if (resetHoldTime >= RESET_HOLD_TIME)
+			{
+				resetHoldTime = 0;
+				resetArmed = false; // 一直按着不放不要反复清：必须松手再按才重新武装
+				resetGrace = RESET_INPUT_GRACE;
+				FlxG.sound.play(Paths.sound('cancelMenu'));
+				ClientPrefs.data.extraKeyReturn1 = ClientPrefs.defaultData.extraKeyReturn1;
+				ClientPrefs.data.extraKeyReturn2 = ClientPrefs.defaultData.extraKeyReturn2;
+				ClientPrefs.data.extraKeyReturn3 = ClientPrefs.defaultData.extraKeyReturn3;
+				ClientPrefs.data.extraKeyReturn4 = ClientPrefs.defaultData.extraKeyReturn4;
+				// 这是一次**明确**的重置：立刻落盘，免得之后某次退出把它又覆盖成别的值
+				ClientPrefs.saveSettings();
+				resetTitle();
+			}
+			else if (titleTeam != null && titleNum >= 0 && titleNum < titleTeam.length)
+			{
+				var percent:Int = Std.int(Math.min(100, Math.max(0, resetHoldTime / RESET_HOLD_TIME * 100)));
+				var title:ChooseButton = titleTeam.members[titleNum];
+				if (title != null) title.changeExtraText('RESET ' + percent + '%');
+			}
+		}
+		else if (!resetHeld)
+		{
+			resetArmed = true;
+			if (resetHoldTime > 0)
+			{
+				// 松手（没按满）：什么都不做，把标题恢复成当前配置
+				resetHoldTime = 0;
+				resetTitle();
+			}
 		}
 	}
 

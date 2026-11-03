@@ -1,6 +1,8 @@
 package codename.funkin.backend.utils;
 
+#if !mobile
 import codename.funkin.backend.utils.native.HiddenProcess;
+#end
 #if cpp
 import cpp.vm.Gc;
 #elseif hl
@@ -52,10 +54,10 @@ final class MemoryUtil {
 	/**
 	 * Does a full garbage collection.
 	 */
-	public static function clearMajor() {
+	public static function clearMajor(compact:Bool = true) {
 		#if cpp
 		Gc.run(true);
-		Gc.compact();
+		if (compact) Gc.compact();
 		#elseif hl
 		Gc.major();
 		#elseif (java || neko)
@@ -91,6 +93,10 @@ final class MemoryUtil {
 		#if cpp
 			#if windows
 			return codename.funkin.backend.utils.native.Windows.getTotalRam();
+			#elseif android
+			return codename.funkin.backend.utils.native.Android.getTotalRam();
+			#elseif ios
+			return codename.funkin.backend.utils.native.IOS.getTotalRam();
 			#elseif mac
 			return codename.funkin.backend.utils.native.Mac.getTotalRam();
 			#elseif linux
@@ -125,7 +131,7 @@ final class MemoryUtil {
 	 * Output depends on the platform, and hardware.
 	 */
 	public static function getMemType():String {
-		#if windows
+		#if (windows && !mobile)
 		var memoryMap:Map<Int, String> = [
 			0 => null,
 			1 => "Other",
@@ -169,12 +175,12 @@ final class MemoryUtil {
 		var process = new HiddenProcess("powershell", ["-Command", "Get-CimInstance Win32_PhysicalMemory | Select-Object -ExpandProperty SMBIOSMemoryType" ]);
 		if (process.exitCode() == 0) memoryOutput = Std.int(Std.parseFloat(process.stdout.readAll().toString().trim().split("\n")[1]));
 		if (memoryOutput != -1) return memoryMap[memoryOutput] == null ? 'Unknown ($memoryOutput)' : memoryMap[memoryOutput];
-		#elseif mac
+		#elseif (mac && !mobile)
 		var process = new HiddenProcess("system_profiler", ["SPMemoryDataType"]);
 		var reg = ~/Type: (.+)/;
 		reg.match(process.stdout.readAll().toString());
 		if (process.exitCode() == 0) return reg.matched(1);
-		#elseif linux
+		#elseif (linux && !mobile)
 		/*var process = new HiddenProcess("sudo", ["dmidecode", "--type", "17"]);
 		if (process.exitCode() != 0) return "Unknown";
 		var lines = process.stdout.readAll().toString().split("\n");

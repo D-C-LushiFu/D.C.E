@@ -60,32 +60,21 @@ class StrumNote extends FlxSprite
 
 		strumMania = maniaOverride;
 
-		rgbShader = new RGBShaderReference(this, Note.initializeGlobalRGBShader(leData));
+		rgbShader = new RGBShaderReference(this, Note.initializeGlobalRGBShader(leData, curMania()));
 		rgbShader.enabled = false;
-		if (PlayState.SONG != null && (PlayState.SONG.disableNoteRGB || !ClientPrefs.data.noteRGB || ClientPrefs.data.noteColorSwap))
-			useRGBShader = false;
+		// ★ 统一策略：谱面 disableNoteRGB / 玩家 noteRGB / 色相替换模式 任一命中即不启用 RGB
+		//   （旧代码在构造器里用 SONG.mania 建调色板、却用 strumMania 取色，两者不一致时
+		//    RGBShaderReference 会克隆私有调色板并把着色器挂回 → 关掉 RGB 的谱面受体照样染色）
+		useRGBShader = Note.noteRGBAllowed();
 		if (ClientPrefs.data.noteColorSwap){
 		colorSwap = new ColorSwap();
 		shader = colorSwap.shader;
 		}
-		var mania:Int = curMania();
 
-		var arrowRGBIndex = getIndex(mania, leData);
-
-		// ★ 防御：arrowRGB 只有 4 项（4K 默认），但 10K 的 notes 映射会把 leData 翻成
-		//   4..9 的视觉 lane（如 keys[9].notes = [0,1,2,3,4,9,5,6,7,8]）。越界读 arrowRGB
-		//   会返回 null → arr[0] / arr[1] / arr[2] 触发 NPE/AV。clamp + null 兜底。
-		var safeIdx:Int = (arrowRGBIndex >= 0 && arrowRGBIndex < ClientPrefs.data.arrowRGB.length) ? arrowRGBIndex : 0;
-		var arr:Array<FlxColor> = ClientPrefs.data.arrowRGB[safeIdx];
-		if (PlayState.isPixelStage)
-		{
-			var pixIdx:Int = (arrowRGBIndex >= 0 && arrowRGBIndex < ClientPrefs.data.arrowRGBPixel.length) ? arrowRGBIndex : 0;
-			arr = ClientPrefs.data.arrowRGBPixel[pixIdx];
-		}
-
-		// ★ 不用 bypass：值与该 strum 引用的共享槽不同（如按段覆盖/KeyChange 重建）时
-		//   RGBShaderReference 会自动克隆私有 palette，避免按错键数染色
-		if (arr != null)
+		// ★ 取色改用统一的 Extra Keys 映射（旧代码用 getIndex() 直读，越界直接 NPE；
+		//   且 clamp 规则与 Note.buildGlobalPalette 不一致 → 额外触发无谓的 palette 克隆）
+		var arr:Array<FlxColor> = Note.colorRow(curMania(), leData);
+		if (arr != null && arr.length > 2)
 		{
 			rgbShader.r = arr[0];
 			rgbShader.g = arr[1];
@@ -273,18 +262,60 @@ class StrumNote extends FlxSprite
 			centerOffsets();
 			centerOrigin();
 		}
+
+		var isStatic:Bool = (animation.curAnim == null || animation.curAnim.name == 'static');
+
 		if (useRGBShader)
-			rgbShader.enabled = (animation.curAnim != null && animation.curAnim.name != 'static');
-		else if (ClientPrefs.data.noteColorSwap){
-			if(animation.curAnim == null || animation.curAnim.name == 'static') {
-			colorSwap.hue = 0;
-			colorSwap.saturation = 0;
-			colorSwap.brightness = 0;
-			} else {
-			colorSwap.hue = ClientPrefs.data.arrowHSV[noteData % 4][0] / 360;
-			colorSwap.saturation = ClientPrefs.data.arrowHSV[noteData % 4][1] / 100;
-			colorSwap.brightness = ClientPrefs.data.arrowHSV[noteData % 4][2] / 100;
+		{
+			rgbShader.enabled = !isStatic;
+		}
+		else if (ClientPrefs.data.noteColorSwap && colorSwap != null)
+		{
+			// 色相替换模式：RGB 着色器必须让位（两者抢同一个 sprite.shader 槽）
+			if (rgbShader.enabled) rgbShader.enabled = false;
+			if (shader != colorSwap.shader) shader = colorSwap.shader;
+
+			// ★ 旧代码写死 `noteData % 4`：>4K 时按键轨号 ≠ 基础色下标（见 Note.baseColorIndex）
+			var hsv:Array<Float> = Note.hsvRow(curMania(), noteData);
+			if (isStatic || hsv == null || hsv.length < 3)
+			{
+				colorSwap.hue = 0;
+				colorSwap.saturation = 0;
+				colorSwap.brightness = 0;
 			}
+			else
+			{
+				colorSwap.hue = hsv[0] / 360;
+				colorSwap.saturation = hsv[1] / 100;
+				colorSwap.brightness = hsv[2] / 100;
+			}
+		}
+		else
+		{
+			// 谱面 disableNoteRGB / 玩家 noteRGB 关闭：确保着色器彻底摘除。
+			// 这是「RGB 关不掉」的第二道保险（第一道在 RGBShaderReference.cloneOriginal）。
+			if (rgbShader.enabled) rgbShader.enabled = false;
+		}
+	}
+
+	/**
+	 * RGB 开关（谱面 disableNoteRGB / 玩家选项）在运行期变化后重新套用策略。
+	 * 图表编辑器勾选 "Disable Note RGB" 重建 strumline、或脚本改了 ClientPrefs 之后调用。
+	 */
+	public function applyRGBPolicy():Void
+	{
+		useRGBShader = Note.noteRGBAllowed();
+		var isStatic:Bool = (animation.curAnim == null || animation.curAnim.name == 'static');
+
+		if (useRGBShader)
+		{
+			rgbShader.enabled = !isStatic;
+		}
+		else
+		{
+			rgbShader.enabled = false;
+			if (ClientPrefs.data.noteColorSwap && colorSwap != null && shader != colorSwap.shader)
+				shader = colorSwap.shader;
 		}
 	}
 	
@@ -314,12 +345,21 @@ class StrumNote extends FlxSprite
 	}
 
 	private function shaderInit() {
-		if (this.useRGBShader)
+		if (useRGBShader)
 			rgbShader.enabled = false;
-		else if (ClientPrefs.data.noteColorSwap){
+		else if (ClientPrefs.data.noteColorSwap && colorSwap != null)
+		{
+			// ★ `shader = colorSwap.shader` 在构造器里、super() 之前就赋过了；这里再确认一次，
+			//   防止中途被 RGB 分支或脚本覆盖（两者抢同一个 shader 槽）。
+			if (shader != colorSwap.shader) shader = colorSwap.shader;
 			colorSwap.hue = 0;
 			colorSwap.saturation = 0;
 			colorSwap.brightness = 0;
+		}
+		else
+		{
+			// 谱面 disableNoteRGB / 玩家 noteRGB 关闭：静态箭头绝不能带着 RGB 着色器
+			rgbShader.enabled = false;
 		}
 	}
 }

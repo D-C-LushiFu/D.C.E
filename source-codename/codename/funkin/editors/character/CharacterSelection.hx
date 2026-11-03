@@ -48,7 +48,7 @@ class CharacterSelectionScreen extends EditorTreeMenuScreen {
 				}
 				else {
 					list.push(new IconOption(char, getID('acceptCharacter'), Character.getIconFromCharName(folderPath + char, char), () -> {
-						FlxG.switchState(new CharacterEditor(folderPath + char));
+						MobileEditorWarning.open(parent, () -> FlxG.switchState(new CharacterEditor(folderPath + char)));
 					}));
 				}
 			}
@@ -77,7 +77,7 @@ class CharacterSelectionScreen extends EditorTreeMenuScreen {
 
 		// Add to Menu >:D
 		var option:IconOption = new IconOption(name, getID('acceptCharacter'), Character.getIconFromCharName(name), () -> {
-			FlxG.switchState(new CharacterEditor(name));
+			MobileEditorWarning.open(parent, () -> FlxG.switchState(new CharacterEditor(name)));
 		});
 
 		insert(1, option);

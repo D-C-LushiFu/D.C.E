@@ -1,6 +1,7 @@
 package developer.editors;
 
 import haxe.Json;
+import developer.editors.EditorDocumentHistory.EditorDocumentTimeline;
 
 import lime.system.Clipboard;
 
@@ -36,11 +37,13 @@ class WeekEditorState extends MusicBeatState
 	var weekThing:MenuItem;
 	var missingFileText:FlxText;
 
+	public static var documentTimeline:EditorDocumentTimeline;
 	var weekFile:WeekFile = null;
 
 	public function new(weekFile:WeekFile = null)
 	{
 		super();
+		if (weekFile == null || documentTimeline == null) documentTimeline = new EditorDocumentTimeline();
 		this.weekFile = WeekData.createWeekFile();
 		if (weekFile != null)
 			this.weekFile = weekFile;
@@ -48,12 +51,31 @@ class WeekEditorState extends MusicBeatState
 			weekFileName = 'week1';
 	}
 
+	public var documentHistory:EditorDocumentHistory;
+
+	function historyRead():String return EditorDocumentHistory.jsonSnapshot(weekFile);
+	function historyRestore(snapshot:String):Void
+	{
+		weekFile = cast haxe.Json.parse(snapshot);
+		reloadAllShit();
+	}
+	function exitEditor():Void
+	{
+		documentHistory.confirmDiscard(function() {
+			MusicBeatState.switchState(new MasterEditorMenu());
+			FlxG.sound.playMusic(Paths.music('freakyMenu'));
+		});
+	}
+
 	override function create()
 	{
+		// ★ 十三轮：编辑器统一走高分辨率设计（文字 1:1 光栅化 = 清晰）；
+		//   离开时由 EditorInputStyle 的 stateSwitched 钩子自动还原 1280×720。
+		EditorInputStyle.enterHiRes();
 		// 强制刷新语言数据，确保 week 等语言分组被加载（多语言文案）
 		general.backend.language.Language.resetData();
 
-		txtWeekTitle = new FlxText(FlxG.width * 0.7, 10, 0, "", 32);
+		txtWeekTitle = new EditorText(FlxG.width * 0.7, 10, 0, "", 32);
 		txtWeekTitle.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 32, FlxColor.WHITE, RIGHT);
 		txtWeekTitle.alpha = 0.7;
 
@@ -79,7 +101,7 @@ class WeekEditorState extends MusicBeatState
 		lock.antialiasing = ClientPrefs.data.antialiasing;
 		add(lock);
 
-		missingFileText = new FlxText(0, 0, FlxG.width, "");
+		missingFileText = new EditorText(0, 0, FlxG.width, "");
 		missingFileText.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 24, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		missingFileText.borderSize = 2;
 		missingFileText.visible = false;
@@ -101,7 +123,7 @@ class WeekEditorState extends MusicBeatState
 		tracksSprite.antialiasing = ClientPrefs.data.antialiasing;
 		add(tracksSprite);
 
-		txtTracklist = new FlxText(FlxG.width * 0.05, tracksSprite.y + 60, 0, "", 32);
+		txtTracklist = new EditorText(FlxG.width * 0.05, tracksSprite.y + 60, 0, "", 32);
 		txtTracklist.alignment = CENTER;
 		txtTracklist.font = Paths.font(EditorInputStyle.langFontFileName());
 		txtTracklist.color = 0xFFe55777;
@@ -114,6 +136,11 @@ class WeekEditorState extends MusicBeatState
 		FlxG.mouse.visible = true;
 
 		super.create();
+		documentHistory = new EditorDocumentHistory(historyRead, historyRestore, () -> EditorDocumentHistory.inputFocused(cast blockPressWhileTypingOn), null, documentTimeline);
+		documentHistory.onSave = () -> WeekEditorState.saveWeek(weekFile);
+		add(documentHistory);
+		documentHistory.panel.y = EditorInputStyle.si(104);
+
 
 		// ★ addVirtualPad 必须在 super.create() 之后：MusicBeatState.create 里的
 		// initPsychCamera() 会 FlxG.cameras.reset 清掉所有旧相机；移动端“调整各
@@ -123,7 +150,7 @@ class WeekEditorState extends MusicBeatState
 		addVirtualPad(UP_DOWN, B);
 	}
 
-	// ============ NovaFlare 深色设计规范色板（AARRGGBB） ============
+	// ============ D.C.E. 深色设计规范色板（AARRGGBB） ============
 	static final COL_BG:Int = 0xFF12141A; // 页面底层背景
 	static final COL_CARD:Int = 0xFF1C1F28; // 卡片/面板背景
 	static final COL_HOVER:Int = 0x147C7FFF; // hover 通用底色（半透明）
@@ -184,14 +211,22 @@ class WeekEditorState extends MusicBeatState
 	// 布局约束：
 	//  - 面板不遮挡周目展示背景（bgYellow/bgSprite 底 y≈442）→ 面板顶 ≥ 背景底
 	//  - 面板底部贴按钮条上方（向上弹出）
-	static final PANEL_W:Int = 360; // 面板宽（行式布局：标签+输入）
-	static final BAR_BTN_W:Int = 110; // 一级菜单按钮宽
-	static final ARROW_W:Int = 36; // 折叠箭头按钮宽
-	static final BAR_H:Int = 36;
+	static var PANEL_W(get, never):Int;
+	static function get_PANEL_W():Int return EditorInputStyle.si(360);
+	static var BAR_BTN_W(get, never):Int;
+	static function get_BAR_BTN_W():Int return EditorInputStyle.si(110);
+	static var ARROW_W(get, never):Int;
+	static function get_ARROW_W():Int return EditorInputStyle.si(36);
+	static var BAR_H(get, never):Int;
+	static function get_BAR_H():Int return EditorInputStyle.si(36);
+	static function set_BAR_H(v:Int):Int return v;
 	// 面板内容行高
-	static final ROW_H:Int = 24;
+	static var ROW_H(get, never):Int;
+	static function get_ROW_H():Int return EditorInputStyle.si(24);
+	static function set_ROW_H(v:Int):Int return v;
 	// 各面板高度（面板底贴按钮条、顶不遮挡周目背景）
-	static final PANEL_H_WEEK:Int = 230;
+	static var PANEL_H_WEEK(get, never):Int;
+	static function get_PANEL_H_WEEK():Int return EditorInputStyle.si(230);
 	static final PANEL_H_OTHER:Int = 158;
 	static final PANEL_H_FILE:Int = 152;
 
@@ -248,7 +283,7 @@ class WeekEditorState extends MusicBeatState
 		add(barTopLine);
 
 		// 折叠箭头（Week 左侧）
-		arrowTxt = new FlxText(0, 0, ARROW_W, '<', 18);
+		arrowTxt = new EditorText(0, 0, ARROW_W, '<', 18);
 		arrowTxt.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 18, COL_TEXT_MAIN, CENTER);
 		arrowTxt.scrollFactor.set();
 		add(arrowTxt);
@@ -276,7 +311,7 @@ class WeekEditorState extends MusicBeatState
 			add(hov);
 			barHoverBg.push(hov);
 
-			var txt:FlxText = new FlxText(0, 0, BAR_BTN_W, label, 14);
+			var txt:FlxText = new EditorText(0, 0, BAR_BTN_W, label, 14);
 			txt.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 14, COL_MENU_OFF, CENTER);
 			txt.scrollFactor.set();
 			add(txt);
@@ -604,7 +639,7 @@ class WeekEditorState extends MusicBeatState
 
 		// 文字（14px，垂直居中于行内）
 		var labelText:String = Language.get(labelKey, 'week');
-		var lbl:FlxText = new FlxText(x0 + 26, y + 3, PANEL_W - 24 - 30, labelText, 14);
+		var lbl:FlxText = new EditorText(x0 + 26, y + 3, PANEL_W - 24 - 30, labelText, 14);
 		lbl.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 14, COL_TEXT_MAIN, LEFT);
 		group.add(lbl);
 		checkRowLabels.push(lbl);
@@ -697,10 +732,10 @@ class WeekEditorState extends MusicBeatState
 	{
 		tabWeek = new FlxUI(null, this);
 		tabWeek.name = "Week";
-		var x0:Float = 12;
+		var x0:Float = EditorInputStyle.sv(12);
 		var lblX:Float = x0;
-		var inputX:Float = x0 + 144;
-		var inputW:Int = PANEL_W - 24 - 148;
+		var inputX:Float = x0 + EditorInputStyle.sv(144);
+		var inputW:Int = PANEL_W - EditorInputStyle.si(24 + 148);
 
 		var rows:Array<String> = ['w_songs', 'w_opponent', 'w_boyfriend', 'w_girlfriend', 'w_background', 'w_display_name', 'w_week_name', 'w_week_file'];
 		var inputs:Array<FlxUIInputText> = [];
@@ -759,7 +794,7 @@ class WeekEditorState extends MusicBeatState
 		for (i in 0...rows.length)
 		{
 			var labelText:String = Language.get(rows[i], 'week') + ':';
-			var lbl:FlxText = new FlxText(lblX, 10 + ROW_H * i + 3, 140, labelText, 12);
+			var lbl:FlxText = new EditorText(lblX, 10 + ROW_H * i + 3, EditorInputStyle.si(140), labelText, 12);
 			lbl.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 12, COL_TEXT_SEC, LEFT);
 			tabWeek.add(lbl);
 			tabWeek.add(inputs[i]);
@@ -801,13 +836,13 @@ class WeekEditorState extends MusicBeatState
 		bindSoftKeyboard(difficultiesInputText);
 		blockPressWhileTypingOn.push(difficultiesInputText);
 
-		var lblBefore:FlxText = new FlxText(x0, 66 + 3, 140, Language.get('w_week_before', 'week') + ':', 12);
+		var lblBefore:FlxText = new EditorText(x0, 66 + 3, 140, Language.get('w_week_before', 'week') + ':', 12);
 		lblBefore.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 12, COL_TEXT_SEC, LEFT);
 		tabOther.add(lblBefore);
-		var lblDiff:FlxText = new FlxText(x0, 90 + 3, 140, Language.get('w_difficulties', 'week') + ':', 12);
+		var lblDiff:FlxText = new EditorText(x0, 90 + 3, 140, Language.get('w_difficulties', 'week') + ':', 12);
 		lblDiff.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 12, COL_TEXT_SEC, LEFT);
 		tabOther.add(lblDiff);
-		var lblHint:FlxText = new FlxText(x0, 118, PANEL_W - 24, Language.get('w_difficulties_hint', 'week'), 11);
+		var lblHint:FlxText = new EditorText(x0, 118, PANEL_W - 24, Language.get('w_difficulties_hint', 'week'), 11);
 		lblHint.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 11, COL_TEXT_HINT, LEFT);
 		lblHint.wordWrap = true;
 		tabOther.add(lblHint);
@@ -856,7 +891,7 @@ class WeekEditorState extends MusicBeatState
 			tabFile.add(hov);
 			fileRowHover.push(hov);
 
-			var txt:FlxText = new FlxText(rowX, 0, rowW, label, 15);
+			var txt:FlxText = new EditorText(rowX, 0, rowW, label, 15);
 			txt.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 15, COL_TEXT_MAIN, CENTER);
 			txt.y = ys[i] + (rowH - txt.height) / 2;
 			tabFile.add(txt);
@@ -880,7 +915,7 @@ class WeekEditorState extends MusicBeatState
 		switch (key)
 		{
 			case 'load_week':
-				loadWeek();
+				documentHistory.confirmDiscard(loadWeek);
 			case 'freeplay':
 				MusicBeatState.switchState(new WeekEditorFreeplayState(weekFile));
 			case 'save_week':
@@ -1055,6 +1090,7 @@ class WeekEditorState extends MusicBeatState
 
 	override function update(elapsed:Float)
 	{
+		if (documentHistory != null && documentHistory.blocksInput()) { super.update(elapsed); return; }
 		if (loadedWeek != null)
 		{
 			weekFile = loadedWeek;
@@ -1093,8 +1129,7 @@ class WeekEditorState extends MusicBeatState
 					closePanel();
 				else
 				{
-					MusicBeatState.switchState(new MasterEditorMenu());
-					FlxG.sound.playMusic(Paths.music('freakyMenu'));
+					exitEditor();
 				}
 			}
 		}
@@ -1108,6 +1143,7 @@ class WeekEditorState extends MusicBeatState
 	/** 右下角一级菜单：箭头折叠 / 按钮 hover·点击 / File 行 hover·点击 / 点面板外关闭 */
 	function updateMenuBar(elapsed:Float):Void
 	{
+		if (mobile.objects.EditorMobileKeys.pointerOverButton()) return;
 		if (barHits.length < 1) return;
 		var mx:Float = FlxG.mouse.viewX;
 		var my:Float = FlxG.mouse.viewY;
@@ -1262,13 +1298,18 @@ class WeekEditorState extends MusicBeatState
 			var rawJson:String = File.getContent(fullPath);
 			if (rawJson != null)
 			{
-				loadedWeek = cast Json.parse(rawJson);
-				if (loadedWeek.weekCharacters != null && loadedWeek.weekName != null) // Make sure it's really a week
+				loadedWeek = cast EditorInputValidation.parseJsonObject(rawJson);
+				if (EditorInputValidation.weekDocument(loadedWeek))
 				{
+					var defaults:Dynamic = WeekData.createWeekFile();
+					for (field in Reflect.fields(defaults))
+						if (!Reflect.hasField(loadedWeek, field) || Reflect.field(loadedWeek, field) == null)
+							Reflect.setField(loadedWeek, field, Reflect.field(defaults, field));
 					var cutName:String = _file.name.substr(0, _file.name.length - 5);
 					trace("Successfully loaded file: " + cutName);
 					loadError = false;
 
+					documentTimeline = new EditorDocumentTimeline();
 					weekFileName = cutName;
 					_file = null;
 					return;
@@ -1309,6 +1350,8 @@ class WeekEditorState extends MusicBeatState
 
 	public static function saveWeek(weekFile:WeekFile)
 	{
+		var history:EditorDocumentHistory = cast Reflect.field(FlxG.state, "documentHistory");
+		if (history != null) history.prepareSave();
 		var data:String = haxe.Json.stringify(weekFile, "\t");
 		if (data.length > 0)
 		{
@@ -1326,6 +1369,8 @@ class WeekEditorState extends MusicBeatState
 
 	private static function onSaveComplete(_):Void
 	{
+		var history:EditorDocumentHistory = cast Reflect.field(FlxG.state, "documentHistory");
+		if (history != null) history.markSaved();
 		_file.removeEventListener(#if desktop Event.SELECT #else Event.COMPLETE #end, onSaveComplete);
 		_file.removeEventListener(Event.CANCEL, onSaveCancel);
 		_file.removeEventListener(IOErrorEvent.IO_ERROR, onSaveError);
@@ -1359,7 +1404,9 @@ class WeekEditorState extends MusicBeatState
 
 class WeekEditorFreeplayState extends MusicBeatState
 {
-	// ============ NovaFlare 深色设计规范色板（AARRGGBB，与 WeekEditorState 同值） ============
+	static inline function u(value:Float):Int return EditorInputStyle.si(value);
+
+	// ============ D.C.E. 深色设计规范色板（AARRGGBB，与 WeekEditorState 同值） ============
 	static final COL_BG:Int = 0xFF12141A; // 页面底层背景
 	static final COL_CARD:Int = 0xFF1C1F28; // 卡片/面板背景
 	static final COL_HOVER:Int = 0x147C7FFF; // hover 通用底色（半透明）
@@ -1393,6 +1440,7 @@ class WeekEditorFreeplayState extends MusicBeatState
 	public function new(weekFile:WeekFile = null)
 	{
 		super();
+		if (WeekEditorState.documentTimeline == null) WeekEditorState.documentTimeline = new EditorDocumentTimeline();
 		this.weekFile = WeekData.createWeekFile();
 		if (weekFile != null)
 			this.weekFile = weekFile;
@@ -1407,9 +1455,31 @@ class WeekEditorFreeplayState extends MusicBeatState
 	var scrollTarget:Float = 0;
 	var curSelected = 0;
 
+
+	public var documentHistory:EditorDocumentHistory;
+	function historyRead():String return EditorDocumentHistory.jsonSnapshot(weekFile);
+	function historyRestore(snapshot:String):Void
+	{
+		weekFile = cast haxe.Json.parse(snapshot);
+		for (card in songCards) { remove(card, true); card.destroy(); }
+		songCards = [];
+		buildSongCards();
+		curSelected = Std.int(FlxMath.bound(curSelected, 0, weekFile.songs.length - 1));
+		changeSelection();
+		updateSongCards(1);
+	}
+
 	override function create()
 	{
+		// ★ 十三轮：编辑器统一走高分辨率设计（文字 1:1 光栅化 = 清晰）；
+		//   离开时由 EditorInputStyle 的 stateSwitched 钩子自动还原 1280×720。
+		EditorInputStyle.enterHiRes();
 		bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
+		// ★ 十三轮：设计分辨率可能大于资源尺寸(1286×730) → 拉伸铺满整屏
+		bg.setGraphicSize(Std.int(FlxG.width), Std.int(FlxG.height));
+		bg.updateHitbox();
+		bg.origin.set(0, 0);
+		bg.offset.set(0, 0);
 		bg.antialiasing = ClientPrefs.data.antialiasing;
 		bg.color = FlxColor.WHITE;
 		add(bg);
@@ -1421,6 +1491,10 @@ class WeekEditorFreeplayState extends MusicBeatState
 		addEditorBox();
 		changeSelection();
 		super.create();
+		documentHistory = new EditorDocumentHistory(historyRead, historyRestore, () -> EditorDocumentHistory.inputFocused(cast blockPressWhileTypingOn), null, WeekEditorState.documentTimeline);
+		documentHistory.onSave = () -> WeekEditorState.saveWeek(weekFile);
+		add(documentHistory);
+		documentHistory.panel.y = EditorInputStyle.si(104);
 
 		// ★ Freeplay 模式不再创建移动端虚拟按键（上/下/B 三个按钮已按需求移除）
 	}
@@ -1439,12 +1513,14 @@ class WeekEditorFreeplayState extends MusicBeatState
 			card.scrollFactor.set();
 			card.onCardClick = function(clickedId:Int)
 			{
+				if (documentHistory != null && documentHistory.blocksInput()) return;
 				if (colorInputActive != null)
 					closeColorInputOverlay();
 				if (curSelected != clickedId)
 					changeSelection(clickedId - curSelected);
 			};
-			add(card);
+			if (documentHistory != null) insert(members.indexOf(documentHistory), card);
+			else add(card);
 			songCards.push(card);
 		}
 	}
@@ -1471,7 +1547,9 @@ class WeekEditorFreeplayState extends MusicBeatState
 	}
 
 	// ============ 左下角编辑面板（无分级，内容 = 旧 Freeplay UI） ============
-	static final FP_W:Int = 360;
+	static var FP_W(get, never):Int;
+	static function get_FP_W():Int return EditorInputStyle.si(360);
+	static function set_FP_W(v:Int):Int return v;
 	var fpBg:FlxSprite;
 	var fpBorder:FlxSprite;
 	var fpPanel:FlxUI; // 原生控件组（输入/步进器/勾选数据源等）
@@ -1490,58 +1568,59 @@ class WeekEditorFreeplayState extends MusicBeatState
 	function buildRgbSteppers(x0:Float):Void
 	{
 		var channels:Array<String> = ['R', 'G', 'B'];
-		var y:Float = 48;
+		var y:Float = u(48);
 		for (i in 0...3)
 		{
-			var colX:Float = x0 + i * 84;
-			var lbl:FlxText = new FlxText(colX, y + 2, 16, channels[i], 13);
+			var colX:Float = x0 + i * u(84);
+			var lbl:FlxText = new EditorText(colX, y + 2, u(16), channels[i], 13);
 			lbl.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 13, COL_TEXT_SEC, CENTER);
 			fpPanel.add(lbl);
 			rgbChannelTxts.push(lbl);
 
 			// [-] 钮
-			var minusBorder:FlxSprite = new FlxSprite().makeGraphic(18, 20, COL_SEC_BORDER);
-			minusBorder.x = colX + 16;
+			var minusBorder:FlxSprite = new FlxSprite().makeGraphic(u(18), u(20), COL_SEC_BORDER);
+			minusBorder.x = colX + u(16);
 			minusBorder.y = y;
 			fpPanel.add(minusBorder);
-			var minusBg:FlxSprite = new FlxSprite().makeGraphic(16, 18, COL_BG);
-			minusBg.x = colX + 17;
+			var minusBg:FlxSprite = new FlxSprite().makeGraphic(u(16), u(18), COL_BG);
+			minusBg.x = colX + u(17);
 			minusBg.y = y + 1;
 			fpPanel.add(minusBg);
-			var minusTxt:FlxText = new FlxText(colX + 16, 0, 18, '-', 13);
+			var minusTxt:FlxText = new EditorText(colX + u(16), 0, u(18), '-', 13);
 			minusTxt.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 13, COL_TEXT_MAIN, CENTER);
-			minusTxt.y = y + (20 - minusTxt.height) / 2;
+			minusTxt.y = y + (u(20) - minusTxt.height) / 2;
 			fpPanel.add(minusTxt);
 			rgbMinusTxts.push(minusTxt);
-			var minusHit:FlxSprite = new FlxSprite().makeGraphic(18, 20, FlxColor.TRANSPARENT);
-			minusHit.x = colX + 16;
+			var minusHit:FlxSprite = new FlxSprite().makeGraphic(u(18), u(20), FlxColor.TRANSPARENT);
+			minusHit.x = colX + u(16);
 			minusHit.y = y;
 			fpPanel.add(minusHit);
 			rgbMinusHits.push(minusHit);
 
 			// 数值
-			var valTxt:FlxText = new FlxText(colX + 36, 0, 30, '255', 12);
+			var valTxt:FlxText = new EditorText(colX + u(36), 0, u(30), '255', 12);
+			valTxt.wordWrap = false;
 			valTxt.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 12, COL_TEXT_MAIN, CENTER);
-			valTxt.y = y + (20 - valTxt.height) / 2;
+			valTxt.y = y + (u(20) - valTxt.height) / 2;
 			fpPanel.add(valTxt);
 			rgbValTxts.push(valTxt);
 
 			// [+] 钮
-			var plusBorder:FlxSprite = new FlxSprite().makeGraphic(18, 20, COL_SEC_BORDER);
-			plusBorder.x = colX + 68;
+			var plusBorder:FlxSprite = new FlxSprite().makeGraphic(u(18), u(20), COL_SEC_BORDER);
+			plusBorder.x = colX + u(68);
 			plusBorder.y = y;
 			fpPanel.add(plusBorder);
-			var plusBg:FlxSprite = new FlxSprite().makeGraphic(16, 18, COL_BG);
-			plusBg.x = colX + 69;
+			var plusBg:FlxSprite = new FlxSprite().makeGraphic(u(16), u(18), COL_BG);
+			plusBg.x = colX + u(69);
 			plusBg.y = y + 1;
 			fpPanel.add(plusBg);
-			var plusTxt:FlxText = new FlxText(colX + 68, 0, 18, '+', 13);
+			var plusTxt:FlxText = new EditorText(colX + u(68), 0, u(18), '+', 13);
 			plusTxt.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 13, COL_TEXT_MAIN, CENTER);
-			plusTxt.y = y + (20 - plusTxt.height) / 2;
+			plusTxt.y = y + (u(20) - plusTxt.height) / 2;
 			fpPanel.add(plusTxt);
 			rgbPlusTxts.push(plusTxt);
-			var plusHit:FlxSprite = new FlxSprite().makeGraphic(18, 20, FlxColor.TRANSPARENT);
-			plusHit.x = colX + 68;
+			var plusHit:FlxSprite = new FlxSprite().makeGraphic(u(18), u(20), FlxColor.TRANSPARENT);
+			plusHit.x = colX + u(68);
 			plusHit.y = y;
 			fpPanel.add(plusHit);
 			rgbPlusHits.push(plusHit);
@@ -1621,7 +1700,7 @@ class WeekEditorFreeplayState extends MusicBeatState
 	/** 自绘输入框边框/底板（ChartEditor 风格配色；border=深边框色，inner=内芯色） */
 	function makeSelfBox(x:Float, y:Float, w:Int, group:FlxUI, color:Int = 0x14FFFFFF):FlxSprite
 	{
-		var s:FlxSprite = new FlxSprite().makeGraphic(w, 20, color);
+		var s:FlxSprite = new FlxSprite().makeGraphic(w, u(20), color);
 		s.x = x;
 		s.y = y;
 		group.add(s);
@@ -1631,10 +1710,10 @@ class WeekEditorFreeplayState extends MusicBeatState
 	/** 自绘输入框文本（白字） */
 	function makeSelfText(x:Float, y:Float, w:Int, group:FlxUI):FlxText
 	{
-		var t:FlxText = new FlxText(x, 0, w, '', 12);
+		var t:FlxText = new EditorText(x, 0, w, '', 12);
 		t.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 12, COL_TEXT_MAIN, LEFT);
 		t.wordWrap = false;
-		t.y = y + (20 - t.height) / 2;
+		t.y = y + (u(20) - t.height) / 2;
 		group.add(t);
 		return t;
 	}
@@ -1652,12 +1731,13 @@ class WeekEditorFreeplayState extends MusicBeatState
 		try { widget.visible = true; } catch (e:Dynamic) {}
 		// 统一灰底白字外观（与其它编辑器一致）
 		EditorInputStyle.apply(widget);
+		EditorInputStyle.fitInputOverlay(widget, box.width);
 		try { widget.active = false; } catch (e:Dynamic) {}
 		// 提升到场景顶层
 		var st:Dynamic = this;
 		try { st.remove(widget); } catch (e:Dynamic) {}
 		try { st.add(widget); } catch (e:Dynamic) {}
-		try { widget.hasFocus = true; } catch (e:Dynamic) {}
+		EditorInputStyle.setInputFocus(widget, true);
 		// 程序直接聚焦不走 FlxInputText 的 mouse 聚焦路径（focusGained 不触发），
 		// 这里显式启用系统软键盘（移动端/触屏）
 		WeekEditorState.setTextInputEnabled(true);
@@ -1681,7 +1761,7 @@ class WeekEditorFreeplayState extends MusicBeatState
 				colorInputActive.y = colorInputPrevY;
 				colorInputActive.visible = colorInputPrevVisible;
 				colorInputActive.active = false;
-				colorInputActive.hasFocus = false;
+				EditorInputStyle.setInputFocus(colorInputActive, false);
 			}
 			catch (e:Dynamic) {}
 			colorInputActive = null;
@@ -1692,6 +1772,7 @@ class WeekEditorFreeplayState extends MusicBeatState
 	/** 每帧：覆盖层失焦收回 + 自绘文本与数据源同步 */
 	function updateColorInputs():Void
 	{
+		if (mobile.objects.EditorMobileKeys.pointerOverButton()) return;
 		if (colorInputActive != null)
 		{
 			var focused:Bool = false;
@@ -1699,6 +1780,8 @@ class WeekEditorFreeplayState extends MusicBeatState
 			if (!focused)
 				closeColorInputOverlay();
 		}
+		if (hexSelfTxt != null) hexSelfTxt.visible = colorInputActive != hexInputText;
+		if (iconSelfTxt != null) iconSelfTxt.visible = colorInputActive != iconInputText;
 		// 同步显示文本（超宽截断）
 		if (hexSelfTxt != null)
 		{
@@ -1717,8 +1800,8 @@ class WeekEditorFreeplayState extends MusicBeatState
 	function addEditorBox()
 	{
 		// ===== 面板背景（左下角） =====
-		var h:Int = 345;
-		fpPanelY = FlxG.height - h - 10;
+		var h:Int = u(345);
+		fpPanelY = FlxG.height - h - u(10);
 		fpBorder = new FlxSprite().makeGraphic(FP_W + 2, h + 2, COL_BORDER);
 		fpBorder.x = 10;
 		fpBorder.y = fpPanelY - 1;
@@ -1736,7 +1819,7 @@ class WeekEditorFreeplayState extends MusicBeatState
 		add(fpPanel);
 
 		// 标题（当前编辑歌曲）
-		fpTitleTxt = new FlxText(12, 8, FP_W - 24, '', 14);
+		fpTitleTxt = new EditorText(u(12), u(8), FP_W - u(24), '', 14);
 		fpTitleTxt.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 14, COL_ACCENT, LEFT);
 		fpPanel.add(fpTitleTxt);
 
@@ -1778,7 +1861,7 @@ class WeekEditorFreeplayState extends MusicBeatState
 		t = StringTools.trim(t);
 		if (t.startsWith('#'))
 			t = t.substr(1);
-		if (t.length != 6)
+		if (!~/^[0-9a-fA-F]{6}$/.match(t))
 			return;
 		var r:Null<Int> = Std.parseInt('0x' + t.substr(0, 2));
 		var g:Null<Int> = Std.parseInt('0x' + t.substr(2, 2));
@@ -1802,10 +1885,10 @@ class WeekEditorFreeplayState extends MusicBeatState
 	/** 面板内容：标题 / RGB 步进 / #Hex 输入 + 预览 / Copy·Paste / 图标 / 隐藏勾选 / 动作行 */
 	function addFreeplayUI()
 	{
-		var x0:Float = 12;
+		var x0:Float = u(12);
 
 		// ===== 背景色 R/G/B 自绘步进 =====
-		var lblColor:FlxText = new FlxText(x0, 30, 0, tr('fp_bg_color') + ':', 12);
+		var lblColor:FlxText = new EditorText(x0, u(30), 0, tr('fp_bg_color') + ':', 12);
 		lblColor.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 12, COL_TEXT_SEC, LEFT);
 		fpPanel.add(lblColor);
 
@@ -1813,36 +1896,36 @@ class WeekEditorFreeplayState extends MusicBeatState
 
 		// ===== 十六进制颜色输入（6 位，只允许 0-9/a-f/A-F；无需输入 #）+ 颜色预览 =====
 		// ★ 新 UI：未聚焦时显示自绘框（灰底白字），聚焦时弹出原生输入框（同样灰底白字）
-		hexInputText = new FlxUIInputText(x0, 0, 110, '', 12, 0xFFFFFFFF, 0xFF12141A);
+		hexInputText = new FlxUIInputText(x0, 0, u(110), '', 12, 0xFFFFFFFF, 0xFF12141A);
 		hexInputText.maxLength = 6; // 最多 6 位
-		hexInputText.customFilterPattern = ~/[^0-9a-fA-F]/; // 过滤非法字符
+		hexInputText.customFilterPattern = ~/[^0-9a-fA-F]/g; // 过滤非法字符
 		hexInputText.fieldBorderColor = 0x26FFFFFF;
 		blockPressWhileTypingOn.push(hexInputText);
 		addHiddenSource(hexInputText);
-		hexSelfBorder = makeSelfBox(x0, 70, 112, fpPanel, 0x26FFFFFF);
-		hexSelfBox = makeSelfBox(x0 + 1, 71, 110, fpPanel, 0xFF12141A);
-		hexSelfTxt = makeSelfText(x0 + 8, 70, 98, fpPanel);
+		hexSelfBorder = makeSelfBox(x0, u(70), u(112), fpPanel, 0x26FFFFFF);
+		hexSelfBox = makeSelfBox(x0 + u(1), u(71), u(110), fpPanel, 0xFF12141A);
+		hexSelfTxt = makeSelfText(x0 + u(8), u(70), u(98), fpPanel);
 
-		colorPreview = new FlxSprite().makeGraphic(60, 22, 0xFFFFFFFF);
-		colorPreview.x = x0 + 126;
-		colorPreview.y = 72;
+		colorPreview = new FlxSprite().makeGraphic(u(60), u(22), 0xFFFFFFFF);
+		colorPreview.x = x0 + u(126);
+		colorPreview.y = u(72);
 		fpPanel.add(colorPreview);
 
 		// ===== Copy / Paste 两个半宽动作块 =====
-		makeSmallRow(x0, 108, 0, 'fp_copy');
-		makeSmallRow(x0 + (FP_W - 24) / 2 + 4, 108, 1, 'fp_paste');
+		makeSmallRow(x0, u(108), 0, 'fp_copy');
+		makeSmallRow(x0 + (FP_W - u(24)) / 2 + u(4), u(108), 1, 'fp_paste');
 
 		// ===== 图标输入行（自绘框 + 隐藏数据源，聚焦时原生框同灰底白字） =====
-		var lblIcon:FlxText = new FlxText(x0, 148, 0, tr('fp_icon') + ':', 12);
+		var lblIcon:FlxText = new EditorText(x0, u(148), 0, tr('fp_icon') + ':', 12);
 		lblIcon.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 12, COL_TEXT_SEC, LEFT);
 		fpPanel.add(lblIcon);
-		iconInputText = new FlxUIInputText(x0, 0, 160, '', 12, 0xFFFFFFFF, 0xFF12141A);
+		iconInputText = new FlxUIInputText(x0, 0, u(160), '', 12, 0xFFFFFFFF, 0xFF12141A);
 		iconInputText.fieldBorderColor = 0x26FFFFFF;
 		blockPressWhileTypingOn.push(iconInputText);
 		addHiddenSource(iconInputText);
-		iconSelfBorder = makeSelfBox(x0 + 62, 141, 168, fpPanel, 0x26FFFFFF);
-		iconSelfBox = makeSelfBox(x0 + 63, 142, 166, fpPanel, 0xFF12141A);
-		iconSelfTxt = makeSelfText(x0 + 70, 141, 152, fpPanel);
+		iconSelfBorder = makeSelfBox(x0 + u(62), u(141), u(168), fpPanel, 0x26FFFFFF);
+		iconSelfBox = makeSelfBox(x0 + u(63), u(142), u(166), fpPanel, 0xFF12141A);
+		iconSelfTxt = makeSelfText(x0 + u(70), u(141), u(152), fpPanel);
 
 		// ===== 隐藏勾选行（自绘） =====
 		hideFreeplayCheckbox = new FlxUICheckBox(0, 0, null, null, '', 100);
@@ -1851,39 +1934,39 @@ class WeekEditorFreeplayState extends MusicBeatState
 		{
 			weekFile.hideFreeplay = hideFreeplayCheckbox.checked;
 		};
-		fpCheckBorder = new FlxSprite().makeGraphic(18, 18, 0x33FFFFFF);
+		fpCheckBorder = new FlxSprite().makeGraphic(u(18), u(18), 0x33FFFFFF);
 		fpCheckBorder.x = x0;
-		fpCheckBorder.y = 174;
+		fpCheckBorder.y = u(174);
 		fpPanel.add(fpCheckBorder);
-		fpCheckBox = new FlxSprite().makeGraphic(16, 16, 0xFF12141A);
-		fpCheckBox.x = x0 + 1;
-		fpCheckBox.y = 175;
+		fpCheckBox = new FlxSprite().makeGraphic(u(16), u(16), 0xFF12141A);
+		fpCheckBox.x = x0 + u(1);
+		fpCheckBox.y = u(175);
 		fpPanel.add(fpCheckBox);
-		fpCheckLabel = new FlxText(x0 + 26, 177, FP_W - 60, tr('fp_hide_freeplay'), 14);
+		fpCheckLabel = new EditorText(x0 + u(26), u(177), FP_W - u(60), tr('fp_hide_freeplay'), 14);
 		fpCheckLabel.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 14, COL_TEXT_MAIN, LEFT);
 		fpPanel.add(fpCheckLabel);
-		fpCheckHit = new FlxSprite().makeGraphic(FP_W - 24, 24, FlxColor.TRANSPARENT);
+		fpCheckHit = new FlxSprite().makeGraphic(FP_W - u(24), u(24), FlxColor.TRANSPARENT);
 		fpCheckHit.x = x0;
-		fpCheckHit.y = 172;
+		fpCheckHit.y = u(172);
 		fpPanel.add(fpCheckHit);
 
 		// ===== 分隔线 =====
-		var sep:FlxSprite = new FlxSprite().makeGraphic(FP_W - 24, 2, COL_BORDER);
+		var sep:FlxSprite = new FlxSprite().makeGraphic(FP_W - u(24), u(2), COL_BORDER);
 		sep.x = x0;
-		sep.y = 206;
+		sep.y = u(206);
 		fpPanel.add(sep);
 
 		// ===== 三个动作行（Load / Story / Save） =====
-		makeActionRow(0, 220);
-		makeActionRow(1, 260);
-		makeActionRow(2, 300);
+		makeActionRow(0, u(220));
+		makeActionRow(1, u(260));
+		makeActionRow(2, u(300));
 	}
 
 	/** Copy/Paste 半宽动作块（次要按钮风格：模拟边框 + hover 强调） */
 	function makeSmallRow(x:Float, y:Float, idx:Int, labelKey:String):Void
 	{
-		var w:Int = Std.int((FP_W - 24 - 8) / 2);
-		var h:Int = 30;
+		var w:Int = Std.int((FP_W - u(24) - u(8)) / 2);
+		var h:Int = u(30);
 		// 边框（1px 半透明白，垫底）
 		var border:FlxSprite = new FlxSprite().makeGraphic(w, h, COL_SEC_BORDER);
 		border.x = x;
@@ -1903,7 +1986,7 @@ class WeekEditorFreeplayState extends MusicBeatState
 		fpPanel.add(hov);
 		fpSmallHover.push(hov);
 
-		var txt:FlxText = new FlxText(x, 0, w, tr(labelKey), 13);
+		var txt:FlxText = new EditorText(x, 0, w, tr(labelKey), 13);
 		txt.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 13, COL_TEXT_SEC, CENTER);
 		txt.y = y + (h - txt.height) / 2;
 		fpPanel.add(txt);
@@ -1919,9 +2002,9 @@ class WeekEditorFreeplayState extends MusicBeatState
 	/** 底部动作行（Load Week / Story Mode / Save Week；次要按钮风格） */
 	function makeActionRow(idx:Int, y:Float):Void
 	{
-		var x0:Float = 12;
-		var w:Int = FP_W - 24;
-		var h:Int = 34;
+		var x0:Float = u(12);
+		var w:Int = FP_W - u(24);
+		var h:Int = u(34);
 		var isDanger:Bool = (fpActionKeys[idx] == 'save_week');
 
 		// 边框（危险行用危险色描边，其余半透明白）
@@ -1945,7 +2028,7 @@ class WeekEditorFreeplayState extends MusicBeatState
 		fpActionHover.push(hov);
 
 		var labelKey:String = (fpActionKeys[idx] == 'story_mode') ? 'fp_story_mode' : 'item_' + fpActionKeys[idx];
-		var txt:FlxText = new FlxText(x0, 0, w, tr(labelKey), 14);
+		var txt:FlxText = new EditorText(x0, 0, w, tr(labelKey), 14);
 		txt.setFormat(Paths.font(EditorInputStyle.langFontFileName()), 14,
 			isDanger ? 0xFFF87171 : COL_TEXT_MAIN, CENTER);
 		txt.y = y + (h - txt.height) / 2;
@@ -1962,6 +2045,7 @@ class WeekEditorFreeplayState extends MusicBeatState
 	/** 面板交互（每帧）：勾选行/小动作/动作行 hover 与点击 */
 	function updateFreeplayPanel():Void
 	{
+		if (mobile.objects.EditorMobileKeys.pointerOverButton()) return;
 		var mx:Float = FlxG.mouse.viewX;
 		var my:Float = FlxG.mouse.viewY;
 
@@ -2061,8 +2145,8 @@ class WeekEditorFreeplayState extends MusicBeatState
 	{
 		var checked:Bool = false;
 		try { checked = hideFreeplayCheckbox.checked; } catch (e:Dynamic) {}
-		fpCheckBox.makeGraphic(16, 16, checked ? 0xFF8B5CF6 : 0xFF12141A);
-		fpCheckBorder.makeGraphic(18, 18, checked ? 0xFFA78BFA : 0x33FFFFFF);
+		fpCheckBox.makeGraphic(u(16), u(16), checked ? 0xFF8B5CF6 : 0xFF12141A);
+		fpCheckBorder.makeGraphic(u(18), u(18), checked ? 0xFFA78BFA : 0x33FFFFFF);
 	}
 
 	function onFpSmallClick(key:String):Void
@@ -2073,27 +2157,8 @@ class WeekEditorFreeplayState extends MusicBeatState
 		}
 		else if (key == 'paste')
 		{
-			if (Clipboard.text != null)
-			{
-				var leColor:Array<Int> = [];
-				var splitted:Array<String> = Clipboard.text.trim().split(',');
-				for (i in 0...splitted.length)
-				{
-					var toPush:Int = Std.parseInt(splitted[i]);
-					if (!Math.isNaN(toPush))
-					{
-						if (toPush > 255)
-							toPush = 255;
-						else if (toPush < 0)
-							toPush *= -1;
-						leColor.push(toPush);
-					}
-				}
-				if (leColor.length > 2)
-				{
-					setRgbAll(leColor[0], leColor[1], leColor[2]);
-				}
-			}
+			var channels = EditorInputValidation.rgbChannels(Clipboard.text);
+			if (channels != null) setRgbAll(channels[0], channels[1], channels[2]);
 		}
 	}
 
@@ -2157,6 +2222,7 @@ class WeekEditorFreeplayState extends MusicBeatState
 
 	override function update(elapsed:Float)
 	{
+		if (documentHistory != null && documentHistory.blocksInput()) { super.update(elapsed); return; }
 		updateSongCards(elapsed);
 
 		if (WeekEditorState.loadedWeek != null)
@@ -2169,6 +2235,9 @@ class WeekEditorFreeplayState extends MusicBeatState
 			return;
 		}
 
+		// Native overlays are inactive: process mouse focus changes even while typing.
+		updateColorInputs();
+		updateFreeplayPanel();
 		var typing:Bool = false;
 		for (t in blockPressWhileTypingOn)
 		{
@@ -2187,10 +2256,6 @@ class WeekEditorFreeplayState extends MusicBeatState
 		else
 		{
 			ClientPrefs.toggleVolumeKeys(true);
-			// 自绘输入框：失焦收回 + 文本同步
-			updateColorInputs();
-			// 左下编辑面板交互
-			updateFreeplayPanel();
 			if (FlxG.keys.justPressed.ESCAPE)
 			{
 				// 返回周目编辑器（不再直接跳回主菜单）

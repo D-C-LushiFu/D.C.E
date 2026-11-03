@@ -4,12 +4,6 @@ import openfl.events.UncaughtErrorEvent;
 import openfl.events.ErrorEvent;
 import openfl.errors.Error;
 
-import flixel.FlxSubState;
-
-import states.mainMenuState.MainMenuState;
-
-import substates.ErrorSubState;
-
 #if sys
 import haxe.io.Path;
 import sys.FileSystem;
@@ -32,7 +26,7 @@ class CrashHandler
 	{
 		#if (cpp && (windows || android))
 		general.backend.NativeCrashHandler.init(
-			states.mainMenuState.MainMenuState.novaFlareEngineCommit);
+			states.mainMenuState.MainMenuState.dceEngineCommit);
 		#end
 		openfl.Lib.current.loaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, onUncaughtError);
 		#if cpp
@@ -55,7 +49,7 @@ class CrashHandler
 		e.stopPropagation();
 		e.stopImmediatePropagation();
 
-		var m:String = e.error;
+		var m:String = Std.string(e.error);
 		if (Std.isOfType(e.error, Error))
 		{
 			var err = cast(e.error, Error);
@@ -66,14 +60,16 @@ class CrashHandler
 			var err = cast(e.error, ErrorEvent);
 			m = '${err.text}';
 		}
-		var stack = haxe.CallStack.exceptionStack(true);
-		var callStack = haxe.CallStack.callStack();
+
+		var stack:Array<haxe.CallStack.StackItem> = [];
+		var callStack:Array<haxe.CallStack.StackItem> = [];
+		try stack = haxe.CallStack.exceptionStack(true) catch (_:Dynamic) {}
+		try callStack = haxe.CallStack.callStack() catch (_:Dynamic) {}
+
 		var stackLabelArr:Array<String> = [];
-		var stackLabel:String = "";
-		var errorText:String = "Oh Shit! - " + states.mainMenuState.MainMenuState.novaFlareEngineCommit;
-		for (e in stack)
+		for (item in stack)
 		{
-			switch (e)
+			switch (item)
 			{
 				case CFunction:
 					stackLabelArr.push("Non-Haxe (C) Function");
@@ -93,11 +89,21 @@ class CrashHandler
 					stackLabelArr.push('${cl} - ${m}');
 			}
 		}
-		stackLabel = stackLabelArr.join('\r\n');
+		var stackLabel:String = stackLabelArr.join('\r\n');
+
 		#if sys
+		var haxeSnapshot:String = "";
+		try
+			haxeSnapshot = captureHaxeStackSnapshot(stack)
+		catch (snapshotError:Dynamic)
+			haxeSnapshot = '[snapshot_capture_failed] ${Std.string(snapshotError)}';
+
+		general.backend.NativeCrashHandler.setHaxeRuntimeSnapshot(haxeSnapshot);
+		var savedCrashPath:String = null;
+		var saveFailure:String = null;
 		try
 		{
-			var diagnosticRoot = Sys.getEnv("NOVAFLARE_DIAGNOSTIC_DIR");
+			var diagnosticRoot = Sys.getEnv("DCE_DIAGNOSTIC_DIR");
 			var crashDirectory = diagnosticRoot != null && diagnosticRoot.length > 0
 				? Path.join([diagnosticRoot, "haxe-crash"])
 				: "crash";
@@ -131,10 +137,11 @@ class CrashHandler
 			#end
 
 			var saveError =
-				'commit=${states.mainMenuState.MainMenuState.novaFlareEngineCommit}\n' +
+				'commit=${states.mainMenuState.MainMenuState.dceEngineCommit}\n' +
 				'timestamp=${Date.now()}\n' +
 				'message=$m\n' +
 				'\n[haxe_exception_stack]\n$stackLabel\n' +
+				'\n[haxe_runtime_snapshot]\n$haxeSnapshot\n' +
 				'\n[haxe_exception_stack_raw]\n${haxe.CallStack.toString(stack)}\n' +
 				'\n[haxe_call_stack]\n${haxe.CallStack.toString(callStack)}\n' +
 				'\n[native_hxcpp_exception_stack]\n$nativeExceptionStack\n' +
@@ -142,36 +149,128 @@ class CrashHandler
 			var fileName = Date.now().toString()
 				.replace(' ', '-')
 				.replace(':', "'") + '.txt';
-			File.saveContent(Path.join([crashDirectory, fileName]), saveError);
+			var crashPath = FileSystem.absolutePath(Path.join([crashDirectory, fileName]));
+			File.saveContent(crashPath, saveError);
+			savedCrashPath = crashPath;
 			Sys.println('haxe:uncaught_error message=$m');
 			Sys.println(saveError);
-			errorText = Std.string(saveError);
-			#if (!debug && windows && CODENAME_ENGINE_COMPAT)
-			if (codenamechain.CodeNameMode.active)
-			{
-				codename.funkin.backend.utils.NativeAPI.showMessageBox(
-					"NovaFlare Engine - CodeName Error",
-					errorText,
-					codename.funkin.backend.utils.NativeAPI.MessageBoxIcon.MSG_ERROR);
-				Sys.exit(1);
-				return;
-			}
-			#end
-			if (originfunkin.OriginFunkinMode.active)
-			{
-				originfunkin.OriginFunkinMode.reportRuntimeError(errorText);
-				FlxG.switchState(new originfunkin.OriginFunkinErrorState());
-				return;
-			}
-			FlxG.state.openSubState(new ErrorSubState(errorText));
 		}
-		catch (e:haxe.Exception)
-			trace('Couldn\'t save error message. (${e.message})');
-			trace(Std.string(states.mainMenuState.MainMenuState.novaFlareEngineCommit + '\n' + '$m\n$stackLabel'));
-		#end
+		catch (saveErrorValue:Dynamic)
+		{
+			saveFailure = Std.string(saveErrorValue);
+			trace('Couldn\'t save error message. ($saveFailure)');
+			trace(Std.string(states.mainMenuState.MainMenuState.dceEngineCommit + '\n' + '$m\n$stackLabel'));
+		}
 
-		// mobile.backend.SUtil.showPopUp('$m\n$stackLabel', "Error!");
+		var popupMessage:String = savedCrashPath != null
+			? '程序发生致命错误。\n错误信息已保存至：\n$savedCrashPath\n\nA fatal error occurred.\nThe error report was saved to:\n$savedCrashPath'
+			: '程序发生致命错误，但错误报告保存失败。\n$saveFailure\n\nA fatal error occurred, but the report could not be saved.\n$saveFailure';
+		try
+			mobile.backend.SUtil.showPopUp(popupMessage, "D.C.E. - Error")
+		catch (popupError:Dynamic)
+			Sys.println('Couldn\'t show the fatal error dialog: ${Std.string(popupError)}\n$popupMessage');
+		general.backend.NativeCrashHandler.setHaxeRuntimeSnapshot("");
+		#end
 	}
+
+	#if sys
+	private static final HAXE_RUNTIME_SNAPSHOT_LIMIT:Int = 24;
+
+	private static function captureHaxeStackSnapshot(stack:Array<haxe.CallStack.StackItem>):String
+	{
+		if (stack == null || stack.length == 0)
+			return '';
+
+		var lines:Array<String> = [];
+		var index = 0;
+		for (item in stack)
+		{
+			if (index >= HAXE_RUNTIME_SNAPSHOT_LIMIT)
+				break;
+
+			var file:String = '';
+			var line:Int = 0;
+			var column:Int = 0;
+			var method:String = '<unknown>';
+
+			switch (item)
+			{
+				case CFunction:
+					method = 'CFunction';
+				case FilePos(parent, stackFile, stackLine, stackColumn):
+					file = stackFile;
+					line = stackLine;
+					column = stackColumn;
+					method = switch (parent)
+					{
+						case Method(owner, name): '$owner.$name';
+						case Module(owner): 'module $owner';
+						case LocalFunction(name): 'local function $name';
+						case _: '<unknown>';
+					}
+				case Method(owner, methodName):
+					method = '$owner.$methodName';
+				case Module(owner):
+					method = 'module $owner';
+				case LocalFunction(name):
+					method = 'local function $name';
+			}
+
+			var location = file.length > 0 ? '$file:$line' : '<no-location>';
+			if (column > 0) location += ':$column';
+			var sourceLine = readSourceLine(file, line);
+			if (sourceLine.length > 0) location += ' -> ${sourceLine}';
+			lines.push('#${indexToSnapshotTag(index)} $location in $method');
+
+			index++;
+		}
+
+		return lines.length == 0 ? '[no_haxe_runtime_snapshot]' : lines.join('\r\n');
+	}
+
+	private static function indexToSnapshotTag(value:Int):String
+	{
+		return value < 10 ? '0$value' : Std.string(value);
+	}
+
+	private static function readSourceLine(path:String, line:Int):String
+	{
+		if (path == null || path.length == 0 || line <= 0)
+			return '';
+
+		var sourcePath = resolveSourcePath(path);
+		if (sourcePath == null || sourcePath.length == 0 || !FileSystem.exists(sourcePath))
+			return '';
+
+		try
+		{
+			var lines = File.getContent(sourcePath).split('\n');
+			var index = line - 1;
+			if (index >= 0 && index < lines.length)
+				return lines[index].replace('\r', '').trim();
+		}
+		catch (_:Dynamic) {}
+
+		return '';
+	}
+
+	private static function resolveSourcePath(path:String):String
+	{
+		if (FileSystem.exists(path))
+			return path;
+
+		var cwd = Sys.getCwd();
+		var altPath = Path.join([cwd, path]);
+		if (FileSystem.exists(altPath))
+			return altPath;
+
+		var sourcePath = Path.join([cwd, "source", path]);
+		if (FileSystem.exists(sourcePath))
+			return sourcePath;
+
+		return path;
+	}
+	#end
 
 	#if (cpp || hl)
 	private static function onError(message:Dynamic):Void

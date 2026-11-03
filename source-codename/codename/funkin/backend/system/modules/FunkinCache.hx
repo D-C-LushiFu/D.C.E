@@ -55,7 +55,11 @@ class FunkinCache extends AssetCache {
 
 	public function clearSecondLayer() {
 		for(k=>b in bitmapData2) {
-			FlxG.bitmap.removeByKey(k);
+			// A new state may replace an old FlxGraphic under the same key. Only
+			// remove the Flixel entry when it still owns this second-layer bitmap.
+			var graphic = FlxG.bitmap.get(k);
+			if (graphic == null || (graphic.bitmap == b && graphic.useCount <= 0 && !graphic.persist))
+				FlxG.bitmap.removeByKey(k);
 			LimeAssets.cache.image.remove(k);
 		}
 		for(k=>f in font2) {

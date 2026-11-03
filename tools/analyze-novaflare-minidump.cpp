@@ -518,7 +518,7 @@ void unwindThread(
 int wmain(int argc, wchar_t** argv) {
     if (argc < 2) {
         std::wcerr
-            << L"usage: analyze-novaflare-minidump.exe <dump> [map] [output]"
+            << L"usage: analyze-dce-minidump.exe <dump> [map] [output]"
                L" [address[:bytes] ...]\n";
         return 2;
     }
@@ -625,7 +625,7 @@ int wmain(int argc, wchar_t** argv) {
         }
         output = &outputFile;
     }
-    *output << "NovaFlare native minidump thread-stack report\n"
+    *output << "D.C.E. native minidump thread-stack report\n"
             << "dump=" << narrow(dumpPath.wstring()) << '\n'
             << "threads=" << threadList->NumberOfThreads << '\n'
             << "modules=" << modules.size() << '\n'
@@ -635,7 +635,7 @@ int wmain(int argc, wchar_t** argv) {
             << "exception_address=0x" << exceptionAddress << std::dec << '\n';
     for (const Module& module : modules) {
         if (std::filesystem::path(module.path).filename() ==
-            L"NovaFlare Engine.exe") {
+            L"D.C.E.exe") {
             *output << "main_dump_base=0x" << std::hex << module.dumpBase
                     << '\n'
                     << "main_preferred_base=0x" << module.preferredBase << '\n'

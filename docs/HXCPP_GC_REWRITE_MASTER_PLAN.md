@@ -1,4 +1,4 @@
-# NovaFlare hxcpp GC 深度重写总纲
+# D.C.E. hxcpp GC 深度重写总纲
 
 > 状态：设计评审稿，尚未据此开始大规模重写  
 > 目标平台：Windows 为第一验证平台，随后覆盖 Linux、Android、macOS 与 iOS  
@@ -435,7 +435,7 @@
 
 退出条件：优化在多台机器上有统计显著收益，不只对单一 CPU 有效。
 
-### 阶段 15：NovaFlare 游戏集成
+### 阶段 15：D.C.E. 游戏集成
 
 - 替换简单 `GCManager.enable(false)` 的长期禁用策略。
 - 增加 loading、interactive、idle 和 memory warning hint。
@@ -645,7 +645,7 @@
 - Windows/Linux/Android/macOS/iOS 验证记录。
 - GC 配置说明和安全默认值。
 - Tracy/JSON/CSV 遥测接口。
-- NovaFlare GC HUD 和帧时间关联工具。
+- D.C.E. GC HUD 和帧时间关联工具。
 - 已知限制、技术瓶颈与下一代对象模型建议。
 
 ## 12. 推荐执行顺序
@@ -666,7 +666,7 @@
 12. 大对象区。
 13. weak/finalizer 管线。
 14. 碎片整理与 OS 内存归还。
-15. NovaFlare 帧预算集成。
+15. D.C.E. 帧预算集成。
 16. 跨平台、故障注入和最长 20 分钟稳定性验证。
 17. 多机器复测并确认技术瓶颈。
 

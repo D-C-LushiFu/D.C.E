@@ -16,7 +16,7 @@
 - `R`：原技术不照搬，但必须由新机制提供等价或更强语义，例如保守栈扫描改为精确根/stack map。
 - `X`：经过调用图、Haxe 标准库和目标平台审计后确认不适用于目标；必须写出证据，不能口头跳过。
 
-完成条件不是把所有格子改成同一个字母，而是：所有适用于 Windows/Lime/OpenFL/NovaFlare 的项目均为 `E`；跨平台与可选子系统至少有明确实现或有证据的 `X`；任何公开 ABI 缺口均有测试、适配层或明确替代协议。
+完成条件不是把所有格子改成同一个字母，而是：所有适用于 Windows/Lime/OpenFL/D.C.E. 的项目均为 `E`；跨平台与可选子系统至少有明确实现或有证据的 `X`；任何公开 ABI 缺口均有测试、适配层或明确替代协议。
 
 ## 2. 对照基线的真实状态
 
@@ -362,7 +362,7 @@ val_ocallN
 - scriptable class、动态字段、调试变量。
 - SLJIT JIT 编译器和 x86/x64/ARM/MIPS/PPC/SPARC/TILEGX 等后端。
 
-当前状态为 `N`。NovaFlare 当前主要使用 HScript/Lua，不代表 cppia 永久不需要。处理规则：
+当前状态为 `N`。D.C.E. 当前主要使用 HScript/Lua，不代表 cppia 永久不需要。处理规则：
 
 1. 先扫描项目、Lime/OpenFL 和全部 NDLL 是否引用 cppia/scriptable ABI。
 2. Windows 游戏主路径若无引用，可从 P0 延后，但不能在“完整 hxcpp 替代”清单中消失。
@@ -631,7 +631,7 @@ __hxcpp_utf8_string_to_char_array
 4. GC 压力：调用前后强制 Full GC、young GC、concurrent mark、relocation。
 5. native 压力：blocking、callback、跨线程、shutdown。
 6. 失败测试：null、越界、非法类型、OOM/分配失败、重复释放。
-7. 集成验证：至少一个 Lime/OpenFL 或 NovaFlare 的真实调用路径。
+7. 集成验证：至少一个 Lime/OpenFL 或 D.C.E. 的真实调用路径。
 8. 性能数据：热路径吞吐、分配量、barrier/load-barrier 命中、P99/P99.9/max。
 
 ## 17. 构建和游戏最终门槛
@@ -655,7 +655,7 @@ __hxcpp_utf8_string_to_char_array
 
 - 新 GC 核心测试 19/19 已通过。
 - Haxe 生成 smoke 已通过，包括强制 Full GC 的调用临时根与 ShaderData `textureScale` 动态字段回归。
-- 完整 NovaFlare 项目正在使用修复后的生成器重新编译，共 2761 个 translation units，2507 个需要编译。
+- 完整 D.C.E. 项目正在使用修复后的生成器重新编译，共 2761 个 translation units，2507 个需要编译。
 - 旧候选包仍被判定为失败：主菜单确认后 transition 异常、`x` 日志风暴、Freeplay 初始化 `unknown dynamic field: textureScale`、FPS 崩溃。
 - 失败判定不会因独立 smoke 通过而撤销；只有新整包真实操作路径通过才可关闭。
 
@@ -793,7 +793,7 @@ __hxcpp_utf8_string_to_char_array
 
 1. `P`、`N`、`A`、`R` 都表示未完成，不可用于“已经兼容”的结论。
 2. 同名 symbol、同名类或能链接，只能证明名称存在；必须继续验证布局、调用约定、返回值、异常、线程和 GC 生命周期。
-3. Windows/NovaFlare 的 P0 故障优先修复，但不能因此删掉 cppia、Apple、Android、Neko 等账目；暂不适用项只能带证据改为 `X`。
+3. Windows/D.C.E. 的 P0 故障优先修复，但不能因此删掉 cppia、Apple、Android、Neko 等账目；暂不适用项只能带证据改为 `X`。
 4. 每完成一项，同步记录测试命令、结果文件、基线 commit 和性能数据，避免再次靠人工记忆重复排查。
 5. 真实应用第一次异常是主因；后续 `x` 日志风暴、低 FPS、画面停滞只能作为放大结果，不能掩盖最先发生的对象/根/ABI 错误。
 
@@ -816,4 +816,4 @@ __hxcpp_utf8_string_to_char_array
 - `tools/build-hxcpp-zgc-kernel.ps1`：19/19 通过；
 - `tools/test-hxcpp-zgc-haxe-smoke.ps1`：`Haxe-generated hxcpp ZGC smoke test passed`；
 - 生成的 `StaticPropertyTarget_obj::__novaCffiGetStatic` 已包含计算 getter；
-- 下一门禁：完整重新生成 NovaFlare，确认 `FreeplayState_obj` 描述符包含 `songPosiData`，再进入 Freeplay检查 Haxe/原生栈/GC 日志。
+- 下一门禁：完整重新生成 D.C.E.，确认 `FreeplayState_obj` 描述符包含 `songPosiData`，再进入 Freeplay检查 Haxe/原生栈/GC 日志。

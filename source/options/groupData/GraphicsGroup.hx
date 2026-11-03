@@ -1,5 +1,7 @@
 package options.groupData;
 
+import openfl.Lib;
+
 class GraphicsGroup extends OptionCata
 {
 	public function new(X:Float, Y:Float, width:Float, height:Float)
@@ -52,7 +54,7 @@ class GraphicsGroup extends OptionCata
 		if (Main.watermark != null)
 		{
 			Main.watermark.scaleX = Main.watermark.scaleY = ClientPrefs.data.watermarkScale;
-			Main.watermark.y += (1 - ClientPrefs.data.watermarkScale) * Main.watermark.bitmapData.height;
+			Main.watermark.y = Lib.current.stage.stageHeight - 5 - Main.watermark.scaleY * Main.watermark.bitmapData.height;
 			Main.watermark.visible = ClientPrefs.data.showWatermark;
 		}
 	}

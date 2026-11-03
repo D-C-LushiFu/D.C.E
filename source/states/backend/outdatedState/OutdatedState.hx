@@ -21,8 +21,8 @@ class OutdatedState extends MusicBeatState
 		if (controls.mobileC)
 		{
 			guh = "Sup kiddo, looks like you're running an   \n
-			outdated version of NovaFlare Engine ("
-				+ MainMenuState.novaFlareEngineVersion
+			outdated version of D.C.E. ("
+				+ MainMenuState.dceEngineVersion
 				+ "),\n
 			please update to "
 				+ TitleState.updateVersion
@@ -34,8 +34,8 @@ class OutdatedState extends MusicBeatState
 		else
 		{
 			guh = "Sup bro, looks like you're running an   \n
-			outdated version of NovaFlare Engine ("
-				+ MainMenuState.novaFlareEngineVersion
+			outdated version of D.C.E. ("
+				+ MainMenuState.dceEngineVersion
 				+ "),\n
 			please update to "
 				+ TitleState.updateVersion
@@ -60,7 +60,7 @@ class OutdatedState extends MusicBeatState
 			if (controls.ACCEPT)
 			{
 				leftState = true;
-				CoolUtil.browserLoad("https://github.com/D-C-LushiFu/NovaFlare-Engine-LushiFuFixedsss/releases");
+				CoolUtil.browserLoad("https://github.com/D-C-LushiFu/Different-Creatingness-Engine/releases");
 			}
 			else if (controls.BACK)
 			{

@@ -167,7 +167,7 @@ class RuntimePostEffectShader extends FlxRuntimeShader
 
   public function new(fragmentSource:String = null, glVersion:String = null)
   {
-    // NovaFlare's selected flixel-addons predates the optional glVersion
+    // D.C.E.'s selected flixel-addons predates the optional glVersion
     // constructor argument. It also falls back to FlxRuntimeShader's own
     // metadata when a null source is passed, which drops this subclass's three
     // post-effect uniforms. Resolve this subclass's header/body metadata before
@@ -188,7 +188,7 @@ class RuntimePostEffectShader extends FlxRuntimeShader
   }
 
   /**
-   * Compatibility with FNF's pinned FlxRuntimeShader. NovaFlare's selected
+   * Compatibility with FNF's pinned FlxRuntimeShader. D.C.E.'s selected
    * flixel-addons predates this helper, but exposes the same ShaderInput data.
    */
   public function setBitmapData(name:String, value:BitmapData):Void

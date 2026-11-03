@@ -15,7 +15,7 @@ class CodenameBuildField extends TextField {
 	public function reload() {
 		var versionMessage:String = Flags.VERSION_MESSAGE;
 		#if CODENAME_ENGINE_COMPAT
-		versionMessage += "\nNovaFlare Engine v1.2.1";
+		versionMessage += "\nD.C.E. v" + states.mainMenuState.MainMenuState.dceEngineVersion;
 		#end
 
 		#if COMPILE_EXPERIMENTAL

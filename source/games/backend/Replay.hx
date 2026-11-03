@@ -188,7 +188,7 @@ class Replay extends FlxBasic
 		this.recordedPlaybackRate = stateRecord.playbackRate;
 		this.replayVersion = stateRecord.replayVersion;
 
-		trace('Replay v2: restored recorded environment (speed=${stateRecord.songSpeed}, rate=${stateRecord.playbackRate})');
+		trace('Replay v2: restored recorded environment (songSpeed=${stateRecord.songSpeed}, rate=${stateRecord.playbackRate})');
 		return issues.length > 0 ? issues.join('; ') : null;
 	}
 
@@ -324,6 +324,8 @@ class Replay extends FlxBasic
 				
 				keysHeld.remove(flxKey);
 			}
+
+			PlayState.instance.playbackRate = frame.playbackRate;
 
 			Reflect.callMethod(follow, Reflect.field(follow, "replayApplyInput"), [frame.time, tmpPressLanes, tmpReleaseLanes, tmpHeldLanes]);
 			

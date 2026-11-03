@@ -59,7 +59,7 @@ class MusicBeatTransition extends MusicBeatSubstate {
 		add(transitionSprite = new FunkinSprite().loadSprite(Paths.image('menus/transitionSpr')));
 		resizeDefaultSprites();
 
-		// CNE's original Flixel fork flips this texture through the camera. NF's
+		// CNE's original Flixel fork flips this texture through the camera. D.C.E.'s
 		// renderer has a different camera pipeline, so flip the gradient itself to
 		// keep the transparent edge leading the incoming transition.
 		transitionCamera.flipY = false;

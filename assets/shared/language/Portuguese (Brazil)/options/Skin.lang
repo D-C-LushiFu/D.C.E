@@ -9,6 +9,8 @@ noteColorSwap => HSV das Notas
 NotesSubState => Configuração de Cor das Notas
 NotesSubStateLegacy => Configuração de Cor Antiga
 
+KeyboardViewerSubState => Feedback do Teclado
+
 Splash => Splash
 
 showSplash => Mostrar Splash

@@ -1,9 +1,11 @@
 package codename.funkin.options.type;
 
+import codename.funkin.options.TreeMenu.ITreeHorizontalOption;
+
 /**
  * Option type that allows stepping through a number.
 **/
-class NumOption extends TextOption {
+class NumOption extends TextOption implements ITreeHorizontalOption {
 	public var changedCallback:Float->Void;
 
 	public var min:Float;

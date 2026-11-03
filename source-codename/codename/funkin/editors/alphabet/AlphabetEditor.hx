@@ -47,6 +47,10 @@ class AlphabetEditor extends UIState {
 	public var glyphChar:UITextBox;
 	public var confirmGlyph:UIButton;
 	public var deleteGlyph:UIButton;
+	#if TOUCH_CONTROLS
+	public var previousLetterButton:UIButton;
+	public var nextLetterButton:UIButton;
+	#end
 
 	public var infoWindow:GlyphInfoWindow;
 	public var curSelectedComponent:AlphabetComponent = null;
@@ -245,6 +249,16 @@ class AlphabetEditor extends UIState {
 		infoWindow = new GlyphInfoWindow();
 		uiGroup.add(infoWindow);
 
+		#if TOUCH_CONTROLS
+		previousLetterButton = new UIButton((FlxG.width * 0.5) - 55, FlxG.height - 50, "<", () -> _tape_left(null), 50, 40);
+		nextLetterButton = new UIButton((FlxG.width * 0.5) + 5, FlxG.height - 50, ">", () -> _tape_right(null), 50, 40);
+		for (button in [previousLetterButton, nextLetterButton]) {
+			button.cameras = [uiCamera];
+			button.field.scale.set(1.5, 1.5);
+			button.alpha = Options.touchPadAlpha;
+		}
+		#end
+
 		componentList = new UIButtonList<ComponentButton>(0, 720 - 170 - 30, 230, 170, "Components:", FlxPoint.get(230, 50), FlxPoint.get(0, 0), 0);
 		componentList.dragCallback = (button, oldID, newID) -> {
 			queueReorder = true; // not do it for every button reordered
@@ -282,6 +296,10 @@ class AlphabetEditor extends UIState {
 
 		add(topMenuSpr);
 		add(uiGroup);
+		#if TOUCH_CONTROLS
+		add(previousLetterButton);
+		add(nextLetterButton);
+		#end
 
 		if(Framerate.isLoaded) {
 			Framerate.fpsCounter.alpha = 0.4;
@@ -351,7 +369,7 @@ class AlphabetEditor extends UIState {
 		if (currentFocus == null) {
 			if(FlxG.keys.justPressed.ANY)
 				UIUtil.processShortcuts(topMenu);
-			
+
 			if(curSelectedComponent != null) {
 				if(FlxG.keys.pressed.K) {
 					curSelectedComponent.y -= 100 * elapsed;
@@ -499,6 +517,13 @@ class AlphabetEditor extends UIState {
 		/*if (undos.unsaved) SaveWarning.triggerWarning();
 		else */FlxG.switchState(new AlphabetSelection());
 	}
+
+	#if mobile
+	public override function onMobileBack():Bool {
+		_file_exit(null);
+		return true;
+	}
+	#end
 
 	function _edit_main(_) {
 		FlxG.state.openSubState(new AlphabetMainDataScreen());

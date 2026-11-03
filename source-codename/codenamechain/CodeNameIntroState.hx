@@ -8,6 +8,7 @@ import flixel.tweens.FlxEase;
 import flixel.tweens.FlxTween;
 import flixel.util.FlxColor;
 import flixel.util.FlxTimer;
+import openfl.utils.Assets;
 
 #if VIDEOS_ALLOWED
 import hxvlc.flixel.FlxVideoSprite;
@@ -35,14 +36,21 @@ class CodeNameIntroState extends FlxState
 		}
 		FlxG.camera.bgColor = FlxColor.BLACK;
 		FlxG.mouse.visible = false;
+		codename.funkin.options.Options.loadStartupSettings();
 		new FlxTimer().start(0, function(_):Void startIntro());
 	}
 
 	function startIntro():Void
 	{
+		if (codename.funkin.options.Options.skipTitleVideo)
+		{
+			finishIntro();
+			return;
+		}
+
 		#if VIDEOS_ALLOWED
-		var videoPath:String = CodeNameMode.novaFlareIntroVideoPath;
-		if (videoPath == null || videoPath.length == 0 || !originfunkin.OriginFunkinConfig.canStartVideo())
+		var videoPath:String = CodeNameMode.dceIntroVideoPath;
+		if (videoPath == null || videoPath.length == 0)
 		{
 			finishIntro();
 			return;
@@ -88,10 +96,14 @@ class CodeNameIntroState extends FlxState
 			}
 		});
 
-		skipText = new FlxText(0, FlxG.height - 32, FlxG.width, "Press Enter to skip", 18);
-		skipText.setFormat(null, 18, FlxColor.WHITE, CENTER);
+		skipText = new FlxText(0, FlxG.height - 26, 0,
+			"Press " + #if android "Back on your Phone " #else "Enter " #end + "to skip", 18);
+		skipText.setFormat(Assets.getFont("assets/fonts/montserrat.ttf").fontName, 18);
 		skipText.alpha = 0;
+		skipText.alignment = CENTER;
+		skipText.screenCenter(flixel.util.FlxAxes.X);
 		skipText.scrollFactor.set();
+		skipText.antialiasing = codename.funkin.options.Options.antialiasing;
 		add(skipText);
 		FlxTween.tween(skipText, {alpha: 1}, 1, {ease: FlxEase.quadIn});
 		FlxTween.tween(skipText, {alpha: 0}, 1, {ease: FlxEase.quadIn, startDelay: 4});
@@ -113,6 +125,12 @@ class CodeNameIntroState extends FlxState
 	function shouldSkip():Bool
 	{
 		if (FlxG.keys.justPressed.ENTER) return true;
+		#if android
+		if (FlxG.android.justReleased.BACK) return true;
+		#elseif ios
+		for (touch in FlxG.touches.list)
+			if (touch.justPressed) return true;
+		#end
 		var gamepad:FlxGamepad = FlxG.gamepads.lastActive;
 		return gamepad != null && gamepad.justPressed.START;
 	}

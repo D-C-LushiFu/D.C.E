@@ -32,13 +32,29 @@ class Cutscene extends MusicBeatSubstate {
 		skippable = canSkip;
 	}
 
+	public override function create() {
+		super.create();
+		#if TOUCH_CONTROLS
+		// PlayState's controls are inactive while a cutscene substate is open.
+		// Give every cutscene (including scripted/video/dialogue subclasses) its
+		// own confirm and back controls.
+		if (touchPad == null) {
+			addTouchPad("NONE", "A_B");
+			addTouchPadCamera();
+		}
+		#end
+	}
+
 	public override function update(elapsed:Float) {
 		super.update(elapsed);
 		if (pauseCheck()) pauseCutscene();
+		#if mobile
+		else if (controls.BACK && !pausable && skippable) close();
+		#end
 	}
 
 	public function pauseCheck():Bool
-		return controls.PAUSE && pausable;
+		return (controls.PAUSE #if mobile || controls.BACK #end) && pausable;
 
 	var _before:Array<Bool> = [false, true];
 	public function pauseCutscene() {

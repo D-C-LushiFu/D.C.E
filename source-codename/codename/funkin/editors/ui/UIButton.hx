@@ -41,6 +41,9 @@ class UIButton extends UISliceSprite {
 	public override function update(elapsed:Float) {
 		if (autoFollow && field != null) field.follow(this, 0, (bHeight - field.height) / 2);
 		if (!hovered && hasBeenPressed && FlxG.mouse.justReleased) hasBeenPressed = false;
+		// A substate can suspend this button during the release frame. Do not
+		// carry that old press into the next click after the parent resumes.
+		if (hasBeenPressed && FlxG.mouse.released && !FlxG.mouse.justReleased) hasBeenPressed = false;
 		if (autoAlpha) {
 			alpha = selectable ? 1 : 0.4;
 			if(field != null) field.alpha = alpha;

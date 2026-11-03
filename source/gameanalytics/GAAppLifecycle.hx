@@ -4,7 +4,7 @@ import lime.app.Application;
 
 /**
  * Owns analytics for the whole application rather than one engine's state
- * hierarchy. NovaFlare, Origin Funkin and Codename all pass through Main, but
+ * hierarchy. D.C.E., Origin Funkin and Codename all pass through Main, but
  * they do not share a MusicBeatState implementation.
  */
 class GAAppLifecycle
@@ -81,6 +81,6 @@ class GAAppLifecycle
 		#end
 		if (originfunkin.OriginFunkinMode.active)
 			return 'origin';
-		return 'novaflare';
+		return 'dce';
 	}
 }

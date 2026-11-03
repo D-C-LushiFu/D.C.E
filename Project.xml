@@ -2,7 +2,19 @@
 <project>
 	<!-- _________________________ Application Settings _________________________ -->
 
-	<app title="NovaFlare Engine" file="NovaFlare Engine" packageName="com.NovaFlareEngineNew" package="com.NovaFlareEngineNew" main="Main" version="1.2.2" build-number="29260805" company="NF crew" />
+	<!-- build-number 会作为 Android 的 versionCode（见 lime 的 AndroidManifest 模板
+	     android:versionCode="::APP_BUILD_NUMBER::"），Android 只按这个整数判断版本高低，
+	     与 version 字符串无关。编号规则（见 .github/workflows/release.yml）：
+	         build-number = <数据版本号去掉小数点> + <构建日期 YYMMDD>
+	     ★ 注意：仓库 tag 里的值不一定等于官方实际发布包的值，必须 aapt 实测 APK：
+	         官方 V1.2.1         实测 versionCode = 29260804  (数据版本 2.9 + 260804)
+	         官方 V1.2.1-Hotfix  实测 versionCode = 33260811  (数据版本 3.3 + 260811)
+	         用户 1.2.1hf 包      实测 versionCode = 35260811  (数据版本 3.5 + 260811) ← 真正的对手（2026-09-21 从手机 aapt 实测）
+	         本 1.2.2 旧包        实测 versionCode = 29260805  (被 Android 判定为降级)
+	     1.2.2 修改版包含 Hotfix 的全部修复，必须严格大于 35260811，故取数据版本 3.5 + 260921 (35260921)。
+	     以后改动这里时，请先用 aapt 实测官方最新发布包的 versionCode 再定值，
+	     否则 Android 会拒绝覆盖安装（弹「降级安装」提示）。 -->
+	<app title="D.C.E." file="DCE" packageName="com.DCEEngine" package="com.DCEEngine" main="Main" version="20261024Beta1.0Fix1" build-number="35261024" company="D.C.E. crew" />
 	<!--Switch Export with Unique ApplicationID and Icon-->
 	<set name="APP_ID" value="0x0100f6c013bbc000" />
 	
@@ -17,7 +29,7 @@
 	<!--Minimum without FLX_NO_GAMEPAD: 11.8, without FLX_NO_NATIVE_CURSOR: 11.2-->
 	<set name="SWF_VERSION" value="11.8" />
 	
-	<!-- ______________________ NOVAFLARE ENGINE CUSTOMIZATION ______________________ -->
+	<!-- ______________________ D.C.E. CUSTOMIZATION ______________________ -->
 
 	<define name="MODS_ALLOWED" if="desktop || mobile || emscripten" />
 	<define name="LUA_ALLOWED" if="desktop || mobile" unless="hl"/>
@@ -25,15 +37,17 @@
 	<define name="ACHIEVEMENTS_ALLOWED" />
 	<define name="DISCORD_ALLOWED" if="desktop" unless="hl"/>
 	<define name="PSYCH_WATERMARKS"/> <!-- DELETE THIS TO REMOVE WATERMARKS/DEV NAMES ON TITLE SCREEN -->
-	<define name="VIDEOS_ALLOWED" if="desktop || mobile" unless="32bits || hl || NOVIDEO || rpi"/> <!-- i'll keep this cuz it makes vscode think i don't use videos -->
+	<define name="VIDEOS_ALLOWED" if="desktop || mobile" unless="32bits || hl || NOVIDEO || rpi"/>
     <define name="CUSTOM_SHADERS_ALLOWED" if="LUA_ALLOWED"/>
 	<!-- FNF 0.8.4 compatibility features. Origin scripts remain enabled. -->
 	<define name="ORIGIN_FUNKIN_COMPAT"/>
-	<!-- Codename runs as an isolated state chain inside the Windows NF binary. -->
-	<define name="CODENAME_ENGINE_COMPAT" unless="mobile" />
+	<!-- Codename runs as an isolated state chain with D.C.E.'s state-aware
+	     mobile input layer. Keyboard, gamepad and touch stay active together. -->
+	<define name="CODENAME_ENGINE_COMPAT" />
+	<define name="TOUCH_CONTROLS" if="mobile" />
 	<!-- Match Codename's HScript abstract surface. This is required for abstract
 	     statics such as FlxColor.fromRGB. Abstracts are registered explicitly;
-	     NF's newer Flixel must not be force-included package-wide. -->
+	     D.C.E.'s newer Flixel must not be force-included package-wide. -->
 	<haxedef name="HSCRIPT_ABSTRACT_SUPPORT" if="CODENAME_ENGINE_COMPAT"/>
 		<haxedef name="CUSTOM_CLASSES" if="CODENAME_ENGINE_COMPAT"/>
 	<haxedef name="REGION" if="CODENAME_ENGINE_COMPAT"/>
@@ -65,7 +79,17 @@
 	<!-- ____________________________ Window Settings ___________________________ -->
 
 	<!--These window settings apply to all targets-->
-	<window width="1280" height="720" fps="60" background="#000000" hardware="true" vsync="false" allow-shaders="true" antialiasing="0" allowHighDPI="false" preserveDrawingBuffer="false" />
+	<!-- 【实验】窗口创建尺寸决定 OpenFL 的舞台逻辑尺寸：
+	     `Stage.__setLogicalSize()` 只在窗口创建时被调用一次
+	     (openfl/display/Window.hx:65)，之后 stage/后缓冲就固定在这个尺寸，
+	     窗口再被铺满到 1920 也只会把画面整体拉伸放大。
+	     所以 -Dnativeres 构建直接用屏幕原生分辨率创建窗口。 -->
+	<!-- ★ 09-26：默认内部渲染分辨率提到 1920×1080（之前 1280×720 被缩放到 1920 窗口 → 文字发虚） -->
+	<set name="DCE_WIN_W" value="1920" unless="nativeres" />
+	<set name="DCE_WIN_H" value="1080" unless="nativeres" />
+	<set name="DCE_WIN_W" value="1920" if="nativeres" />
+	<set name="DCE_WIN_H" value="1080" if="nativeres" />
+	<window width="${DCE_WIN_W}" height="${DCE_WIN_H}" fps="60" background="#000000" hardware="true" vsync="false" allow-shaders="true" antialiasing="0" allowHighDPI="false" preserveDrawingBuffer="false" />
 
 	<!--HTML5-specific-->
 	<window if="html5" resizable="true" />
@@ -94,6 +118,12 @@
 	<set name="BUILD_DIR" value="export/legacy-gc" if="legacy_gc_compare" />
 	<set name="BUILD_DIR" value="export/32bit" if="32bits" />
         <set name="BUILD_DIR" value="export/rpi" if="rpi" />
+	<!-- ★ GC 实验构建（2026-10-01）：把实验性 GC 开关（HXCPP_VISIT_ALLOCS /
+	     HXCPP_GC_MOVING 等）的产物隔离到单独目录，绝不覆盖可用于发布的那一份。
+	     用法：lime build windows -release -D legacy_gc_compare -D gc_exp -D HXCPP_VISIT_ALLOCS
+	     产物：export/gc-exp/windows/bin/D.C.E.exe
+	     必须放在上面那些 BUILD_DIR 之后 —— 后设置的生效。 -->
+	<set name="BUILD_DIR" value="export/gc-exp" if="gc_exp" />
 	<classpath name="source" />
 	<classpath name="source-originFunkin" />
 	<classpath name="source-codename" if="CODENAME_ENGINE_COMPAT" />
@@ -109,6 +139,9 @@
 	<!-- Assets -->
 	
 	<assets path="assets/fonts" embed="false"/>
+	<assets path="assets/mobile" library="codename_mobile" if="mobile"/>
+	<!-- Small CNE Week 6 fallback. External CodeName assets remain higher
+	     priority; these files only fill incomplete legacy asset packs. -->
 	<assets path="assets/menuExtendHide" rename="assets/shared/images/menuExtendHide" embed="true"/>
 	<assets path="assets/shared"        exclude="*.ogg" if="web"/>
 	<assets path="assets/shared"        exclude="*.mp3" unless="web"/>
@@ -124,6 +157,8 @@
 	</section>
 
 	<library name="videos"        preload="true" if="VIDEOS_ALLOWED"/>
+	<library name="codename_mobile" preload="true" if="mobile"/>
+	<library name="codename_fallback" preload="true" if="CODENAME_ENGINE_COMPAT"/>
 
 	<section if="PRELOAD_ALL">
 	<library name="songs"         preload="true" />
@@ -136,6 +171,9 @@
 	</section>
 
 	<define name="CHECK_FOR_UPDATES" />
+	<!-- Required by the Codename contributor/update clients. Every caller still
+	     handles offline, rate-limited and empty responses at runtime. -->
+	<define name="GITHUB_API" if="CODENAME_ENGINE_COMPAT" unless="web || hl" />
 
 	<section if="MODS_ALLOWED">
 		<assets path='example_mods' rename='mods' embed='false'/>
@@ -168,7 +206,7 @@
 	<haxelib name="flxanimate" unless="html5"/>
 	<haxelib name="tjson"/>
 	<haxelib name="json2object"/>
-	<!-- FNF 0.8.4 dependencies; NF's existing core libraries stay selected. -->
+	<!-- FNF 0.8.4 dependencies; D.C.E.'s existing core libraries stay selected. -->
 	<haxelib name="polymod"/>
 	<haxelib name="FlxPartialSound"/>
 	<haxelib name="format"/>
@@ -188,6 +226,7 @@
 	<!-- Mobile Specific-->
 	<haxelib name="extension-androidtools" if="android" />
 	<java path="source/mobile/android/java" if="android" />
+	<config:android extension="org.dce.display.RefreshRateExtension" if="android" />
 	<java path="source-originFunkin/funkin/external/android/java" if="android" />
 	<config:android extension="funkin.extensions.CallbackUtil" if="android" />
 	<config:android extension="funkin.extensions.FNFCExtension" if="android" />
@@ -218,14 +257,79 @@
 
 	<haxedef name="HXCPP_ALIGN_ALLOC"/>
 	<haxedef name="HXCPP_GC_GENERATIONAL" />
-	<!-- The public hxcpp name now selects the exact, moving NovaGC backend on
+	<!-- ★★ 正式启用「堆内精确遍历」（2026-10-01 实测，收益最大的一条 GC 开关）。
+	     作用：让编译器为每个类生成字段访问信息，GC 在标记阶段遍历**堆内对象图**时
+	     按真实字段走，而不是把内存里"看起来像指针"的值一律当作存活引用。
+	     实测（编谱器 + BPM-2021 大谱 32787 note 的试玩路径，legacy/Immix 构建）：
+	       · 打开编谱器：堆 644MB → 145MB，reserved 722MB → 157MB，APP MEM 995MB → 377MB
+	       · 退出编谱器后：reserved 749MB → 122MB，APP MEM 1018MB → 335MB（且静置不回升）
+	       · 单次 GC 耗时 137~163ms → 6~12ms
+	     原因解释：以前"退出界面后元素没销毁 / APP MEM 不降"，很大一部分不是没人管的引用，
+	     而是**保守式扫描把已经死掉的对象误当成活的**（栈/寄存器里的陈旧指针），
+	     堆内遍历精确化之后这些对象就能正常回收，Immix 也就能归还整块内存。
+	     安全性：本开关**不移动对象**（移动式是另一个开关 HXCPP_GC_MOVING，有原生库兼容风险，
+	     未启用），所以对 lua/vlc/ssl 等原生库没有额外风险。
+	     代价：每个类多生成一个访问函数 → 代码体积与编译时间略增（运行时开销实测可忽略）。
+	     ★ 注意：切换本开关会改变全部生成代码，因此**首次构建是全量重编**（约 15~20 分钟）。 -->
+	<haxedef name="HXCPP_VISIT_ALLOCS" if="windows" />
+	<!-- The public hxcpp name now selects the exact, moving D.C.GC backend on
 	     Windows; keep this in the project so normal Lime builds cannot silently
-	     fall back to the old C++ generator ABI. -->
+	     fall back to the old C++ generator ABI.
+	     ★ 名字说明：对外统一叫 **D.C.GC**；下面两个 haxedef 是 hxcpp 构建工具
+	     （hxcpp/run.n）校验的「codegen 契约」标记，属于 ABI 层标识，
+	     改了会被 run.n 直接拒绝构建（"refusing Build.xml without HXCPP_ZGC_ABI=1
+	     or the hxcpp_zgc + novagc_precise codegen contract"），所以内部保留原名不动。 -->
 	<haxedef name="hxcpp_zgc" if="windows" unless="legacy_gc_compare" />
 	<haxedef name="novagc-precise" if="windows" unless="legacy_gc_compare" />
+	<!-- ★★ 缺这一个就构建不出精确 GC：它才是"Haxe 生成精确 GC ABI"的开关。
+	     实测（2026-09-30）：只给 hxcpp_zgc + novagc-precise 时，生成的 C++ 仍是旧 ABI
+	     （`_hx_.mPtr->*(hx::interface_cast<...>)`），而 D.C.GC 运行时的 `_hx_` 是
+	     `hx::gc::RefSlot` → 编译报错 "base operand of '->' has non-pointer type
+	     'hx::gc::RefSlot'"，整个构建失败。加上本定义后生成的是
+	     `_hx_.managedPointer()` + `static_cast<::hx::Object*>` 的新 ABI，编译通过。
+	     （同时需要 toolchains/haxe-novagc/haxe.exe；见构建说明。） -->
+	<haxedef name="HXCPP_ZGC_ABI" value="1" if="windows" unless="legacy_gc_compare" />
 	<!-- Lime otherwise emits a random web cache-buster into AssetCache on every
 	     native build, forcing one unchanged C++ unit to recompile. -->
 	<haxedef name="lime_disable_assets_version" if="windows" />
+
+	<!-- ___________________ 崩溃符号化（可选，-D crash_symbols） ___________________ -->
+
+	<!-- 默认关闭：加上 -D crash_symbols 后会输出 .map / .pdb，并让链接器写入调试目录。
+	     为什么需要它：引擎自带的 crash 报告只给 fault_module_rva（模块内偏移），
+	     而默认构建的 exe 里 **Debug Directories 段是空的**（没有 /DEBUG），
+	     既没有 PDB 引用也没有 .map，拿到 RVA 也查不出是哪个函数 —— 2026-09-22
+	     那两次崩溃（RVA 0x1307bbf / 0x195eeb1）就是因此只能靠代码推断。
+	     开了这个开关以后，RVA 直接用 _dsh_tools/map_rva.ps1 就能查到函数名。
+	     用法：haxelib run lime build windows -D crash_symbols
+	     （代价：exe 与构建目录变大、链接更慢，所以不默认开。） -->
+	<haxedef name="HXCPP_MAP_FILE" value="DCE.map" if="crash_symbols" />
+	<haxedef name="HXCPP_PDB_FILE" value="DCE.pdb" if="crash_symbols" />
+
+	<!-- ___________________ 中文 / 非 ASCII 路径兼容 (Windows) ___________________ -->
+
+	<!-- 构建完成后把 windows/DCE.manifest 写进 exe 的 RT_MANIFEST 资源。
+	     清单里的 activeCodePage=UTF-8（Win10 1903+）把整个进程的 ANSI 代码页改成
+	     UTF-8，让 CRT 的 fopen/unlink/stat、Win32 *A 系列，以及 LuaJIT / libVLC /
+	     zlib / hxcpp 插件加载（Sys.loadLibrary）等一切窄字符文件 API 都与
+	     hxcpp 的 UTF-8 字符串对齐 —— 这是「mods/中文模组/xxx」这类路径能正确
+	     加载的根治手段，无需逐个打补丁，也覆盖了改不动的第三方 DLL。
+
+	     为什么不用 hxcpp 的 `manifestFile` define：hxcpp 确实支持它，但本项目
+	     链接的 .haxelib/hxcpp（被本地改造过的构建工具副本）丢掉了 <outPre> /
+	     <outPost> 两个分支，导致 mt.exe 拿不到 -outputresource: 而以
+	     c10100a8 中断构建。放到 postbuild 里既在版本控制内，也不依赖 hxcpp 内部实现。
+
+	     该步骤是「尽力而为」：找不到 exe（非 Windows target）就静默跳过；
+	     找不到 mt.exe 只告警、不中断构建（但会明确提示中文路径可能失效）。
+	     脚本刻意只用 ASCII 注释：PowerShell 5.1 会按 ANSI 代码页解码无 BOM 的脚本。 -->
+	<postbuild cmd="powershell" if="windows" unless="winrt">
+		<arg>-NoProfile</arg>
+		<arg>-ExecutionPolicy</arg>
+		<arg>Bypass</arg>
+		<arg>-File</arg>
+		<arg>tools/embed_utf8_manifest.ps1</arg>
+	</postbuild>
 
 	<!-- _______________________________ TRACY ______________________________ -->
 
@@ -277,13 +381,16 @@
 	<haxedef name='no-inline' if="html5"/>
 
 	<section if="cpp">
-		<!-- These checks add work to nearly every generated call and preserve
-		     large stacks/string tables. Keep them in debug builds only. -->
-		<haxedef name="HXCPP_CHECK_POINTER" if="debug" />
-		<haxedef name="HXCPP_STACK_LINE" if="debug" />
+		<!-- The project no longer requests per-line HXCPP stack maintenance. Normal
+		     Release builds keep it off; stock hxcpp may still enable it internally
+		     for an explicit -debug build. HScript/Lua hot contexts instead use
+		     immutable NativeCrashHandler slots for actionable source evidence. -->
 		<haxedef name="HXCPP_STACK_TRACE" if="debug" />
-		<haxedef name="HXCPP_CATCH_SEGV" if="debug" />
-		<haxedef name="HXCPP_GC_BIG_BLOCKS" if="debug" />
+		<!-- On POSIX targets hxcpp installs this process-wide on every Haxe
+		     thread attach, which can overwrite D.C.E.'s Android crash logger.
+		     Keep the translator debug-only and leave Android signals to
+		     NativeCrashHandler even in debug builds. -->
+		<haxedef name="HXCPP_CATCH_SEGV" if="debug" unless="android" />
 	</section>
 
 	<haxedef name="hscriptPos" if="HSCRIPT_ALLOWED" />
@@ -297,7 +404,10 @@
 	</section>
 	
 	<!-- Do whatever you want I'm tired uninstall and install everytime -->
-	<certificate path="key.keystore" password="novaFlare" alias="psychport" alias-password="novaFlare" if="android" unless="debug" />
+	<!-- ★ 注意：这里的 password / alias-password 必须与 key.keystore 文件内部的口令一致，
+	     否则 Android 签名失败。当前口令已用 keytool 改为 D.C.LushiFu
+	     （PKCS12 格式下库口令与密钥口令必然相同）。 -->
+	<certificate path="key.keystore" password="D.C.LushiFu" alias="psychport" alias-password="D.C.LushiFu" if="android" unless="debug" />
 
 	<!--Avoid memory leaks with for loops in HScript-->
 	<haxedef name="loop_unroll_max_cost" value="25" />
@@ -324,18 +434,26 @@
 	<classpath name="private" />
 	<haxeflag name="--macro" value="gameanalytics.GACompileConfig.configure()" />
 
-	<assets path='art/icon16.png' rename='icon.png' if="linux" />
+	<assets path='art/iconDCE-v2/icon16.png' rename='icon.png' if="linux" />
+	<section if="android">
+		<icon path="art/iconDCE-v2/icon36.png" size='36'/>
+		<icon path="art/iconDCE-v2/icon48.png" size='48'/>
+		<icon path="art/iconDCE-v2/icon72.png" size='72'/>
+		<icon path="art/iconDCE-v2/icon96.png" size='96'/>
+		<icon path="art/iconDCE-v2/icon144.png" size='144'/>
+		<icon path="art/iconDCE-v2/icon192.png" size='192'/>
+	</section>
 	<section if="mobile">
-    	<icon path="art/icon16.png" size='16'/>
-    	<icon path="art/icon32.png" size='32'/>
-    	<icon path="art/icon64.png" size='64'/>
-    	<icon path="art/iconOG.png"/>
+    	<icon path="art/iconDCE-v2/icon16.png" size='16'/>
+    	<icon path="art/iconDCE-v2/icon32.png" size='32'/>
+    	<icon path="art/iconDCE-v2/icon64.png" size='64'/>
+    	<icon path="art/iconDCE-v2/iconOG.png"/>
     </section>
     <section if="desktop">
-    	<icon path="art/icon16-PC.png" size='16'/>
-    	<icon path="art/icon32-PC.png" size='32'/>
-    	<icon path="art/icon64-PC.png" size='64'/>
-    	<icon path="art/iconOG-PC.png"/>
+    	<icon path="art/iconDCE-v2/icon16-PC.png" size='16'/>
+    	<icon path="art/iconDCE-v2/icon32-PC.png" size='32'/>
+    	<icon path="art/iconDCE-v2/icon64-PC.png" size='64'/>
+    	<icon path="art/iconDCE-v2/iconOG-PC.png"/>
     </section>
 
 	<architecture name="arm64" exclude="armv7" if="android" />

@@ -22,7 +22,7 @@ class StageSelectionScreen extends EditorTreeMenuScreen {
 
 	public function makeStageOption(stage:String):TextOption {
 		return new TextOption(stage, getID('acceptStage'), () -> {
-			FlxG.switchState(new StageEditor(stage));
+			MobileEditorWarning.open(parent, () -> FlxG.switchState(new StageEditor(stage)));
 		});
 	}
 

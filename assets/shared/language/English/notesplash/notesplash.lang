@@ -109,3 +109,6 @@ desc_help_copy => Ctrl+C copies the current offset, Ctrl+V pastes, Ctrl+R resets
 desc_help_fps => The next set of animation names is generated every 4 note datas
 desc_help_f1 => Open this help menu: F1
 desc_help_exit => Exit back to the master editor menu: ESC / Back
+
+item_load_json => Import JSON configuration
+desc_load_json => Validate and import a splash configuration using the current atlas

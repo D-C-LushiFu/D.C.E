@@ -11,7 +11,7 @@
 - [JEP 351: ZGC: Uncommit Unused Memory](https://openjdk.org/jeps/351)：延迟 uncommit 与物理内存归还。
 - [Oracle JDK 25 ZGC 指南](https://docs.oracle.com/en/java/javase/25/gctuning/z-garbage-collector.html)：JDK 24 起只保留分代 ZGC，并包含动态 generation/worker/tenuring 调节。
 
-NovaFlare 的运行时不是 HotSpot，也不能因为机制名称相似就宣称是完整 OpenJDK ZGC。以下只记录代码和可执行测试能证明的能力。
+D.C.E. 的运行时不是 HotSpot，也不能因为机制名称相似就宣称是完整 OpenJDK ZGC。以下只记录代码和可执行测试能证明的能力。
 
 ## 当前已经落地并有测试的能力
 

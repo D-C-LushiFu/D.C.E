@@ -69,7 +69,7 @@ class GlobalScript {
 			call("preStateCreate", [state]);
 		});
 		FlxG.signals.preStateSwitch.add(function() {
-			call("preStateSwitch", []);
+			call("preStateSwitch");
 
 			@:privateAccess var requestedState = FlxG.game._nextState.createInstance();
 			var stateName = Type.getClassName(Type.getClass(requestedState));
@@ -92,6 +92,7 @@ class GlobalScript {
 				if (PlayerSettings.solo.controls.DEV_RELOAD) {
 					reloading = true;
 					Logs.trace("Reloading Global Scripts...", INFO, YELLOW);
+					Paths.assetsTree.invalidateLookupCaches();
 
 					// yeah its a bit messy, sorry. This just prevents actually reloading the actual state.
 					_lastAllow_Reload = MusicBeatState.ALLOW_DEV_RELOAD;
@@ -107,7 +108,7 @@ class GlobalScript {
 	public static function onModSwitch(newMod:String) {
 		destroy();
 		scripts = new ScriptPack("GlobalScript");
-		for (lib in codename.funkin.backend.assets.ModsFolder.getLoadedModsLibs()) {
+		for (lib in codename.funkin.backend.assets.ModsFolder.getLoadedModsLibs(true, true)) {
 			var modName = lib.modName;
 			var path = Paths.script('data/global/LIB_$modName');
 			var script = Script.create(path);
