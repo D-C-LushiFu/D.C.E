@@ -106,23 +106,12 @@ jobs:
     uses: ./.github/workflows/MobileBuild.yml
     with:
       dependencies_to_update: 'all'
-    secrets: inherit
-
-  macos-build:
-    name: "macOS Build"
-    needs: mobile-build
-    uses: ./.github/workflows/MacBuild.yml
-    secrets: inherit
-
-  linux-build:
-    name: "Linux Build"
-    needs: update-versions
-    uses: ./.github/workflows/LinuxBuild.yml
+      build_ios: false
     secrets: inherit
 
   releaser:
     name: "Create Release"
-    needs: [update-versions, mobile-build, macos-build, linux-build]
+    needs: [update-versions, mobile-build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -131,30 +120,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: androidBuild
-          path: artifacts/
-
-      - name: Download iOS Build
-        uses: actions/download-artifact@v4
-        with:
-          name: iOSBuild
-          path: artifacts/
-
-      - name: Download macOS14 Build
-        uses: actions/download-artifact@v4
-        with:
-          name: macOSBuild-14
-          path: artifacts/
-
-      - name: Download macOS15 Build
-        uses: actions/download-artifact@v4
-        with:
-          name: macOSBuild-15
-          path: artifacts/
-
-      - name: Download Linux Build
-        uses: actions/download-artifact@v4
-        with:
-          name: LinuxBuild
           path: artifacts/
 
       - name: List downloaded artifacts

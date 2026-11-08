@@ -2,6 +2,11 @@ name: MobileBuild
 on:
   workflow_call:
     inputs:
+      build_ios:
+        description: 'Whether to build the iOS release package'
+        required: false
+        type: boolean
+        default: true
       dependencies_to_update:
         description: '输入 "all" 更新所有haxelib, 或指定库名 (e.g. "lime,openfl")不输入即不给haxelib做任何更新'
         required: false
@@ -195,6 +200,7 @@ jobs:
             ~/.gradle
           
   iOS:
+    if: inputs.build_ios != false
     runs-on: macos-15
     environment: ${{ github.repository == 'D-C-LushiFu/Different-Creatingness-Engine' && github.event_name != 'pull_request_target' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'private-build' || 'public-build' }}
     concurrency:
