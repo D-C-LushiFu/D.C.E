@@ -170,5 +170,36 @@ jobs:
           prerelease: false
           tag_name: "V${{ needs.update-versions.outputs.version_name }}"
           name: "V${{ needs.update-versions.outputs.version_name }}"
+          body: |
+            ## Beta1.1 — StoryMode Update
+
+            This release focuses on a refreshed StoryMode experience.
+
+            ### What's new
+            - Redesigned the StoryMode week selection screen with opponent themed gradient backgrounds and smoother transitions.
+            - Added a clearer track list with per song scores, grades, and week score details.
+            - Improved navigation and touch interaction for mobile players.
+            - Added updated StoryMode character artwork and expanded Chinese, English, and Brazilian Portuguese text.
+
+            ### Fixes and improvements
+            - Improved opponent color detection from chart and character data, with safer fallbacks.
+            - Avoided loading full chart note data while changing weeks to reduce menu stalls.
+            - Fixed several menu, display, mobile refresh rate, and resource handling issues included in this update.
+
+            ---
+            ## Beta1.1 — StoryMode 更新
+
+            本次更新以 StoryMode 为主，重新整理了周目选择界面与曲目浏览体验。
+
+            ### 新增与改进
+            - StoryMode 周目选择界面改版，加入与对手主题对应的渐变背景和更顺畅的切换效果。
+            - 曲目列表展示个人分数与评级，并让周目分数信息更清晰。
+            - 改善移动端触控操作与菜单导航。
+            - 更新 StoryMode 角色素材，并补充中文、英文和巴西葡萄牙语文本。
+
+            ### 修复
+            - 改进对手颜色读取逻辑，并为缺失的谱面或角色数据提供回退处理。
+            - 切换周目时避免读取完整谱面音符数据，减少菜单卡顿。
+            - 同步修复若干菜单显示、移动端刷新率和资源处理问题。
           files: |
             artifacts/*.zip
