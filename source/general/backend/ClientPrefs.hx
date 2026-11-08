@@ -1260,7 +1260,12 @@ class ClientPrefs
 
 		FlxG.updateFramerate = data.framerate;
 		FlxG.drawFramerate = data.drawFramerate;
-		mobile.backend.MobileRefreshRate.apply(data.drawFramerate);
+		#if android
+		var windowRate:Int = mobile.backend.MobileRefreshRate.maximumWindowRate(data.drawFramerate);
+		FlxG.stage.application.window.frameRate = windowRate;
+		FlxG.stage.application.window.drawFrameRate = windowRate;
+		#end
+		mobile.backend.MobileRefreshRate.requestMaximum();
 		FlxG.stage.application.window.lockRender = #if android true #else data.lockRender #end;
 
 		var output:Array<Float> = [];

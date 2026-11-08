@@ -64,7 +64,10 @@ class ReplayRect extends FlxSpriteGroup
 	var grade:String;
 	var gradePulse:Float = 0;
 
-	var settingsIcon:FlxSprite;
+	var statsPanel:states.freeplayState.objects.PhiPanel;
+	var replayPanel:states.freeplayState.objects.PhiPanel;
+	var statsText:FlxText;
+	var replayText:FlxText;
 	var gradeText:FlxText;
 	var scoreText:FlxText;
 	var dateText:FlxText;
@@ -90,47 +93,31 @@ class ReplayRect extends FlxSpriteGroup
 		add(bg2);
 		if (isDynamicGrade(grade)) ensureGradeShine();
 
-		// Settings icon on the far left
-		settingsIcon = new FlxSprite(5, h / 2 - 12);
-		settingsIcon.loadGraphic(Paths.image(FreeplayState.filePath + "function/options"));
-		settingsIcon.setGraphicSize(24, 24);
-		settingsIcon.updateHitbox();
-		settingsIcon.antialiasing = ClientPrefs.data.antialiasing;
-		add(settingsIcon);
+		// Compact row fields: full date, grade, score, then explicit actions.
+		dateText = new FlxText(14, h / 2 - 10, 300, formatPlayDate(data.playDate), 14);
+		dateText.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 14, 0xFFE0E7ED, LEFT);
+		dateText.borderStyle = NONE;
+		dateText.antialiasing = ClientPrefs.data.antialiasing;
+		add(dateText);
 
-		// Score - keep original position
-		scoreText = new FlxText(w - 153, h / 2 - 13, 107, Std.string(data.songScore), 19);
-		scoreText.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 19, 0xFFFFFFFF, LEFT);
-		scoreText.borderStyle = NONE;
-		scoreText.antialiasing = ClientPrefs.data.antialiasing;
-		add(scoreText);
-
-		// Rating grade - keep original position
-		gradeText = new FlxText(w - 65, h / 2 - 12, 60, grade, 17);
-		gradeText.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 17, 0xFFFFFFFF, RIGHT);
+		gradeText = new FlxText(334, h / 2 - 11, 52, grade, 16);
+		gradeText.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 16, 0xFFFFFFFF, CENTER);
 		gradeText.borderStyle = NONE;
 		gradeText.antialiasing = ClientPrefs.data.antialiasing;
 		add(gradeText);
 
-		// Time/Date - keep original position
-		try
-		{
-			var date:Date = Date.fromString(data.playDate);
-			var dateStr:String = DateTools.format(date, "%Y-%m-%d %H:%M");
-			dateText = new FlxText(38, h / 2 - 10, w - 210, dateStr, 15);
-			dateText.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 15, 0xCCD1DEE6, RIGHT);
-			dateText.borderStyle = NONE;
-			dateText.antialiasing = ClientPrefs.data.antialiasing;
-			add(dateText);
-		}
-		catch (e:Dynamic)
-		{
-			dateText = new FlxText(38, h / 2 - 10, w - 210, data.playDate, 15);
-			dateText.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 15, 0xCCD1DEE6, RIGHT);
-			dateText.borderStyle = NONE;
-			dateText.antialiasing = ClientPrefs.data.antialiasing;
-			add(dateText);
-		}
+		scoreText = new FlxText(396, h / 2 - 12, 112, Std.string(data.songScore), 17);
+		scoreText.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), 17, 0xFFFFFFFF, LEFT);
+		scoreText.borderStyle = NONE;
+		scoreText.antialiasing = ClientPrefs.data.antialiasing;
+		add(scoreText);
+
+		statsPanel = new states.freeplayState.objects.PhiPanel(w - 188, 5, 82, Std.int(h - 10), 0xAA17212D); add(statsPanel);
+		replayPanel = new states.freeplayState.objects.PhiPanel(w - 98, 5, 90, Std.int(h - 10), 0xDD17212D); add(replayPanel);
+		statsText = new FlxText(w - 188, h / 2 - 8, 82, '统计', 13);
+		statsText.setFormat(Paths.font('Lang-ZH.ttf'), 13, 0xFFFFFFFF, CENTER); statsText.borderStyle = NONE; statsText.antialiasing = ClientPrefs.data.antialiasing; add(statsText);
+		replayText = new FlxText(w - 98, h / 2 - 8, 90, '回放', 13);
+		replayText.setFormat(Paths.font('Lang-ZH.ttf'), 13, 0xFFFFFFFF, CENTER); replayText.borderStyle = NONE; replayText.antialiasing = ClientPrefs.data.antialiasing; add(replayText);
 	}
 
 	public function moveY(target:Float)
@@ -145,8 +132,7 @@ class ReplayRect extends FlxSpriteGroup
 		var hovering:Bool = (mouseX >= x && mouseX <= x + entryWidth
 			&& mouseY >= y && mouseY <= y + entryHeight);
 
-		// Left ~50px zone = settings/data view, right side = replay
-		var inSettingsZone:Bool = hovering && (mouseX >= x && mouseX <= x + 50);
+		var inSettingsZone:Bool = hovering && mouseX >= x + entryWidth - 188 && mouseX <= x + entryWidth - 106;
 
 		if (hovering && !isHovered)
 		{
@@ -158,6 +144,8 @@ class ReplayRect extends FlxSpriteGroup
 			isHovered = false;
 			bg.color = 0xFF263444;
 		}
+		statsPanel.alpha = inSettingsZone ? 0.95 : 0.72;
+		replayPanel.alpha = hovering && !inSettingsZone ? 1 : 0.78;
 
 		if (hovering && FlxG.mouse.justPressed)
 		{
@@ -215,12 +203,21 @@ class ReplayRect extends FlxSpriteGroup
 		gradeText.text = grade;
 		try
 		{
-			dateText.text = DateTools.format(Date.fromString(data.playDate), "%Y-%m-%d %H:%M");
+			dateText.text = formatPlayDate(data.playDate);
 		}
 		catch (e:Dynamic)
 		{
 			dateText.text = data.playDate;
 		}
+	}
+
+	static function formatPlayDate(value:String):String
+	{
+		try
+		{
+			return DateTools.format(Date.fromString(value), "%Y.%m.%d %H:%M:%S");
+		}
+		catch (e:Dynamic) return value;
 	}
 
 	function ensureGradeShine():Void

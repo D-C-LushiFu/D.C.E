@@ -3,6 +3,7 @@ package general.objects;
 class MenuItem extends FlxSprite
 {
 	public var targetY:Float = 0;
+	public var animationSpeed:Float = 1;
 
 	public function new(x:Float, y:Float, weekName:String = '')
 	{
@@ -30,7 +31,17 @@ class MenuItem extends FlxSprite
 	{
 		super.update(elapsed);
 
-		y = FlxMath.lerp((targetY * 120) + 480, y, Math.exp(-elapsed * 10.2));
+		var target:Float = (targetY * 120) + 480;
+		if (Math.abs(target - y) < 0.05)
+		{
+			y = target;
+			// StoryMode can contain many mod weeks. Static menu art has no per-frame
+			// animation work once its vertical easing finishes; wake it when layout
+			// assigns a new target or when the confirm flash is active.
+			if (!isFlashing) active = false;
+		}
+		else
+			y = FlxMath.lerp(target, y, Math.exp(-elapsed * 10.2 * Math.max(1, animationSpeed)));
 		if (isFlashing)
 		{
 			_flashingElapsed += elapsed;

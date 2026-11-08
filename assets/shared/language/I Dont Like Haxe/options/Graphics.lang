@@ -1,17 +1,17 @@
-Graphics => 口
+Graphics => Graphics / 口
 
 
-FPScounter => 数据显示
+FPScounter => FPS Counter / 数据显示
 
-showFPS => 显示帧数
-showExtra => 更多性能数据
-rainbowFPS => 帧数变色
-memoryType => 运存展示类型
-fpsScale => 大小
-fpsDisplayMode => 显示模式
+showFPS => Show FPS / 显示帧数
+showExtra => Show Extra Data / 更多性能数据
+rainbowFPS => Rainbow FPS / 帧数变色
+memoryType => Memory Type / 运存展示类型
+fpsScale => FPS Scale / 大小
+fpsDisplayMode => FPS Display Mode / 显示模式
 
 
-Watermark => 水印设置
+Watermark => Watermark / 水印设置
 
-showWatermark => 显示水印
-watermarkScale => 大小
+showWatermark => Show Watermark / 显示水印
+watermarkScale => Watermark Scale / 大小

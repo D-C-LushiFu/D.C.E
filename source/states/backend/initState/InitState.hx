@@ -411,6 +411,9 @@ class InitState extends MusicBeatState
 		ClientPrefs.ensureSaveData();
 
 		ClientPrefs.loadPrefs();
+		#if android
+		mobile.backend.MobileRefreshRate.installFocusRestore();
+		#end
 
 		#if sys
 		// 【默认关闭】文字字形超采样 —— 实测会改动部分 UI 元素的排版，待查清后再启用。

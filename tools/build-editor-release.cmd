@@ -16,7 +16,16 @@ rem Reuse the validated native build cache. Distribution copies only additive fi
 rem Keep app.file=DCE so existing saves and preferences use the same location.
 set "DCE_MANIFEST_EXE=%CD%\export\credits-preview\windows\bin\DCE.exe"
 haxelib run lime build windows -release -DofficialBuild -Dlegacy_gc_compare --app-path=export/credits-preview --app-file=DCE
-exit /b %errorlevel%
+if errorlevel 1 exit /b %errorlevel%
+set "DCE_VLC_SOURCE=%CD%\dependencies\hxvlc-2.2.4-main\project\vlc"
+set "DCE_VLC_TARGET=%CD%\export\credits-preview\windows\bin"
+copy /Y "%DCE_VLC_SOURCE%\lib\Windows\libvlc.dll" "%DCE_VLC_TARGET%\libvlc.dll" >nul
+if errorlevel 1 exit /b %errorlevel%
+copy /Y "%DCE_VLC_SOURCE%\lib\Windows\libvlccore.dll" "%DCE_VLC_TARGET%\libvlccore.dll" >nul
+if errorlevel 1 exit /b %errorlevel%
+xcopy "%DCE_VLC_SOURCE%\plugins\Windows\*" "%DCE_VLC_TARGET%\plugins\" /E /I /Y >nul
+if errorlevel 1 exit /b %errorlevel%
+exit /b 0
 
 :android
 set "HXCPP_COMPILE_THREADS=8"

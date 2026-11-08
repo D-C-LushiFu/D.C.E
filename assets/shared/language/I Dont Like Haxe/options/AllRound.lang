@@ -1,6 +1,12 @@
-D.C.E. => Fuck You Haxe
-Reset => 🔂
-ResetConfirm => Enter=🔂
-back => 🔙
-tapToSearch => 🔍⚙
-Target => 变量名称
+D.C.E. => D.C.E. / Fuck You Haxe
+Reset => Reset / 🔂
+ResetConfirm => Sure? / Enter=🔂
+back => Back / 🔙
+tapToSearch => Search settings / 🔍⚙
+Target => Target / 变量名称
+
+pixelArrowDone => Pixel-arrow assets copied to the mod. / 已复制像素箭头资源到模组。
+pixelArrowCopy => Copy / 复制
+pixelArrowCancel => Cancel / 取消
+pixelArrowMissingTitle => Missing Pixel Arrows / 缺少像素箭头
+pixelArrowMissingMsg => Current mod is missing pixel-arrow assets (images & color data). Copy the default set into the mod? / 当前模组缺少像素箭头资源（图片与配色数据），是否复制默认一套到模组？

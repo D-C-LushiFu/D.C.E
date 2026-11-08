@@ -47,7 +47,7 @@ class MainMenuState extends MusicBeatState
 	// 34260921 > 33260811，不会被 Android 判为降级），也让仍在旧数据版本的用户
 	// 能正确收到更新提示。改这里必须同步改 gitVersion.txt 第 2 行。
 	public static var dceEngineDataVersion:Float = 3.4;
-	public static var dceEngineVersion:String = '20261024Beta1.0Fix1';
+	public static var dceEngineVersion:String = '20261108DebugFix2';
 	public static var dceEngineCommit:String = 
 	    #if commit_sha
             haxe.macro.Compiler.getDefine("commit_sha");

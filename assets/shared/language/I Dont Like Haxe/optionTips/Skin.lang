@@ -1,19 +1,21 @@
-Skin => 皮肤设置
+Skin => Skin / 皮肤设置
 
-Note => 箭头皮肤设置
+Note => Note / 箭头皮肤设置
 
-noteSkin => 箭头类型
-noteRGB => 启用箭头着色器
+noteSkin => Change your current noteSkin / 箭头类型
+noteRGB => RGB for Note / 启用箭头着色器
 NotesSubState =>箭头颜色设置
-noteColorSwap => 使用旧版 Psych 的 HSV 着色方式调整箭头颜色
-NotesSubStateLegacy => 打开旧版 HSV 箭头颜色设置
+noteColorSwap => Use HSV Coloring like old psych for Note / 使用旧版 Psych 的 HSV 着色方式调整箭头颜色
+NotesSubStateLegacy => Note HSV setup / 打开旧版 HSV 箭头颜色设置
 
-KeyboardViewerSubState => 打开键盘反馈设置：各键颜色、长条、透明度、统计配色、布局，并支持颜色跟随曲目音符配色
+KeyboardViewerSubState => Open the keyboard feedback editor: per-key colors, bars, alpha, stat colors, layout, and follow-the-song note colors / 打开键盘反馈设置：各键颜色、长条、透明度、统计配色、布局，并支持颜色跟随曲目音符配色
 
 
-Splash => 溅射皮肤设置
+Splash => Splash / 溅射皮肤设置
 
-showSplash => 喷溅显示
-splashSkin => 喷溅类型
-splashRGB => 启用喷溅着色器
-splashAlpha => 喷溅透明度
+showSplash => Show on sick/marvelous judge / 喷溅显示
+splashSkin => Change your current splashSkin / 喷溅类型
+splashRGB => RGB for Splash / 启用喷溅着色器
+splashAlpha => Alpha / 喷溅透明度
+
+NotesSubState => Note color setup / 箭头颜色设置

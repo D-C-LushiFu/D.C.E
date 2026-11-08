@@ -1,13 +1,40 @@
 # ===== 编辑器主菜单（主菜单按 7 进入） =====
-chartEditor => 编谱器
-characterEditor => 角色编辑器
-stageEditor => 舞台编辑器
-weekEditor => 章节编辑器
-menuCharEditor => 菜单角色编辑器
-dialogueEditor => 对话编辑器
-dialoguePortraitEditor => 对话立绘编辑器
-noteSplashDebug => 音符溅射调试
+chartEditor => Chart Editor / 编谱器
+characterEditor => Character Editor / 角色编辑器
+stageEditor => Stage Editor / 舞台编辑器
+weekEditor => Week Editor / 章节编辑器
+menuCharEditor => Menu Character Editor / 菜单角色编辑器
+dialogueEditor => Dialogue Editor / 对话编辑器
+dialoguePortraitEditor => Dialogue Portrait Editor / 对话立绘编辑器
+noteSplashDebug => Note Splash Debug / 音符溅射调试
 
 # ===== Mod 目录提示（底部状态条） =====
-noModDirectory => < 未加载 Mod 目录 >
-loadedModDirectory => < 已加载 Mod 目录:
+noModDirectory => < No Mod Directory Loaded > / < 未加载 Mod 目录 >
+loadedModDirectory => < Loaded Mod Directory: / < 已加载 Mod 目录:
+
+history_open => History / 历史记录
+cameraEditorSelectDifficulty => Choose a difficulty to preview: / 请选择要预览的难度：
+confirm_hint => Enter / Y confirm  |  Esc cancel / Enter / Y 确认  |  Esc 取消
+history_save => Save / 保存
+history_redo => Redo / 重做
+confirm_btn_confirm => Discard & Exit / 放弃并退出
+confirm_unsaved_message => This editor has unsaved changes. They will be lost if you leave now. Discard them and exit? / 当前编辑器还有未保存的修改，退出后这些改动将会丢失。确定要放弃修改并退出吗？
+confirm_btn_cancel => Cancel / 取消
+history_saved => No unsaved edits / 无待保存修改
+cameraEditorBackToSongs => Back to song list / 返回曲目列表
+confirm_unsaved_title => Unsaved changes / 未保存的更改
+cameraEditorDialogBusy => Finish the current file dialog first. / 请先完成当前文件对话框。
+history_opened => Opened document / 打开文档
+history_imported => Imported configuration / 导入配置
+cameraEditorLoadFailed => Could not load this chart. / 无法载入此谱面。
+history_discard => Discard the unsaved changes and continue? / 有未保存的修改。放弃这些修改并继续？
+cameraEditorSongBrowserTitle => Choose a song from this mod / 选择本模组的曲目
+history_undo => Undo / 撤销
+history_changed => Edited document / 编辑数据
+cameraEditorOpenDifficulty => Open difficulty / 打开难度
+confirm_hint_touch => Tap a button to choose / 轻点按钮进行选择
+cameraEditorOpenSong => Choose song / 选择曲目
+cameraEditor => Camera Editor (Beta) / 相机编辑器 (Beta)
+cameraEditorNoSongs => No charted songs were found in the current mod. / 当前模组没有找到可用的曲目谱面。
+history_unsaved => Unsaved edits / 有未保存修改
+cameraEditorFolderReadFailed => Could not read this song's difficulty charts. / 无法读取该曲目的难度谱面。

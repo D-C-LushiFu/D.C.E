@@ -113,6 +113,8 @@ class FreeplayState extends MusicBeatState
     public var phiAudioVisible:Bool = true;
     public var phiSortLabel:String = '曲目顺序';
     var phiSort:Int = 0;
+    var phiModFolder:Null<String> = null;
+    public var phiModScroll:Int = 0;
     var phiSearch:String = '';
     var phiRatings:Map<String, Float> = new Map();
     var phiAvailableDifficulties:Map<Int, Array<Int>> = new Map();
@@ -216,8 +218,8 @@ class FreeplayState extends MusicBeatState
 	public var replayMove:MouseMove;
 	public var replaySortMode:ReplaySortMode = DATE_DESC;
 	public var replayPosiData:Float = 0;
-	public var replayStartX:Float = 797;
-	public var replayStartY:Float = 840;
+	public var replayStartX:Float = 846;
+	public var replayStartY:Float = 390;
 	public var replaySlope:Float = 0.03;
 
 	var replaySortBtn:Array<RoundRect> = [];
@@ -313,7 +315,10 @@ class FreeplayState extends MusicBeatState
         // Build native 1920 x 1080 textures and type; scale the camera uniformly to the viewport.
         // Keep the engine's default camera first so FlxG.camera stays stable;
         // the design camera is appended above it for Freeplay content.
-        camBG = FlxG.camera; camBG.bgColor = 0x00000000;
+        // Keep a stable opaque base behind asynchronously loaded artwork/video.
+        // A transparent base exposes the OS swapchain for a frame during VLC
+        // texture replacement, which appears as an intermittent black flash.
+        camBG = FlxG.camera; camBG.bgColor = 0xFF34333B;
         camAfter = new FlxCamera(0, 0, 1920, 1080, Math.min(FlxG.width / 1920, FlxG.height / 1080));
         camAfter.bgColor = 0x00000000;
         FlxG.cameras.add(camAfter, false);
@@ -484,13 +489,13 @@ class FreeplayState extends MusicBeatState
         if (FlxG.keys.justPressed.END && phiSongOrder.length > 0) selectPhiSong(phiSongOrder[phiSongOrder.length - 1]);
         if (controls.ACCEPT) { startGame(); return; }
         if (FlxG.mouse.wheel != 0) {
-            if (phiMouseX < 885 && phiMouseY > 210 && phiMouseY < 958) stepPhiSong(FlxG.mouse.wheel > 0 ? -1 : 1);
-            else if (phiMouseX > 785 && phiMouseX < 1206 && phiMouseY > 804 && phiMouseY < 908) {
-				replayPosiData = FlxMath.bound(replayPosiData - FlxG.mouse.wheel * 48, 0, Math.max(0, replayDataList.length * 48 - (956 - replayStartY))); replayMoveEvent();
+			if (phiView.recordsVisible && phiView.recordAnimationProgress >= 0.98 && phiMouseX > 850 && phiMouseX < 1785 && phiMouseY > 375 && phiMouseY < 710) {
+                replayPosiData = FlxMath.bound(replayPosiData - FlxG.mouse.wheel * 48, 0, phiReplayMaxScroll()); replayMoveEvent();
             }
+            else if (phiMouseX < 885 && phiMouseY > 210 && phiMouseY < 958) stepPhiSong(FlxG.mouse.wheel > 0 ? -1 : 1);
         }
         if (FlxG.mouse.justReleased) phiView.click(phiMouseX, phiMouseY);
-        for (r in replayGroup) if (r.visible) r.updateHover(phiMouseX, phiMouseY);
+		for (r in replayGroup) if (r.visible && phiView.recordAnimationProgress >= 0.98) r.updateHover(phiMouseX, phiMouseY);
         searchJustUnfocused = false;
     }
     static function groupedNumber(value:Int):String {
@@ -521,6 +526,7 @@ class FreeplayState extends MusicBeatState
         if (index < 0 || index >= Difficulty.list.length || index == curDifficulty
             || availablePhiDifficulties(curSelected).indexOf(index) < 0) return;
         curDifficulty = index; phiView.refreshSong(); initSongsData(); FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
+        if (phiSort == 3 || phiSort == 4) warmDifficultySort();
     }
     function updateHybridPlaybackProgress():Void {
         var music = FlxG.sound.music;
@@ -576,6 +582,7 @@ class FreeplayState extends MusicBeatState
     }
     public function selectPhiSong(index:Int, sound:Bool = true):Void {
         if (index < 0 || index >= songGroup.length) return;
+        states.freeplayState.objects.PhiWorker.markBrowseActivity();
         if (index != curSelected || !previewDelayStarted) {
             ++audioSwitchId;
             pendingAudioPath = '';
@@ -597,6 +604,13 @@ class FreeplayState extends MusicBeatState
         if (curDifficulty < 0) { PlayState.SONG = null; phiView.setRating(0); loadReplaysForCurrentSong(); }
     }
     public function stepPhiSong(delta:Int):Void {
+        states.freeplayState.objects.PhiWorker.markBrowseActivity();
+        if (phiIsModCategoryList()) {
+            var count = phiModFolders().length;
+            phiModScroll = Std.int(FlxMath.bound(phiModScroll + delta, 0, Math.max(0, count - 9)));
+            if (phiView != null) phiView.refreshOrder();
+            return;
+        }
         if (phiSongOrder.length == 0) return;
         var position = Std.int(FlxMath.bound(phiSongOrder.indexOf(curSelected) + delta, 0, phiSongOrder.length - 1));
         var id = phiSongOrder[position];
@@ -608,6 +622,7 @@ class FreeplayState extends MusicBeatState
     }
     public function selectPhiScrollRatio(ratio:Float):Void {
         if (phiSongOrder.length == 0) return;
+        states.freeplayState.objects.PhiWorker.markBrowseActivity();
         var id = phiSongOrder[Math.round(ratio * (phiSongOrder.length - 1))];
         if (id != curSelected) selectPhiSong(id);
     }
@@ -702,17 +717,85 @@ class FreeplayState extends MusicBeatState
         phiSongOrder = [];
         for (i in 0...songGroup.length) {
             var song = songGroup[i]; var text = normalizePhiSearch(song.songNameSt + ' ' + song.songMusican + ' ' + song._songCharter.join(' '));
-            song.searchMatch = text.indexOf(phiSearch) >= 0 && (!phiFavoritesOnly || isPhiFavorite(i));
+            song.searchMatch = text.indexOf(phiSearch) >= 0 && (!phiFavoritesOnly || isPhiFavorite(i))
+                && (phiModFolder == null || songsData[i].folder == phiModFolder);
             if (song.searchMatch) phiSongOrder.push(i);
         }
         if (phiSort == 1) phiSongOrder.sort((a, b) -> Reflect.compare(songGroup[a].songNameSt.toLowerCase(), songGroup[b].songNameSt.toLowerCase()));
         if (phiSort == 2 && curDifficulty >= 0) phiSongOrder.sort((a, b) -> Highscore.getScore(Paths.formatToSongPath(songGroup[b].songNameSt), curDifficulty) - Highscore.getScore(Paths.formatToSongPath(songGroup[a].songNameSt), curDifficulty));
+        if (phiSort == 3 || phiSort == 4) phiSongOrder.sort(function(a, b):Int {
+            var ar = phiRatings.get(phiKey(a) + '|' + curDifficulty);
+            var br = phiRatings.get(phiKey(b) + '|' + curDifficulty);
+            var av:Float = ar == null ? -1 : ar;
+            var bv:Float = br == null ? -1 : br;
+            if (av < 0 && bv >= 0) return 1;
+            if (bv < 0 && av >= 0) return -1;
+            var result = Reflect.compare(av, bv);
+            return phiSort == 3 ? result : -result;
+        });
+        if (phiSort == 5 && phiModFolder == null) phiSongOrder = [];
         if (phiView != null) phiView.refreshOrder();
     }
     public function cyclePhiSort():Void {
-        phiSort = (phiSort + 1) % 3;
-        phiSortLabel = [PhigrosFreeplayView.textFor('sortOrder', '曲目顺序', 'Song order'), PhigrosFreeplayView.textFor('sortName', '曲名', 'Song name'), PhigrosFreeplayView.textFor('sortScore', '最高分', 'Best score')][phiSort];
+        phiSort = (phiSort + 1) % 6;
+        phiModFolder = null;
+        phiModScroll = 0;
+        phiSortLabel = [PhigrosFreeplayView.textFor('sortOrder', '曲目顺序', 'Song order'),
+            PhigrosFreeplayView.textFor('sortName', '曲名', 'Song name'),
+            PhigrosFreeplayView.textFor('sortScore', '最高分', 'Best score'),
+            PhigrosFreeplayView.textFor('sortDifficultyAsc', '难度升序', 'Difficulty ↑'),
+            PhigrosFreeplayView.textFor('sortDifficultyDesc', '难度降序', 'Difficulty ↓'),
+            PhigrosFreeplayView.textFor('sortByMod', '按模组分类', 'By Mod')][phiSort];
         rebuildPhiOrder();
+        if ((phiSort == 3 || phiSort == 4) && curDifficulty >= 0) warmDifficultySort();
+    }
+    public function phiIsModCategoryList():Bool return phiSort == 5 && phiModFolder == null;
+    public function phiIsModMode():Bool return phiSort == 5;
+    public function phiEnterMod(folder:String):Void { phiModFolder = folder; rebuildPhiOrder(); if (phiSongOrder.length > 0) selectPhiSong(phiSongOrder[0]); }
+    public function phiLeaveMod():Void { phiModFolder = null; rebuildPhiOrder(); }
+    public function phiModFolders():Array<String> {
+        var found:Map<String, Bool> = new Map();
+        for (i in 0...songsData.length) {
+            var data = songsData[i];
+            if (normalizePhiSearch(data.songName + ' ' + data.folder).indexOf(phiSearch) >= 0
+                && (!phiFavoritesOnly || isPhiFavorite(i))) found.set(data.folder == null ? '' : data.folder, true);
+        }
+        var folders = [for (folder in found.keys()) folder];
+        folders.sort((a, b) -> Reflect.compare(phiModDisplayName(a).toLowerCase(), phiModDisplayName(b).toLowerCase()));
+        return folders;
+    }
+    public function phiModDisplayName(folder:String):String {
+        if (folder == null || folder == '') return PhigrosFreeplayView.textFor('baseGame', '原版曲库', 'Base Game');
+        var pack = Mods.getPack(folder);
+        return pack != null && pack.name != null && StringTools.trim(Std.string(pack.name)) != '' ? Std.string(pack.name) : folder;
+    }
+    function warmDifficultySort():Void {
+        var request = ++ratingWarmupId;
+        var difficulty = curDifficulty;
+        var paths:Array<{id:Int, path:String}> = [];
+        for (id in 0...songsData.length) {
+            availablePhiDifficulties(id);
+            var path = phiChartPaths.get(id + '|' + difficulty);
+            if (path != null && !phiRatings.exists(phiKey(id) + '|' + difficulty)) paths.push({id: id, path: path});
+        }
+        if (paths.length == 0) { rebuildPhiOrder(); return; }
+        states.freeplayState.objects.PhiWorker.runBackground(function():Void {
+            var values:Array<{id:Int, value:Float}> = [];
+            for (entry in paths) try {
+                var raw:Dynamic = Json.parse(File.getContent(entry.path));
+                if (raw.song != null && Type.typeof(raw.song) == TObject) raw = raw.song;
+                if (raw.notes == null) continue;
+                if (raw.mania == null) raw.mania = 3;
+                var sections:Array<Dynamic> = cast raw.notes;
+                raw.notes = [for (section in sections) if (section != null && section.sectionNotes != null) section];
+                values.push({id: entry.id, value: Math.floor(DiffRating.calcForSong(cast raw) * 100) / 100});
+            } catch (e:Dynamic) trace('FREEPLAY DIFFICULTY SORT: ' + e);
+            postPhiResult(function():Void {
+                if (request != ratingWarmupId || difficulty != curDifficulty) return;
+                for (entry in values) phiRatings.set(phiKey(entry.id) + '|' + difficulty, entry.value);
+                rebuildPhiOrder();
+            });
+        });
     }
     public function focusPhiSearch():Void { searchButton.visible = searchButton.active = true; searchButton.focusSearch(); suppressSearchVolumeShortcuts(true); }
 
@@ -1017,37 +1100,73 @@ class FreeplayState extends MusicBeatState
         if (FlxG.sound.music != null && FlxG.sound.music.playing) FlxG.sound.music.fadeOut(audioFadeOutTime, 0);
         for (voice in previewVoices) if (voice.playing) voice.fadeOut(audioFadeOutTime, 0);
         if (phiView != null) phiView.setProgress(0, 0);
-        var voicePaths:Array<String> = [];
-        var voiceRoles:Array<String> = [];
-        if (song.needsVoices) {
-            var combined = Paths.songPath(song.song + '/Voices');
-            if (FileSystem.exists(combined)) { voicePaths.push(combined); voiceRoles.push('voices'); }
-            else {
-                var player = Paths.songPath(song.song + '/Voices' + getVocalFromCharacter(song.player1, 'Player'));
-                var opponent = Paths.songPath(song.song + '/Voices' + getVocalFromCharacter(song.player2, 'Opponent'));
-                if (FileSystem.exists(player)) { voicePaths.push(player); voiceRoles.push('player'); }
-                if (FileSystem.exists(opponent) && opponent != player) { voicePaths.push(opponent); voiceRoles.push('opponent'); }
-            }
-        }
+		var voicePaths:Array<String> = [];
+		var voiceRoles:Array<String> = [];
+		if (song.needsVoices) {
+			// Prefer the split base-game stems so BF and opponent can be analyzed
+			// and rendered independently. Keep character-specific mod stems as a
+			// fallback, then use the legacy combined Voices file if needed.
+			var playerCandidates = [
+				Paths.songPath(song.song + '/Voices-Player'),
+				Paths.songPath(song.song + '/Voices-player'),
+				Paths.songPath(song.song + '/Voices' + getVocalFromCharacter(song.player1, 'Player'))
+			];
+			var opponentCandidates = [
+				Paths.songPath(song.song + '/Voices-Opponent'),
+				Paths.songPath(song.song + '/Voices-opponent'),
+				Paths.songPath(song.song + '/Voices-opponents'),
+				Paths.songPath(song.song + '/Voices' + getVocalFromCharacter(song.player2, 'Opponent'))
+			];
+			var player = firstExistingVoicePath(playerCandidates);
+			var opponent = firstExistingVoicePath(opponentCandidates);
+			if (player != null) { voicePaths.push(player); voiceRoles.push('player'); }
+			if (opponent != null && opponent != player) { voicePaths.push(opponent); voiceRoles.push('opponent'); }
+			if (voicePaths.length == 0) {
+				var combined = Paths.songPath(song.song + '/Voices');
+				if (FileSystem.exists(combined)) { voicePaths.push(combined); voiceRoles.push('voices'); }
+			}
+		}
         trace('FREEPLAY PREVIEW decoding ' + instPath);
         states.freeplayState.objects.PhiWorker.run(function():Void {
             var inst:AudioBuffer = null;
+            var analysis:AudioBuffer = null;
             if (!isAudioRequestCurrent(requestId, sourceDetailId) || selected != curSelected) return;
             var voices:Array<AudioBuffer> = [];
+            // Streamed OGG buffers omit PCM; keep compact analysis-only copies
+            // for vocal visualizers while leaving playback streamed.
+            var voiceAnalysisBuffers:Array<AudioBuffer> = [];
             var decoded:Array<AudioBuffer> = [];
-            var discard = function():Void { PhiPreviewBuffers.releaseAll(decoded); };
+            var discard = function():Void {
+                PhiPreviewBuffers.releaseAll(decoded);
+                if (analysis != null && analysis != inst) { analysis.dispose(); analysis = null; }
+                for (voiceAnalysis in voiceAnalysisBuffers) if (voiceAnalysis != null) voiceAnalysis.dispose();
+                voiceAnalysisBuffers = [];
+            };
             var decodedRoles:Array<String> = [];
             var error:Dynamic = null;
             try {
                 inst = loadPreviewAudioBuffer(instPath);
                 if (inst == null) throw 'Cannot decode ' + instPath;
                 decoded.push(inst);
+                // Streamed OGG buffers intentionally have no full PCM array,
+                // which the FFT analyzer needs. Decode a compact mono 16-bit
+                // analysis track at about 11 kHz; keep playback itself streamed.
+                if (inst.data == null || inst.data.length == 0) analysis = loadPreviewAnalysisBuffer(instPath);
+                else analysis = inst;
                 if (!isAudioRequestCurrent(requestId, sourceDetailId) || selected != curSelected) { discard(); return; }
                 for (i in 0...voicePaths.length) {
                     if (!isAudioRequestCurrent(requestId, sourceDetailId) || selected != curSelected) { discard(); return; }
                     try {
                         var buffer = loadPreviewAudioBuffer(voicePaths[i]);
-                        if (buffer != null) { decoded.push(buffer); voices.push(buffer); decodedRoles.push(voiceRoles[i]); }
+                        if (buffer != null) {
+                            decoded.push(buffer); voices.push(buffer); decodedRoles.push(voiceRoles[i]);
+                            var voiceAnalysis:AudioBuffer = null;
+                            #if lime_vorbis
+                            if (buffer.data == null || buffer.data.length == 0)
+                                voiceAnalysis = loadPreviewAnalysisBuffer(voicePaths[i]);
+                            #end
+                            voiceAnalysisBuffers.push(voiceAnalysis);
+                        }
                         else trace('FREEPLAY PREVIEW skipped undecodable Voice stem: ' + voicePaths[i]);
                     } catch (voiceError:Dynamic) {
                         // A bad optional vocal stem should not prevent Inst and
@@ -1080,6 +1199,9 @@ class FreeplayState extends MusicBeatState
                 var playerVoice:FlxSound = null;
                 var opponentVoice:FlxSound = null;
                 var genericVoice:FlxSound = null;
+                var playerVoiceIndex:Int = -1;
+                var opponentVoiceIndex:Int = -1;
+                var genericVoiceIndex:Int = -1;
                 for (i in 0...voices.length) {
                     var buffer = voices[i];
                     // Stem files are finite tracks, not loops. Looping them makes
@@ -1093,9 +1215,9 @@ class FreeplayState extends MusicBeatState
                     var startPosition = FlxG.sound.music == null ? 0 : FlxG.sound.music.time;
                     voice.play(false, startPosition);
                     switch (decodedRoles[i]) {
-                        case 'player': if (playerVoice == null) playerVoice = voice;
-                        case 'opponent': if (opponentVoice == null) opponentVoice = voice;
-                        default: if (genericVoice == null) genericVoice = voice;
+                        case 'player': if (playerVoice == null) { playerVoice = voice; playerVoiceIndex = i; }
+                        case 'opponent': if (opponentVoice == null) { opponentVoice = voice; opponentVoiceIndex = i; }
+                        default: if (genericVoice == null) { genericVoice = voice; genericVoiceIndex = i; }
                     }
                     if (phiAudioVisible) voice.fadeIn(audioFadeInTime, 0, 0.8);
                     else voice.pause();
@@ -1104,24 +1226,42 @@ class FreeplayState extends MusicBeatState
                 applyPreviewPlaybackRate();
                 alreadyLoadSongPath = instPath;
                 phiView.setProgress(0, FlxG.sound.music == null ? 0 : FlxG.sound.music.length);
-                previewSpectrum.changeAnalyzer(FlxG.sound.music);
+                if (analysis != null && analysis != inst) previewSpectrum.changeAudioBuffer(analysis, FlxG.sound.music);
+                else previewSpectrum.changeAnalyzer(FlxG.sound.music);
                 previewSpectrum.setBarColor(FlxColor.WHITE);
                 if (genericVoice != null) {
                     previewVoiceSpectrum.x = 480;
                     previewVoiceSpectrum.visible = true;
-                    previewVoiceSpectrum.changeAnalyzer(genericVoice);
+                    var genericAnalysis = voiceAnalysisBuffers[genericVoiceIndex];
+                    if (genericAnalysis != null) {
+                        previewVoiceSpectrum.changeAudioBuffer(genericAnalysis, genericVoice);
+                        voiceAnalysisBuffers[genericVoiceIndex] = null;
+                    } else previewVoiceSpectrum.changeAnalyzer(genericVoice);
                     previewVoiceSpectrum.setBarColor(FlxColor.BLACK);
                     previewOpponentSpectrum.changeAnalyzer(null);
                     previewOpponentSpectrum.visible = false;
                 } else {
-                    previewVoiceSpectrum.x = 0;
+					// In split-voice mode the opponent owns the left visualizer and
+					// BF owns the right, matching their on-screen positions.
+					previewVoiceSpectrum.x = playerVoice != null && opponentVoice != null ? 960 : 0;
                     previewVoiceSpectrum.visible = playerVoice != null;
-                    previewVoiceSpectrum.changeAnalyzer(playerVoice);
-                    previewVoiceSpectrum.setBarColor(previewCharacterColor(song.player1, 0xFF31C878));
-                    previewOpponentSpectrum.changeAnalyzer(opponentVoice);
+                    var playerAnalysis = playerVoiceIndex >= 0 ? voiceAnalysisBuffers[playerVoiceIndex] : null;
+                    if (playerAnalysis != null) {
+                        previewVoiceSpectrum.changeAudioBuffer(playerAnalysis, playerVoice);
+                        voiceAnalysisBuffers[playerVoiceIndex] = null;
+                    } else previewVoiceSpectrum.changeAnalyzer(playerVoice);
+					previewVoiceSpectrum.setBarColor(previewCharacterColor(song.player1, 0xFF31C878));
+					previewOpponentSpectrum.x = playerVoice != null && opponentVoice != null ? 0 : 960;
+                    var opponentAnalysis = opponentVoiceIndex >= 0 ? voiceAnalysisBuffers[opponentVoiceIndex] : null;
+                    if (opponentAnalysis != null) {
+                        previewOpponentSpectrum.changeAudioBuffer(opponentAnalysis, opponentVoice);
+                        voiceAnalysisBuffers[opponentVoiceIndex] = null;
+                    } else previewOpponentSpectrum.changeAnalyzer(opponentVoice);
                     previewOpponentSpectrum.setBarColor(previewCharacterColor(song.player2, 0xFFEF5364));
                     previewOpponentSpectrum.visible = opponentVoice != null;
                 }
+                for (voiceAnalysis in voiceAnalysisBuffers) if (voiceAnalysis != null) voiceAnalysis.dispose();
+                voiceAnalysisBuffers = [];
                 trace('FREEPLAY PREVIEW ready: Inst + ' + previewVoices.length + ' Voices');
                 trace('FREEPLAY PREVIEW owned buffers=' + previewAudioBuffers.length
                     + ', streamed OGG=' + PhiPreviewBuffers.streamedCount(previewAudioBuffers)
@@ -1145,6 +1285,55 @@ class FreeplayState extends MusicBeatState
         #end
         return AudioBuffer.fromFile(path);
     }
+    #if lime_vorbis
+    function loadPreviewAnalysisBuffer(path:String):AudioBuffer {
+        var vorbis = VorbisFile.fromFile(path);
+        if (vorbis == null) return null;
+        var output:haxe.io.BytesBuffer = new haxe.io.BytesBuffer();
+        try {
+            var info = vorbis.info();
+            if (info == null || info.rate <= 0 || info.channels <= 0) { vorbis.clear(); return null; }
+            var stride = Std.int(Math.max(1, Math.round(info.rate / 11025)));
+            var bytesPerFrame = info.channels * 2;
+            var chunkFrames = 8192;
+            var chunk = haxe.io.Bytes.alloc(chunkFrames * bytesPerFrame);
+            var frameBase = 0;
+            while (true) {
+                // Lime's native readFloat binding is a stub on Windows and
+                // always returns null. read() uses the working ov_read path
+                // and returns interleaved signed 16-bit PCM bytes.
+                var bytesRead = vorbis.read(chunk, 0, chunk.length, false, 2, true);
+                if (bytesRead <= 0) break;
+                var frames = Std.int(bytesRead / bytesPerFrame);
+                if (frames <= 0) break;
+                for (frame in 0...frames) if ((frameBase + frame) % stride == 0) {
+                    var mono:Float = 0;
+                    for (channel in 0...info.channels) {
+                        var rawSample = chunk.getUInt16((frame * info.channels + channel) * 2);
+                        mono += rawSample >= 32768 ? rawSample - 65536 : rawSample;
+                    }
+                    var sample = Std.int(Math.max(-32768, Math.min(32767, mono / info.channels)));
+                    output.addByte(sample & 0xFF);
+                    output.addByte((sample >> 8) & 0xFF);
+                }
+                frameBase += frames;
+            }
+            vorbis.clear();
+            var pcm = output.getBytes();
+            if (pcm.length == 0) return null;
+            var buffer = new AudioBuffer();
+            buffer.bitsPerSample = 16;
+            buffer.channels = 1;
+            buffer.sampleRate = Std.int(Math.round(info.rate / stride));
+            buffer.data = lime.utils.UInt8Array.fromBytes(pcm);
+            return buffer;
+        } catch (e:Dynamic) {
+            vorbis.clear();
+            trace('FREEPLAY PREVIEW analyzer decode failed: ' + e);
+            return null;
+        }
+    }
+    #end
     function destroyPreviewVoices():Void {
         if (previewVoiceSpectrum != null) previewVoiceSpectrum.changeAnalyzer(null);
         if (previewOpponentSpectrum != null) previewOpponentSpectrum.changeAnalyzer(null);
@@ -1323,7 +1512,7 @@ class FreeplayState extends MusicBeatState
 
 		if (difficulty < 0 || difficulty >= Difficulty.list.length)
 		{
-			replayNoDataText.visible = true; replaySortText.text = '0 ' + PhigrosFreeplayView.textFor('recordCount', '条记录', 'records');
+			replayNoDataText.visible = phiView.recordsVisible; replaySortText.text = '0 ' + PhigrosFreeplayView.textFor('recordCount', '条记录', 'records');
 			if (replayMove != null)
 				replayMove.moveLimit = [0, 0];
 			return;
@@ -1338,7 +1527,7 @@ class FreeplayState extends MusicBeatState
 				if (stateDestroyed || requestId != replayRequestId || selected != curSelected || difficulty != curDifficulty) return;
 				if (data.length == 0)
 				{
-					replayNoDataText.visible = true;
+					replayNoDataText.visible = phiView.recordsVisible;
 					replaySortText.text = '0 ' + PhigrosFreeplayView.textFor('recordCount', '条记录', 'records');
 					if (replayMove != null) replayMove.moveLimit = [0, 0];
 					return;
@@ -1347,15 +1536,15 @@ class FreeplayState extends MusicBeatState
 				ReplayRect.sortReplays(data, replaySortMode);
 				replayDataList = data;
 				// Keep only a few visible row sprites alive; record history remains unlimited.
-				var visiblePoolSize = Std.int(Math.min(4, data.length));
+				var visiblePoolSize = Std.int(Math.min(6, data.length));
 				for (i in 0...visiblePoolSize)
 				{
-					var rect:ReplayRect = new ReplayRect(replayStartX + 12, replayStartY, 700, ReplayRect.fixHeight, data[i]);
+					var rect:ReplayRect = new ReplayRect(replayStartX + 12, replayStartY, 730, ReplayRect.fixHeight, data[i]);
 					rect.cameras = [camReplay];
 					add(rect);
 					replayGroup.push(rect);
 				}
-				var maxScroll:Float = Math.max(0, data.length * 48 - (956 - replayStartY));
+                var maxScroll:Float = phiReplayMaxScroll();
 				if (replayMove != null) replayMove.moveLimit = [0, maxScroll];
 				replayMoveEvent();
 				updateReplaySortLabel();
@@ -1365,6 +1554,9 @@ class FreeplayState extends MusicBeatState
 
 	public function replayMoveEvent()
 	{
+		var animationProgress = phiView == null ? 0 : phiView.recordAnimationProgress;
+		var viewportTop = replayStartY;
+		var viewportBottom = replayStartY + 295;
 		for (i in 0...replayGroup.length)
 		{
 			var offset = replayPosiData % 48;
@@ -1372,9 +1564,11 @@ class FreeplayState extends MusicBeatState
 			var baseY:Float = replayStartY + i * 48 - offset;
 			var row = replayGroup[i];
 			row.moveY(baseY);
+			row.scale.y = 1;
+			row.alpha = phiView != null && phiView.recordsVisible ? animationProgress : 1;
 			row.x = replayStartX + 12 - (baseY - replayStartY) * states.freeplayState.objects.PhiPanel.SLOPE;
-			row.visible = dataIndex >= 0 && dataIndex < replayDataList.length
-				&& baseY >= replayStartY && baseY + ReplayRect.fixHeight <= 956;
+			row.visible = phiView != null && phiView.recordsVisible && dataIndex >= 0 && dataIndex < replayDataList.length
+	                && baseY >= viewportTop && baseY + ReplayRect.fixHeight <= viewportBottom;
 			if (dataIndex >= 0 && dataIndex < replayDataList.length)
 			{
 				var replayData = replayDataList[dataIndex];
@@ -1382,6 +1576,25 @@ class FreeplayState extends MusicBeatState
 				bindReplayActions(row, replayData);
 			}
 		}
+	}
+
+	public function configurePhiReplayView():Void
+	{
+		if (phiView == null) return;
+		replayStartX = 933;
+		replayStartY = 390;
+		replayNoDataText.visible = phiView.recordsVisible && replayDataList.length == 0;
+		replaySortText.visible = phiView.recordsVisible;
+		replayPosiData = FlxMath.bound(replayPosiData, 0, phiReplayMaxScroll());
+		replayMoveEvent();
+	}
+
+	public function phiReplayCount():Int return replayDataList.length;
+	public function phiReplayMaxScroll():Float return Math.max(0, replayDataList.length * 48 - 295);
+	public function setPhiReplayScrollRatio(ratio:Float):Void
+	{
+		replayPosiData = FlxMath.bound(ratio, 0, 1) * phiReplayMaxScroll();
+		replayMoveEvent();
 	}
 
 	function bindReplayActions(row:ReplayRect, replayData:ReplayData):Void
@@ -1542,6 +1755,13 @@ class FreeplayState extends MusicBeatState
 			return '-'+ character.vocals_file;
 		}
 		return '-'+fixName;
+	}
+
+	function firstExistingVoicePath(candidates:Array<String>):Null<String>
+	{
+		for (path in candidates)
+			if (path != null && FileSystem.exists(path)) return path;
+		return null;
 	}
 }
 

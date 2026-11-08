@@ -145,9 +145,15 @@ class GeneralGroup extends OptionCata
 		// TPS value to FlxG.drawFramerate, silently defeating the FPS cap.
 		FlxG.updateFramerate = ClientPrefs.data.framerate;
 		FlxG.drawFramerate = ClientPrefs.data.drawFramerate;
+		#if android
+		var windowRate:Int = mobile.backend.MobileRefreshRate.maximumWindowRate(ClientPrefs.data.drawFramerate);
+		FlxG.stage.application.window.frameRate = windowRate;
+		FlxG.stage.application.window.drawFrameRate = windowRate;
+		#else
 		FlxG.stage.application.window.frameRate = ClientPrefs.data.framerate;
 		FlxG.stage.application.window.drawFrameRate = ClientPrefs.data.drawFramerate;
-		mobile.backend.MobileRefreshRate.apply(ClientPrefs.data.drawFramerate);
+		#end
+		mobile.backend.MobileRefreshRate.requestMaximum();
 		// Android always schedules rendering from the FPS cap independently of TPS.
 		FlxG.stage.application.window.lockRender = #if android true #else ClientPrefs.data.lockRender #end;
 	}

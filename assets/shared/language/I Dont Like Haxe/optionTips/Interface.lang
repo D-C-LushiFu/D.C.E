@@ -1,17 +1,17 @@
-User Interface => 用户界面
+User Interface => User Interface / 用户界面
 
 
-UserInterface => 用户界面设置
+UserInterface => UserInterface / 用户界面设置
 
-customFade => 自定义过场动画类型
-customFadeText => 自定义过场文本可见
-customFadeSound => 自定义过场音量
-audioDisplayQuality => 对音乐解析的质量，数据越高运算需求越高
-audioDisplayUpdate => 音乐解析器的反应间隔时间
-freeplayOld => 使用Psych的FreePlay界面
-skipTitleVideo => 跳过游戏启动时的动画
-resultsScreen => 在结尾歌曲处打开结算界面
-loadingScreen => 为 PlayState 添加预加载界面并更快地加载，如果遇到问题，请禁用它
-loadThreads => 加载资源的线程数量，有时候并不是越多越好
-useFlixelCoords => UI元素（按键区、视频播放等）使用Flixel舞台坐标。关闭后改用OpenFL屏幕坐标。
-SelectGameSubState => 切换引擎，PC可选vslice和codename，手机只有vslice
+customFade => Custom fade type / 自定义过场动画类型
+customFadeText => Custom fade text visible / 自定义过场文本可见
+customFadeSound => Custom fade sound volume / 自定义过场音量
+audioDisplayQuality => The analytical quality of music data / 对音乐解析的质量，数据越高运算需求越高
+audioDisplayUpdate => The reaction interval of the music analyzer / 音乐解析器的反应间隔时间
+freeplayOld => Use psych freeplay / 使用Psych的FreePlay界面
+skipTitleVideo => Skip intro video / 跳过游戏启动时的动画
+resultsScreen => Open Results Screen at end song / 在结尾歌曲处打开结算界面
+loadingScreen => Add a LoadingScreen for PlayState / 为 PlayState 添加预加载界面并更快地加载，如果遇到问题，请禁用它
+loadThreads => Number of threads for loading resources / 加载资源的线程数量，有时候并不是越多越好
+useFlixelCoords => Uses Flixel stage coordinates for UI elements (hitbox, video playback). When disabled, uses OpenFL screen coordinates instead. / UI元素（按键区、视频播放等）使用Flixel舞台坐标。关闭后改用OpenFL屏幕坐标。
+SelectGameSubState => Switch engine, PC can choose vslice and codename, mobile only has vslice / 切换引擎，PC可选vslice和codename，手机只有vslice

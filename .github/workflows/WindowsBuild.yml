@@ -34,6 +34,7 @@ jobs:
           haxelib setup C:\haxelib
           haxelib install hmm --quiet
           haxelib run hmm install
+          node tools/patch-novaflare-dependencies.js
 
       - name: Extract current version
         id: get_version
@@ -59,6 +60,16 @@ jobs:
       - name: Compile
         shell: pwsh
         run: |
+          $buildDrive = 'R:'
+          if (Test-Path "$buildDrive\") {
+            throw "Drive $buildDrive is already in use; cannot create a short build path."
+          }
+          subst $buildDrive $env:GITHUB_WORKSPACE
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to map $env:GITHUB_WORKSPACE to $buildDrive"
+          }
+          Push-Location "$buildDrive\"
+          try {
           $COMMIT_SHA = (git rev-parse --short HEAD)
           $CURRENT_VERSION = "${{ steps.get_version.outputs.current_version }}"
           
@@ -67,6 +78,14 @@ jobs:
             haxelib run lime build windows -Dlegacy_gc_compare -Dcommit_sha=$COMMIT_SHA -Dbuild_number=$NEW_VERSION
           } else {
             haxelib run lime build windows -Dlegacy_gc_compare -Dcommit_sha=$COMMIT_SHA -Dbuild_number=$CURRENT_VERSION
+          }
+          if ($LASTEXITCODE -ne 0) {
+            throw "Windows build failed with exit code $LASTEXITCODE"
+          }
+          }
+          finally {
+            Pop-Location
+            subst $buildDrive /d
           }
           
       - name: Create Windows zip package

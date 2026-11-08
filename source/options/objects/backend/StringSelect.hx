@@ -15,6 +15,10 @@ class StringSelect extends FlxSpriteGroup
 
     var mainX:Float = 0;
     var mainY:Float = 0;
+	var gridColumns:Int = 1;
+	var gridRows:Int = 0;
+	var visibleRows:Int = 0;
+	var itemHeight:Float = 0;
 
     public var specX:Float = 0;
 
@@ -37,8 +41,14 @@ class StringSelect extends FlxSpriteGroup
 
         //这些alpha会在后面出现的时候设置（具体去看stringrect）
 
-        var calcHeight:Float = height;
-        if (follow.strGroup.length < 5) calcHeight = calcHeight * (follow.strGroup.length / 5);
+        // Lay dropdown choices out as a compact grid instead of a single tall
+        // vertical stack. Keep at most five rows visible so large mod lists can
+        // still scroll inside the popup.
+		gridColumns = Std.int(Math.min(4, Math.max(1, options.length)));
+		gridRows = Std.int(Math.ceil(options.length / gridColumns));
+		itemHeight = height / 5;
+		visibleRows = Std.int(Math.min(5, gridRows));
+		var calcHeight:Float = itemHeight * visibleRows;
 
         // 展开列表的底板：必须是**接近不透明的深色**，否则列表看起来就是一堆
         // 白字浮在设置面板上（原来这里是 0xffffff + alpha 0.1，淡到几乎看不见，
@@ -48,29 +58,31 @@ class StringSelect extends FlxSpriteGroup
         bg.alpha = 0;
         add(bg);
 
-        var init = 80;
-
-        var calcWidth = width * (init - 2) / init;
+		var cellWidth:Float = width / gridColumns;
+		var horizontalInset:Float = Math.max(4, width / 240);
         optionSprites = [];
         var displayNames = follow.strDisplayGroup;
         for (i in 0...options.length)
         {
             var disName:String = (displayNames != null && i < displayNames.length) ? displayNames[i] : options[i];
-            var option = new ChooseRect(width / 80, 0, calcWidth, height / 5, options[i], disName, i, this);
+			var column:Int = i % gridColumns;
+			var row:Int = Std.int(i / gridColumns);
+			var rightInset:Float = (column == gridColumns - 1 && gridRows > visibleRows)
+				? horizontalInset + width / 80 : horizontalInset;
+			var option = new ChooseRect(column * cellWidth + horizontalInset, row * itemHeight,
+				cellWidth - horizontalInset - rightInset, itemHeight, options[i], disName, i, this);
             add(option);
             optionSprites.push(option);
-            option.y = follow.followY + follow.innerY + mainY + i * height / 5; //初始化在state的y
         }
 
         // 创建滑块
-        var calcWidth = width / init;
-        var calcHeight = bg.height * 5 / options.length;
-        if (calcHeight > bg.height) calcHeight = bg.height;
-        slider = new Rect(width - calcWidth, 0, calcWidth, calcHeight, calcWidth, calcWidth, 0xffffff, 0);
+		var sliderWidth:Float = width / 80;
+		var sliderHeight:Float = gridRows > 0 ? bg.height * visibleRows / gridRows : bg.height;
+		if (sliderHeight > bg.height) sliderHeight = bg.height;
+		slider = new Rect(width - sliderWidth, 0, sliderWidth, sliderHeight, sliderWidth, sliderWidth, 0xffffff, 0);
         add(slider);
 
-        var calc = -1 * (height / 5) * (options.length - 5);
-        if (optionSprites.length < 5) calc = 0;
+		var calc:Float = -itemHeight * Math.max(0, gridRows - visibleRows);
 
         optionMove = new MouseMove(this, 'posiData',
 								[calc , 0],
@@ -106,9 +118,8 @@ class StringSelect extends FlxSpriteGroup
          for (i in 0...options.length)
         {
             var option = optionSprites[i];
-            var calcHeight = bg.height / 5;
-            if (options.length < 5) calcHeight = bg.height / options.length;
-            option.y = follow.y + mainY + i * calcHeight + posiData; //初始化在state的y
+			var row:Int = Std.int(i / gridColumns);
+			option.y = follow.y + mainY + row * itemHeight + posiData;
         }
 
         var mouse = FlxG.mouse;
@@ -120,12 +131,13 @@ class StringSelect extends FlxSpriteGroup
             changeRect(str, startY, overY);
         }
 
-        if (options.length > 5) { //对的其实我是真懒得兼容了
+        if (gridRows > visibleRows) {
             var data = posiData;
             if (data > 0) data = 0;
             if (data < optionMove.moveLimit[0]) data = optionMove.moveLimit[0];
             data = Math.abs(data);
-            slider.y = follow.y + mainY + (data / Math.abs(optionMove.moveLimit[0])) * (bg.height - slider.height);
+			var scrollRange:Float = Math.abs(optionMove.moveLimit[0]);
+			slider.y = follow.y + mainY + (scrollRange > 0 ? data / scrollRange : 0) * (bg.height - slider.height);
         }
     }
 
@@ -202,11 +214,12 @@ class ChooseRect extends FlxSpriteGroup {
         bg.alpha = 0;
         add(bg);
 
-        textDis = new FlxText(0, 0, 0, displayName, Std.int(height * 0.15));
-		textDis.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), Std.int(height * 0.45), 0xffffff, LEFT, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
+        textDis = new FlxText(0, 0, width, displayName, Std.int(height * 0.15));
+		var fittedSize:Int = Std.int(Math.max(12, Math.min(height * 0.42, width * 1.55 / Math.max(1, displayName.length))));
+		textDis.setFormat(Paths.font(Language.get('fontName', 'main') + '.ttf'), fittedSize, 0xffffff, CENTER, FlxTextBorderStyle.OUTLINE, 0xFFFFFFFF);
         textDis.borderStyle = NONE;
 		textDis.antialiasing = ClientPrefs.data.antialiasing;
-        textDis.y += (height - textDis.height) * 0.5;
+		textDis.y = (height - textDis.height) * 0.5;
 		add(textDis);
         textDis.alpha = 0;
 

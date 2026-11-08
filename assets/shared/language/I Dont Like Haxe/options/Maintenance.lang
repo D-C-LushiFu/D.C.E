@@ -1,20 +1,22 @@
-Maintenance => 维护设置
+Maintenance => Maintenance / 维护设置
 
-developerMode => 开发者模式
-deepDebug => 深度调试
-devConScale => 控制台大小
-luaErrorOverlay => Lua 语法错误提示
-hscriptErrorOverlay => HScript 语法错误提示
+developerMode => developer model / 开发者模式
+deepDebug => Deep Debug / 深度调试
+devConScale => console Size / 控制台大小
+luaErrorOverlay => Lua Error Overlay / Lua 语法错误提示
+hscriptErrorOverlay => HScript Error Overlay / HScript 语法错误提示
 
-oldHscriptVersion => 兼容旧模组
+oldHscriptVersion => Old Hscript Version / 兼容旧模组
 
 
-APP => 应用程序
+APP => App / 应用程序
 
-discordRPC => Discord显示
-checkForUpdates => 版本检查
-screensaver => 休眠禁用
-filesCheck => 文件缺失检查
-filesCheckNew => 可疑文件检查
-storageFolder => 存储文件夹
-adjustMobileEditorKeys => 调整移动端各Editor键位
+discordRPC => Discord RPC / Discord显示
+checkForUpdates => Check Updates / 版本检查
+screensaver => Screensaver / 休眠禁用
+filesCheck => Files Check / 文件缺失检查
+filesCheckNew => New Files Check / 可疑文件检查
+storageFolder => Storage Folder / 存储文件夹
+adjustMobileEditorKeys => Adjust Mobile Editor Keys / 调整移动端各Editor键位
+
+enterOriginFunkin => Enter Origin Funkin / 进入 Origin Funkin

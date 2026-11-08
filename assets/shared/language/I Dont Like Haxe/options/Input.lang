@@ -1,19 +1,19 @@
-Input => 输入设置
+Input => Input / 输入设置
 
-ControlsSubState => 键盘设置
-
-
-TouchMain => 触屏设置
-
-needMobileControl => 触屏支持
-controlsAlpha => 按键透明度
+ControlsSubState => Controls Setup / 键盘设置
 
 
-TouchGame => 游戏内触屏
+TouchMain => Touch Main / 触屏设置
 
-MobileControlSelectSubState => 触屏类型
-hitboxLocation => 特殊键位置
-dynamicColors => 随箭头变色
-playControlsAlpha => 游戏内透明度
-extraKey => 特殊按键数量
-MobileExtraControl => 特殊键设置
+needMobileControl => Mobile Control Support / 触屏支持
+controlsAlpha => Controls Alpha / 按键透明度
+
+
+TouchGame => Touch Game / 游戏内触屏
+
+MobileControlSelectSubState => Control Type / 触屏类型
+hitboxLocation => Hitbox Location / 特殊键位置
+dynamicColors => Dynamic Colors / 随箭头变色
+playControlsAlpha => Play Controls Alpha / 游戏内透明度
+extraKey => Extra Key / 特殊按键数量
+MobileExtraControl => Mobile Extra Control / 特殊键设置

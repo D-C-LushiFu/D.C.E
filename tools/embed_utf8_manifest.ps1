@@ -47,13 +47,9 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
 }
 
 # --- 1. find the built executable -----------------------------------------
-# lime builds into export/<config>/windows/bin/.  This project has SEVERAL
-# configs: release, debug, and the GC-comparison variant `legacy-gc`
-# (built with: haxelib run lime build windows -release -D legacy_gc_compare).
-# We must embed into EVERY windows bin dir that holds an exe - missing one means
-# that build silently ships without the UTF-8 code page (this actually happened:
-# an earlier version only scanned release/debug and the legacy-gc build - the one
-# being used for testing - never got the manifest).
+# lime builds into export/<config>/windows/bin/. If the caller did not pass an
+# explicit path, choose only the newest exe: a post-build hook must not rewrite
+# unrelated release/config outputs just because they are present in export/.
 $exeCandidates = @()
 $exportDir = Join-Path $projectRoot 'export'
 if ($ExecutablePath) {
@@ -69,6 +65,15 @@ foreach ($configDir in @(Get-ChildItem -LiteralPath $exportDir -Directory -Error
 	if (Test-Path -LiteralPath $binDir) {
 		$exeCandidates += @(Get-ChildItem -LiteralPath $binDir -Filter '*.exe' -File -ErrorAction SilentlyContinue)
 	}
+}
+if ($exeCandidates.Count -gt 1) {
+	$exeCandidates = @($exeCandidates | Sort-Object LastWriteTime -Descending | Select-Object -First 1)
+}
+if ($exeCandidates.Count -eq 1 -and $exeCandidates[0].LastWriteTime -lt (Get-Date).AddMinutes(-5)) {
+	# A post-build hook should only touch an exe produced by the current build.
+	# If none was emitted under export/ (for example, an isolated --app-path build),
+	# leave every existing export untouched; callers can pass -ExecutablePath.
+	$exeCandidates = @()
 }
 }
 

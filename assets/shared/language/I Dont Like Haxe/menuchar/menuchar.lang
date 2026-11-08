@@ -1,0 +1,32 @@
+# ===== Menu Character Editor (new UI) =====
+
+# ===== Bottom bar menu buttons =====
+menu_type => Character Type / 角色类型
+menu_char => Character / 角色
+menu_hint => Hint / 提示
+
+# ===== Character type names =====
+type_opponent => Opponent / 对手
+type_boyfriend => Boyfriend / 男友
+type_girlfriend => Girlfriend / 女友
+
+# ===== Status label above the panel (current role + offsets) =====
+cur_role => Current Character:  / 当前调整角色：
+
+# ===== Character panel field labels =====
+lbl_image => Image file name: / 图片文件名：
+lbl_idle => Idle animation (.XML): / 空闲动画（.XML）：
+lbl_confirm => Start Press animation (.XML): / Start Press 动画（.XML）：
+lbl_scale => Scale: / 缩放：
+
+# ===== Character panel actions =====
+chk_flip_x => Flip X / 水平翻转
+btn_reload => Reload Char / 重新加载角色
+
+# ===== Hint panel =====
+btn_load => Load Character / 加载角色
+btn_save => Save Character / 保存角色
+h_arrow => Arrow Keys - Change Offset (Hold Shift for 10x speed) / 方向键 - 调整偏移（按住 Shift 为 10 倍速）
+h_space1 => Space - Play "Start Press" animation / 空格 - 播放 "Start Press" 动画
+h_space2 => (Boyfriend Character Type only) / （仅 Boyfriend 角色类型）
+h_esc => Esc - Close panel / Exit editor / Esc - 关闭面板 / 退出编辑器

@@ -14,6 +14,7 @@ class PhiWorker
     static var pressureMutex = new sys.thread.Mutex();
     static var lastPressureRequest:Float = 0;
     static var lastIdleCheck:Float = 0;
+    static var lastBrowseActivity:Float = 0;
     #end
 
     /** Released full-song PCM can otherwise wait through several more decodes.
@@ -28,6 +29,13 @@ class PhiWorker
         if (cpp.vm.Gc.memInfo64(0) < 256 * 1048576) return;
         var now = haxe.Timer.stamp();
         pressureMutex.acquire();
+        // A full hxcpp collection coordinates every thread at a safepoint.
+        // Do not let either worker completions or the UI idle check trigger it
+        // while the player is actively paging through Freeplay.
+        if (lastBrowseActivity > 0 && now - lastBrowseActivity < 8) {
+            pressureMutex.release();
+            return;
+        }
         var request = now - lastPressureRequest >= minimumInterval;
         if (request) lastPressureRequest = now;
         pressureMutex.release();
@@ -35,6 +43,16 @@ class PhiWorker
         // flag; it does not start a collector and can leave every thread waiting.
         // Gc.run starts collection and coordinates the native safepoints.
         if (request) cpp.vm.Gc.run(true);
+        #end
+    }
+
+    /** Defer stop-the-world pressure collection until browsing has settled. */
+    public static function markBrowseActivity():Void
+    {
+        #if cpp
+        pressureMutex.acquire();
+        lastBrowseActivity = haxe.Timer.stamp();
+        pressureMutex.release();
         #end
     }
 

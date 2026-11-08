@@ -14,7 +14,7 @@
 	     1.2.2 修改版包含 Hotfix 的全部修复，必须严格大于 35260811，故取数据版本 3.5 + 260921 (35260921)。
 	     以后改动这里时，请先用 aapt 实测官方最新发布包的 versionCode 再定值，
 	     否则 Android 会拒绝覆盖安装（弹「降级安装」提示）。 -->
-	<app title="D.C.E." file="DCE" packageName="com.DCEEngine" package="com.DCEEngine" main="Main" version="20261024Beta1.0Fix1" build-number="35261024" company="D.C.E. crew" />
+	<app title="D.C.E." file="DCE" packageName="com.DCEEngine" package="com.DCEEngine" main="Main" version="20261108DebugFix2" build-number="35261024" company="D.C.E. crew" />
 	<!--Switch Export with Unique ApplicationID and Icon-->
 	<set name="APP_ID" value="0x0100f6c013bbc000" />
 	
@@ -89,7 +89,7 @@
 	<set name="DCE_WIN_H" value="1080" unless="nativeres" />
 	<set name="DCE_WIN_W" value="1920" if="nativeres" />
 	<set name="DCE_WIN_H" value="1080" if="nativeres" />
-	<window width="${DCE_WIN_W}" height="${DCE_WIN_H}" fps="60" background="#000000" hardware="true" vsync="false" allow-shaders="true" antialiasing="0" allowHighDPI="false" preserveDrawingBuffer="false" />
+	<window width="${DCE_WIN_W}" height="${DCE_WIN_H}" fps="120" background="#000000" hardware="true" vsync="true" allow-shaders="true" antialiasing="0" allowHighDPI="false" preserveDrawingBuffer="false" />
 
 	<!--HTML5-specific-->
 	<window if="html5" resizable="true" />

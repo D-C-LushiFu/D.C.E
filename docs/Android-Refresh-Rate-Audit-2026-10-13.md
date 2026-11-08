@@ -110,3 +110,37 @@ Normal generated Gradle/manifest files were restored after saving the diagnostic
 ## GC and both NF versions follow-up
 
 See [Android GC and frame rate audit](Android-GC-Frame-Rate-Audit-2026-10-13.md) for the subsequent 180-second native GC sampling, both NF package presentation measurements, actual 24/120/2000 cap checks, and render-thread A/B. The newer NF includes the identical VLC library, correcting the scope of the older APK-only VLC comparison above. The phone now retains the separate GC-audit diagnostic update. The MIUI limit remains unresolved; no high-refresh fix is claimed.
+
+## 2026-11-07 foreground-resume 120Hz follow-up
+
+The user changed the root `Project.xml` window setting from `fps="60"` to
+`fps="120"`. Generated Android `ApplicationMain` was checked and contained
+`frameRate: 120` and `app.window.frameRate = 120`. Flixel still constructs its
+Android `FlxGame` with the separate bootstrap value of 60, so the XML setting
+alone was not isolated as the cause of the foreground-resume behavior.
+
+The additional lifecycle issue found was that Flixel rewrites Lime window
+update/render rates on focus transitions, while D.C.E.'s Android path keeps the
+native window schedulers at the display's maximum supported rate. Added
+`MobileRefreshRate.installFocusRestore()` after preference loading; 250ms after
+focus gain it reapplies the maximum supported window update/render rates,
+`lockRender=true`, and the Android maximum-refresh request. Source locations:
+`source/mobile/backend/MobileRefreshRate.hx` and
+`source/states/backend/initState/InitState.hx`.
+
+The combined build (Project.xml 120 plus the delayed focus-restore callback)
+was installed on Redmi K70 package `com.DCEEngine`. After three HOME-to-app
+foreground cycles, SurfaceFlinger reported `activeModeId=1` at 120Hz each time.
+The in-game counter screenshot showed UPDATE 120/2000 TPS and DRAW 119/2000
+FPS, with the device refresh overlay at 120: `_build/dce-hfr-verify.png`.
+This is sufficient to treat the reported 60Hz-on-return symptom as resolved
+for the tested build/configuration; it does not isolate whether the XML change
+or the focus-restore callback was individually necessary, nor explain MIUI's
+per-app policy internals.
+
+Test APK: `export/editor-update/android/bin/app/build/outputs/apk/release/DCE-release.apk`
+(versionCode 35261107, SHA256
+`514F4DA1242D43FF185AC8044C0951BE87269F0E7A908A561E9708C1ACD147F6`). It was
+installed with package data retained. The temporary source build-number change
+was restored to 35261024; the user's `fps="120"` setting remains in the root
+`Project.xml`.

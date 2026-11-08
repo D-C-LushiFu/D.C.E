@@ -1,18 +1,18 @@
-tapToSearch => 🔍
-mapsFound => =🔍
-searchSorted => 🔍=a>z
-speed => 速
-noteCount => 箭头数量
-rating => 等级
-audioDisplay => 🔊
-historyScore => 📜
-option => ⚙
-mods => 📂
-changers => 🔧
-editor => 📃
-reset => 🔂
-random => 🔀
-skip => 过
-playedTime => 🎮⏲️
-accurate => %
-score => 分数
+tapToSearch => Tap here to search / 🔍
+mapsFound =>  maps has found / =🔍
+searchSorted => Search results sorted alphabetically from a to z / 🔍=a>z
+speed => Speed / 速
+noteCount => Note Count / 箭头数量
+rating => Rating / 等级
+audioDisplay => Audio Display / 🔊
+historyScore => History Score / 📜
+option => option / ⚙
+mods => mods / 📂
+changers => changers / 🔧
+editor => editors / 📃
+reset => reset / 🔂
+random => random / 🔀
+skip => skip / 过
+playedTime => Played Time / 🎮⏲️
+accurate => Accurate / %
+score => Score / 分数

@@ -439,6 +439,8 @@ class PlayState extends MusicBeatState
 		add(replayExam);
 
 		camGame = initPsychCamera();
+		// Story charts can expose transparent areas around stage art; keep the base clear black.
+		camGame.bgColor = FlxColor.BLACK;
 		camHUD = new FlxCamera();
 		camOther = new FlxCamera();
 		luaVpadCam = new FlxCamera();

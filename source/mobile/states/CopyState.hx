@@ -400,6 +400,36 @@ class CopyState extends MusicBeatState
 			var toFile = Path.join([to, file]);
 			if (FileSystem.exists(toFile))
 			{
+				#if android
+				// The Android copy lives under the runtime root and survives app
+				// reinstalls. Refresh small text assets even when the version marker
+				// is unchanged; size-only checks miss same-length JSON edits.
+				if (textFilesExtensions.contains(Path.extension(file)))
+				{
+					var internalBytes:ByteArray = getFileBytes(getFile(file));
+					if (internalBytes != null)
+					{
+						var externalBytes:haxe.io.Bytes = File.getBytes(toFile);
+						var sameContent:Bool = internalBytes.length == externalBytes.length;
+						if (sameContent)
+						{
+							for (byteIndex in 0...internalBytes.length)
+							{
+								if (internalBytes[byteIndex] != externalBytes.get(byteIndex))
+								{
+									sameContent = false;
+									break;
+								}
+							}
+						}
+						if (!sameContent)
+						{
+							FileSystem.deleteFile(toFile);
+						continue;
+						}
+					}
+				}
+				#end
 				filesToRemove.push(file);
 			}
 		}
@@ -435,7 +465,22 @@ class CopyState extends MusicBeatState
 				// If the installed asset library cannot expose bytes for an
 				// existing external file, preserve that file instead of
 				// dereferencing null or repeatedly re-entering CopyState.
-				if (internalBytes == null || internalBytes.length == externalBytes.length)
+				var sameContent:Bool = internalBytes == null || internalBytes.length == externalBytes.length;
+				// Android keeps a writable copy of assets under the selected storage
+				// directory. Length-only checks leave stale JSON/text files in place
+				// whenever an update changes values without changing file size.
+				if (sameContent && internalBytes != null && textFilesExtensions.contains(Path.extension(file)))
+				{
+					for (byteIndex in 0...internalBytes.length)
+					{
+						if (internalBytes[byteIndex] != externalBytes.get(byteIndex))
+						{
+							sameContent = false;
+							break;
+						}
+					}
+				}
+				if (sameContent)
 				{
 					filesToRemove.push(file);
 				}

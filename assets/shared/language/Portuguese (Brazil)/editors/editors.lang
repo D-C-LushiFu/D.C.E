@@ -23,3 +23,20 @@ history_discard => Descartar as alterações não salvas e continuar?
 history_imported => Configuração importada
 
 history_save => Salvar
+
+cameraEditor => Camera Editor (Beta)
+cameraEditorSongBrowserTitle => Choose a song from this mod
+cameraEditorNoSongs => No charted songs were found in the current mod.
+cameraEditorFolderReadFailed => Could not read this song's difficulty charts.
+cameraEditorSelectDifficulty => Choose a difficulty to preview:
+cameraEditorOpenDifficulty => Open difficulty
+cameraEditorOpenSong => Choose song
+cameraEditorBackToSongs => Back to song list
+cameraEditorDialogBusy => Finish the current file dialog first.
+cameraEditorLoadFailed => Could not load this chart.
+confirm_unsaved_title => Unsaved changes
+confirm_unsaved_message => This editor has unsaved changes. They will be lost if you leave now. Discard them and exit?
+confirm_btn_confirm => Discard & Exit
+confirm_btn_cancel => Cancel
+confirm_hint => Enter / Y confirm  |  Esc cancel
+confirm_hint_touch => Tap a button to choose

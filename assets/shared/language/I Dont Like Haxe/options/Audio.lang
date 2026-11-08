@@ -1,7 +1,7 @@
-Audio => 🔊
+Audio => Audio / 🔊
 
-mainMusic => 主界面歌曲
-optionMusic => 设置界面歌曲
-pauseMusic => 暂停界面歌曲
-hitsoundType => 打击音效
-hitsoundVolume => 打击音量
+mainMusic => Main Screen Music / 主界面歌曲
+optionMusic => Option Screen Music / 设置界面歌曲
+pauseMusic => Pause Screen Music / 暂停界面歌曲
+hitsoundType => Hitsound Type / 打击音效
+hitsoundVolume => Hitsound Volume / 打击音量

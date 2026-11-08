@@ -1,0 +1,114 @@
+# ===== Note Splash Editor top menu (Adobe style) =====
+# ===== Menu titles =====
+menu_anim => Animation / 动画
+menu_props => Properties / 属性
+menu_shader => Shader / 染色
+menu_file => File / 文件
+menu_help => Help / 帮助
+
+# ===== Status bar =====
+status_skin => Skin: / 皮肤:
+status_anim => Anim: / 动画:
+status_offset => Offset: / 偏移:
+status_note => NoteData: / NoteData:
+status_scale => Scale: / 缩放:
+
+# ===== Items: Animation menu =====
+item_anim => Animations / 动画列表
+label_anim => Animation / 动画
+item_anim_name => Animation name / 动画名
+label_anim_name => Anim name / 动画名
+item_prefix => XML prefix / XML 帧前缀
+label_prefix => Prefix / 帧前缀
+item_note_data => Note Data / Note Data
+label_note_data => Note Data / Note Data
+item_indices => Indices (optional) / 帧索引（可选）
+label_indices => Indices / 帧索引
+item_min_fps => Minimum FPS / 最低帧率
+label_min_fps => Min FPS / 最低帧率
+item_max_fps => Maximum FPS / 最高帧率
+label_max_fps => Max FPS / 最高帧率
+item_anim_add => Add / Update / 添加 / 更新
+item_anim_remove => Remove animation / 删除动画
+item_anim_reset => Reset to template / 重置为模板
+
+# ===== Items: Properties menu =====
+item_image => Splash image / 皮肤图片
+label_image => Skin / 皮肤
+item_reload_image => Reload this skin / 加载该皮肤
+item_scale => Scale / 缩放
+label_scale => Scale / 缩放
+item_allow_rgb => Allow RGB tinting / 允许 RGB 染色
+item_allow_pixel => Allow pixel art / 允许像素风
+item_template => New blank template / 生成空白模板
+item_convert_txt => Convert legacy TXT -> JSON / 转换旧版 TXT → JSON
+
+# ===== Items: Shader menu =====
+item_target => Color to replace / 替换目标通道
+label_target => Channel / 通道
+item_target_red => Red / Red
+item_target_green => Green / Green
+item_target_blue => Blue / Blue
+item_r => Replace with R / 替换为 R
+label_r => R / R
+item_g => Replace with G / 替换为 G
+label_g => G / G
+item_b => Replace with B / 替换为 B
+label_b => B / B
+item_no_replace => Do not replace channel / 不替换该通道
+item_reset_rgb => Reset tint / 重置染色
+
+# ===== Items: File menu =====
+item_save => Save config (JSON) / 保存配置（JSON）
+item_exit => Exit editor / 退出编辑器
+
+# ===== Descriptions =====
+desc_anim => Pick an animation from the list to edit; it plays back automatically / 从列表选择要编辑的动画；选中后自动播放预览
+desc_anim_name => Name of this animation inside the config JSON / 该动画在配置 JSON 中的名字
+desc_prefix => Frame prefix of this animation inside the atlas XML / 图集 XML 中该动画的帧前缀
+desc_note_data => Note data column this animation belongs to (0=Left 1=Down 2=Up 3=Right) / 该动画对应的 Note Data 列（0=左 1=下 2=上 3=右）
+desc_indices => Only use the given frame indices of the prefix (comma separated; empty = all frames) / 只取前缀下指定帧索引（逗号分隔；留空 = 全部帧）
+desc_min_fps => Minimum playback FPS for this animation (random lower bound) / 播放该动画的最低帧率（随机区间下限）
+desc_max_fps => Maximum playback FPS for this animation (random upper bound) / 播放该动画的最高帧率（随机区间上限）
+desc_anim_add => Write (or update) the current parameters into the animation list / 把当前参数写入（或更新）动画列表
+desc_anim_remove => Remove the current animation from the list / 从列表移除当前动画
+desc_anim_reset => Clear the current config and restore the default template / 清空当前配置并恢复默认模板
+desc_image => Splash atlas path (under images/, e.g. noteSplashes/noteSplashes) / 溅射图集路径（images/ 下，如 noteSplashes/noteSplashes）
+desc_reload_image => Reload the atlas & config using the entered path / 按输入路径重新载入图集与配置
+desc_scale => Overall splash scale / 溅射整体缩放倍率
+desc_allow_rgb => Allow the RGB tint shader / 允许使用 RGB 染色着色器
+desc_allow_pixel => Allow pixelated rendering on pixel stages / 像素舞台下允许像素化渲染
+desc_template => Start over with a blank config (add animations one by one) / 以空白配置开始（可随后逐条添加动画）
+desc_convert_txt => Read a legacy .txt splash config and save it as JSON / 读取旧版 .txt 溅射配置并转换为 JSON 保存
+desc_target => Choose which replacement channel you are editing / 选择正在编辑的替换目标通道
+desc_target_red => Edit the replacement color of the red channel / 编辑红色通道的替换色
+desc_target_green => Edit the replacement color of the green channel / 编辑绿色通道的替换色
+desc_target_blue => Edit the replacement color of the blue channel / 编辑蓝色通道的替换色
+desc_r => Red component of the replacement color / 该通道替换色的红色分量
+desc_g => Green component of the replacement color / 该通道替换色的绿色分量
+desc_b => Blue component of the replacement color / 该通道替换色的蓝色分量
+desc_no_replace => When checked, this target channel is not replaced / 勾选后该目标通道不做颜色替换
+desc_reset_rgb => Reset all three replacement colors to zero / 把三通道替换色全部清零
+desc_save => Save the current config as JSON (next to the atlas) / 把当前配置保存为 JSON（与图集同目录）
+desc_exit => Exit the Note Splash editor and return to the master editor menu / 退出 Note Splash 编辑器，返回主编辑器菜单
+
+# ===== Help rows =====
+item_help_click => Click a note or press SPACE to spawn a splash / 点击音符或按 SPACE 触发溅射
+item_help_offset => Arrow keys nudge the offset / 方向键微调偏移
+item_help_shift => Hold Shift: offset steps x10 / 按住 Shift：偏移步长 ×10
+item_help_copy => Ctrl+C / Ctrl+V / Ctrl+R: copy / paste / reset offset / Ctrl+C / Ctrl+V / Ctrl+R：复制/粘贴/重置偏移
+item_help_fps => Every 4 note datas add another set of animations / 每 4 个 Note Data 一组，自动追加一套动画
+item_help_f1 => Open this help menu: F1 / 打开本帮助菜单：F1
+item_help_exit => Exit editor: ESC / Back / 退出编辑器：ESC / Back
+
+# ===== Help row descriptions =====
+desc_help_click => Click any note below, or press SPACE on the Animation page to preview a splash / 点击下方任一音符，或在动画页按 SPACE 播放溅射预览
+desc_help_offset => Arrow keys nudge the current animation offset by 1px / 方向键以 1px 步长微调当前动画偏移
+desc_help_shift => While held, arrow keys move by 10px (auto-repeat) / 按住 Shift 时方向键步长为 10px（长按连发）
+desc_help_copy => Ctrl+C copies the current offset, Ctrl+V pastes, Ctrl+R resets to zero / Ctrl+C 复制当前偏移，Ctrl+V 粘贴，Ctrl+R 归零
+desc_help_fps => The next set of animation names is generated every 4 note datas / 后续每 4 个 Note Data 自动生成下一套动画名
+desc_help_f1 => Open this help menu: F1 / 打开本帮助菜单：F1
+desc_help_exit => Exit back to the master editor menu: ESC / Back / 退出编辑器返回主编辑器菜单：ESC / Back
+
+item_load_json => Import JSON configuration / 导入 JSON 配置
+desc_load_json => Validate and import a splash configuration using the current atlas / 导入并检查已有的溅射配置，保留当前图片资源

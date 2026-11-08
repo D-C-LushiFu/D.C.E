@@ -35,7 +35,7 @@ class OriginFunkinIntroState extends FlxState
 		@:privateAccess
 		{
 			if (FlxG.game.stage != null && FlxG.game.stage.window != null)
-				FlxG.game.stage.window.frameRate = FlxG.updateFramerate;
+				FlxG.game.stage.window.frameRate = #if android mobile.backend.MobileRefreshRate.maximumWindowRate(FlxG.updateFramerate) #else FlxG.updateFramerate #end;
 		}
 
 		FlxG.camera.bgColor = FlxColor.BLACK;

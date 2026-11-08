@@ -1,47 +1,47 @@
-Game UI => 界面设置
+Game UI => Game UI / 界面设置
 
 
-GameUI => 游戏界面设置
+GameUI => GameUI / 游戏界面设置
 
-Visble => 显示设置
-hideHud => 隐藏UI
-showComboNum => 显示连击数字
-showRating => 显示评级贴图
-opponentStrums => 显示对手箭头
-judgementCounter => 显示判定计数板
-keyboardViewer => 显示键盘反馈
-
-
-TimeBar => 时长条
-
-timeBarType => 显示类型
+Visble => Visble / 显示设置
+hideHud => Hide hud / 隐藏UI
+showComboNum => Combo sprite appearance / 显示连击数字
+showRating => Rating sprite appearance / 显示评级贴图
+opponentStrums => Shows opponent strums on screen / 显示对手箭头
+judgementCounter => Show your judgements / 显示判定计数板
+keyboardViewer => Feedback the key you pressed / 显示键盘反馈
 
 
-HealthBar => 生命条
+TimeBar => TimeBar / 时长条
 
-healthBarAlpha => 透明度
-oldHealthBarVersion => 使用psych 0.63h的血条以修复旧模组
-Combo => 连击设置
-comboColor => 允许贴图获取和使用评级颜色
-comboOffsetFix => 偏移修复
+timeBarType => Display type / 显示类型
 
 
-KeyBoard => 键盘反馈
+HealthBar => HealthBar / 生命条
 
-keyboardTimeDisplay => 显示摁压的时间细节
-keyboardAlpha => 透明度
-keyboardTime => 滞留时长
-keyboardBGColor => 背景颜色
-keyboardTextColor => 文字颜色
-
-
-Camera => 摄像机
-
-camZooms => 摄像机根据音乐节奏进行Beat
-scoreZoom => 击打箭头会使分数栏Beat
+healthBarAlpha => Alpha / 透明度
+oldHealthBarVersion => Reduced version to psych 0.63h / 使用psych 0.63h的血条以修复旧模组
+Combo => Combo / 连击设置
+comboColor => Allow to get and use rating color / 允许贴图获取和使用评级颜色
+comboOffsetFix => Fix position offset / 偏移修复
 
 
-pauseButton => 在游玩时左上角添加暂停按钮
+KeyBoard => KeyBoard / 键盘反馈
 
-compulsionPause => 你可以强制打开暂停菜单
-compulsionPauseNumber => 按多少次暂停键强行打开暂停菜单
+keyboardTimeDisplay => support display press details / 显示摁压的时间细节
+keyboardAlpha => Alpha / 透明度
+keyboardTime => press sustain display time / 滞留时长
+keyboardBGColor => keyboardBGColor / 背景颜色
+keyboardTextColor => keyboardTextColor / 文字颜色
+
+
+Camera => Camera / 摄像机
+
+camZooms => Toggle the camera zoom in-game / 摄像机根据音乐节奏进行Beat
+scoreZoom => Score beat when you hit note / 击打箭头会使分数栏Beat
+
+
+pauseButton => Add pauseButton in game / 在游玩时左上角添加暂停按钮
+
+compulsionPause => You can force open pause menu / 你可以强制打开暂停菜单
+compulsionPauseNumber => How many times to press the button to force a pause / 按多少次暂停键强行打开暂停菜单

@@ -1,7 +1,7 @@
-Audio => 音频设置
+Audio => Audio / 音频设置
 
-mainMusic => 主界面播放的歌曲
-optionMusic => 设置界面播放的歌曲
-pauseMusic => 暂停界面播放的歌曲
-hitsoundType => 是否启用打击音效
-hitsoundVolume => 打击音效音量大小
+mainMusic => Main Screen song type / 主界面播放的歌曲
+optionMusic => Option Screen song type / 设置界面播放的歌曲
+pauseMusic => Pause Screen song type / 暂停界面播放的歌曲
+hitsoundType => Hitsound type / 是否启用打击音效
+hitsoundVolume => Hitsound volume / 打击音效音量大小

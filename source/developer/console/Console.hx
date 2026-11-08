@@ -36,6 +36,9 @@ class Console extends Sprite {
 	private static inline var MIN_WIDTH:Float = 420;
 	private static inline var MIN_HEIGHT:Float = 260;
 	private static inline var MAX_PENDING_LINES:Int = 5000;
+	// Bound the amount of HTML parsed by TextField in one render. The in-memory
+	// history and any file logging remain untouched.
+	private static inline var MAX_RENDER_LINES:Int = 500;
 	private static inline var MAX_LINES:Int = 1500;
 	private static inline var MAX_DRAIN_PER_FRAME:Int = 350;
 	private static inline var RENDER_INTERVAL:Float = 0.05;
@@ -110,7 +113,7 @@ class Console extends Sprite {
 	}
 
 	public static function show():Void {
-		if (!ClientPrefs.data.developerMode) return;
+		if (ClientPrefs.data == null || !ClientPrefs.data.developerMode) return;
 
 		var console = consoleInstance;
 		console.visible = true;
@@ -267,7 +270,7 @@ class Console extends Sprite {
 
 	/** 恢复用户上次拖动/缩放后的位置尺寸（未自定义则保持默认） */
 	private function applySavedPrefs():Void {
-		if (isMaximized) return;
+		if (isMaximized || ClientPrefs.data == null) return;
 
 		var savedX:Float = ClientPrefs.data.consoleX;
 		var savedY:Float = ClientPrefs.data.consoleY;
@@ -467,7 +470,9 @@ class Console extends Sprite {
 		var first = true;
 		shownLines = 0;
 
-		for (line in lines) {
+		var firstVisible = lines.length > MAX_RENDER_LINES ? lines.length - MAX_RENDER_LINES : 0;
+		for (i in firstVisible...lines.length) {
+			var line = lines[i];
 			if (!first) html.add("<br/>");
 			html.add(lineToHtml(line));
 			first = false;

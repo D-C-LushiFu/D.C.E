@@ -18,3 +18,5 @@ filesCheck => Verificar se o jogo possui arquivos faltando
 filesCheckNew => Verificar se o jogo possui arquivos suspeitos
 storageFolder => Escolher uma pasta para armazenar os dados do jogo. O jogo será reiniciado após a troca.
 adjustMobileEditorKeys => Esconde os botões móveis padrão dos Editores e abre uma janela externa (navegador) para criar/excluir/salvar botões. Arquivos ficam em FuckYouDCEMobile, nomeados por Editor (ex.: ChartEditorNewFuckingButtonMobile.json)
+
+enterOriginFunkin => Exit D.C.E. and start the Origin Funkin frontend on the next launch.

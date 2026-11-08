@@ -59,6 +59,7 @@ jobs:
           haxelib setup ~/haxelib
           haxelib install hmm --quiet
           haxelib run hmm install
+          node tools/patch-novaflare-dependencies.js
 
       - name: Extract current version
         id: get_version

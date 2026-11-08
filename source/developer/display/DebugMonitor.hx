@@ -9,7 +9,7 @@ import openfl.Lib;
  * 调试监控（DebugMonitor）—— 采集引擎运行时数据，供"屏幕外面的面板"和 .erdb 导出使用。
  *
  * 采什么：
- *   - FPS（平滑值）
+ *   - 更新 TPS（平滑值）和绘制 FPS
  *   - 内存：GC 使用/预留/当前/大对象池 + **进程工作集**（hxcpp 的 MEM_INFO_PROCESS，索引 4）
  *   - 当前界面：状态类名 **以及它对应的 .hx 文件路径**（自动在 source/ 与依赖目录里找）
  *   - 键盘：最近按下的按键（带时间戳的队列）
@@ -325,7 +325,8 @@ class DebugMonitor
 			appLabel = 'APP MEM(workingset)';
 		}
 
-		out.push('fps ' + (Math.round(fpsSmooth * 10) / 10) + '   uptime ' + Math.round((haxe.Timer.stamp() - startedAt)) + 's');
+		out.push('tps ' + Math.round(fpsSmooth * 10) / 10 + '   fps ' + Math.round(DataCalc.drawFPS) + '   uptime '
+			+ Math.round((haxe.Timer.stamp() - startedAt)) + 's');
 		// ★ 指标顺序（2026-10-01 按用户反馈调整）：
 		//   **判断内存有没有泄漏请只看 GC used**（存活对象）—— 启动时 75MB，跑完大谱回到主菜单
 		//   若仍是 230MB 左右，那多出来的才是真残留。
@@ -560,7 +561,8 @@ class DebugMonitor
 		var line:String = '{';
 		line += '"t":"' + Date.now().toString() + '"';
 		line += ',"uptime":' + Math.round((haxe.Timer.stamp() - startedAt) * 10) / 10;
-		line += ',"fps":' + Math.round(fpsSmooth * 10) / 10;
+		line += ',"tps":' + Math.round(fpsSmooth * 10) / 10;
+		line += ',"fps":' + Math.round(DataCalc.drawFPS);
 		line += ',"frames":' + frames;
 		line += ',"heapUsedMB":' + mb(Gc.memInfo64(0));
 		line += ',"heapReservedMB":' + mb(Gc.memInfo64(1));

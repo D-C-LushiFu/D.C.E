@@ -1,47 +1,47 @@
-Game UI => 界面设置
+Game UI => Game UI / 界面设置
 
 
-GameUI => 游戏界面设置
+GameUI => Game UI / 游戏界面设置
 
-Visble => 显示设置
-hideHud => 隐藏UI
-showComboNum => 连击数字
-showRating => 评级贴图
-opponentStrums => 显示对手箭头
-judgementCounter => 判定计数板
-keyboardViewer => 键盘反馈
-
-
-TimeBar => 时长条
-
-timeBarType => 显示类型
+Visble => Visibility / 显示设置
+hideHud => Hide HUD / 隐藏UI
+showComboNum => Show Combo Num / 连击数字
+showRating => Show Rating / 评级贴图
+opponentStrums => Opponent Strums / 显示对手箭头
+judgementCounter => Judgement Counter / 判定计数板
+keyboardViewer => Keyboard Display / 键盘反馈
 
 
-HealthBar => 生命条
+TimeBar => Time Bar / 时长条
 
-healthBarAlpha => 透明度
-oldHealthBarVersion => 旧版血条
-Combo => 连击设置
-comboColor => 评级颜色关联
-comboOffsetFix => 偏移修复
+timeBarType => Time Bar Type / 显示类型
 
 
-KeyBoard => 键盘反馈
+HealthBar => Health Bar / 生命条
 
-keyboardTimeDisplay => 摁压细节
-keyboardAlpha => 透明度
-keyboardTime => 滞留时长
-keyboardBGColor => 背景色
-keyboardTextColor => 文字色
-
-
-Camera => 摄像机
-
-camZooms => 节奏缩放
-scoreZoom => 分数栏Beat
+healthBarAlpha => Health Bar Alpha / 透明度
+oldHealthBarVersion => Old Health Bar / 旧版血条
+Combo => Combo / 连击设置
+comboColor => Combo Color / 评级颜色关联
+comboOffsetFix => Combo Offset Fix / 偏移修复
 
 
-pauseButton => 暂停键
+KeyBoard => Keyboard / 键盘反馈
 
-compulsionPause => 强制暂停
-compulsionPauseNumber => 强制暂停次数
+keyboardTimeDisplay => Keyboard Press Details / 摁压细节
+keyboardAlpha => Keyboard Alpha / 透明度
+keyboardTime => Keyboard Sustain Time / 滞留时长
+keyboardBGColor => Keyboard BG Color / 背景色
+keyboardTextColor => Keyboard Text Color / 文字色
+
+
+Camera => Camera / 摄像机
+
+camZooms => Camera Zooms / 节奏缩放
+scoreZoom => Score Zoom / 分数栏Beat
+
+
+pauseButton => Pause Button / 暂停键
+
+compulsionPause => Compulsion Pause / 强制暂停
+compulsionPauseNumber => Compulsion Pause Count / 强制暂停次数

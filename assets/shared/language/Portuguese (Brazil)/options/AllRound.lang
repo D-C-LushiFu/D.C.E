@@ -4,3 +4,9 @@ ResetConfirm => Tem certeza?
 back => Voltar
 tapToSearch => Pesquisar configurações
 Target => Alvo
+
+pixelArrowMissingTitle => Missing Pixel Arrows
+pixelArrowMissingMsg => Current mod is missing pixel-arrow assets (images & color data). Copy the default set into the mod?
+pixelArrowCopy => Copy
+pixelArrowCancel => Cancel
+pixelArrowDone => Pixel-arrow assets copied to the mod.

@@ -14,13 +14,34 @@ import org.haxe.extension.Extension;
 
 /** Display requests belong to this app window and do not change system settings. */
 public class RefreshRateExtension extends Extension {
-    private static int targetFrameRate = 60;
-    private static float surfaceFrameRate = 60;
+    private static float surfaceFrameRate = 0;
     private static final WeakHashMap<SurfaceView, Boolean> watched = new WeakHashMap<>();
 
-    public static void setTargetFrameRate(int framesPerSecond) {
-        targetFrameRate = Math.max(24, framesPerSecond);
+    /** Keep the display at its fastest supported mode, independently of game FPS caps. */
+    public static void requestMaximumRefreshRate() {
         if (mainActivity != null) mainActivity.runOnUiThread(RefreshRateExtension::apply);
+    }
+
+    /** The native window frame scheduler also needs a real supported display rate. */
+    public static int getMaximumRefreshRate() {
+        if (mainActivity == null || Build.VERSION.SDK_INT < 21) return 0;
+        try {
+            Display display = mainActivity.getWindowManager().getDefaultDisplay();
+            float fastestRefreshRate = display.getRefreshRate();
+            if (Build.VERSION.SDK_INT >= 23) {
+                Display.Mode current = display.getMode();
+                for (Display.Mode mode : display.getSupportedModes()) {
+                    if (mode.getPhysicalWidth() != current.getPhysicalWidth()
+                            || mode.getPhysicalHeight() != current.getPhysicalHeight()) continue;
+                    if (mode.getRefreshRate() > fastestRefreshRate)
+                        fastestRefreshRate = mode.getRefreshRate();
+                }
+            }
+            return Math.round(fastestRefreshRate);
+        } catch (Exception error) {
+            Log.w("DCE-Display", "Could not read maximum display refresh rate", error);
+            return 0;
+        }
     }
 
     @Override public void onResume() {
@@ -28,30 +49,33 @@ public class RefreshRateExtension extends Extension {
     }
 
     private static void apply() {
-        if (mainActivity == null || Build.VERSION.SDK_INT < 23) return;
+        if (mainActivity == null || Build.VERSION.SDK_INT < 21) return;
         try {
             Display display = mainActivity.getWindowManager().getDefaultDisplay();
-            Display.Mode current = display.getMode();
-            Display.Mode selected = null;
-            Display.Mode fastest = current;
-            for (Display.Mode mode : display.getSupportedModes()) {
-                if (mode.getPhysicalWidth() != current.getPhysicalWidth()
-                        || mode.getPhysicalHeight() != current.getPhysicalHeight()) continue;
-                if (mode.getRefreshRate() > fastest.getRefreshRate()) fastest = mode;
-                if (mode.getRefreshRate() + 0.5f >= targetFrameRate
-                        && (selected == null || mode.getRefreshRate() < selected.getRefreshRate())) selected = mode;
+            float fastestRefreshRate = display.getRefreshRate();
+            Display.Mode fastestMode = null;
+            if (Build.VERSION.SDK_INT >= 23) {
+                Display.Mode current = display.getMode();
+                for (Display.Mode mode : display.getSupportedModes()) {
+                    if (mode.getPhysicalWidth() != current.getPhysicalWidth()
+                            || mode.getPhysicalHeight() != current.getPhysicalHeight()) continue;
+                    if (mode.getRefreshRate() > fastestRefreshRate) {
+                        fastestRefreshRate = mode.getRefreshRate();
+                        fastestMode = mode;
+                    }
+                }
             }
-            if (selected == null) selected = fastest;
-            surfaceFrameRate = Math.min(targetFrameRate, selected.getRefreshRate());
+            surfaceFrameRate = fastestRefreshRate;
             WindowManager.LayoutParams attributes = mainActivity.getWindow().getAttributes();
-            attributes.preferredDisplayModeId = selected.getModeId();
-            attributes.preferredRefreshRate = selected.getRefreshRate();
+            if (Build.VERSION.SDK_INT >= 23 && fastestMode != null)
+                attributes.preferredDisplayModeId = fastestMode.getModeId();
+            attributes.preferredRefreshRate = fastestRefreshRate;
             mainActivity.getWindow().setAttributes(attributes);
             // SDL can replace its layout after orientation or native startup.
             // Traverse the attached window rather than a cached Extension view.
             visit(mainActivity.getWindow().getDecorView());
-            Log.i("DCE-Display", "renderCap=" + targetFrameRate + " requestedMode="
-                    + selected.getModeId() + " refresh=" + selected.getRefreshRate()
+            Log.i("DCE-Display", "requestedMaximumRefresh=" + fastestRefreshRate + " requestedMode="
+                    + (fastestMode == null ? "preferredRefreshRate" : fastestMode.getModeId())
                     + " current=" + display.getRefreshRate());
         } catch (Exception error) {
             Log.w("DCE-Display", "Could not request display refresh rate", error);

@@ -547,6 +547,11 @@ class ResultsScreen extends MusicBeatSubstate
 		}
 
 		replaySaveReady = true;
+		// ReplayRect caches directory scans, including empty results. Saving a
+		// new record must invalidate that snapshot before Freeplay is revisited.
+		states.freeplayState.objects.replay.ReplayRect.clearCache();
+		if (FreeplayState.instance != null && !FreeplayState.instance.stopAll)
+			FreeplayState.instance.loadReplaysForCurrentSong();
 		if (replayAfterSave)
 			startReplayNow();
 		else

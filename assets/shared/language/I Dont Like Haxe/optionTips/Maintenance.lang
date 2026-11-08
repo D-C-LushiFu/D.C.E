@@ -1,20 +1,22 @@
-Maintenance => 维护设置
+Maintenance => Maintenance / 维护设置
 
-developerMode => 开发者模式，会禁用一些报错显示和trace
-deepDebug => 记录每首歌曲使用的脚本、图片、音频等资源，并在歌曲结束后输出到运行目录下的debug文件夹
-devConScale => 控制台的大小，此控制台是用来捕捉所有trace输出的
-luaErrorOverlay => 开启后，Lua 脚本的报错会像以前那样一条条铺在屏幕左上角；默认关闭，报错仍然照常写入控制台和日志文件，游戏行为不受影响。注意：debugPrint 的输出不受此开关影响，始终显示
-hscriptErrorOverlay => 开启后，HScript 脚本的报错（runHaxeCode 执行出错、addHaxeLibrary 解析失败）会显示在屏幕左上角；默认关闭，报错仍然照常写入控制台和日志文件。与上面那条 Lua 开关各自独立、互不影响。注意：debugPrint 的输出不受此开关影响，始终显示
+developerMode => developer mode, which disables some error displays and traces / 开发者模式，会禁用一些报错显示和trace
+deepDebug => Records the scripts, images, audio, and other resources used by each song / 记录每首歌曲使用的脚本、图片、音频等资源，并在歌曲结束后输出到运行目录下的debug文件夹
+devConScale => size of the console used to capture all trace output / 控制台的大小，此控制台是用来捕捉所有trace输出的
+luaErrorOverlay => When on, Lua script errors are printed on screen like before. Off by default; errors are still written to the console and log files, and gameplay is unaffected. Note: debugPrint output is not affected by this switch and always shows / 开启后，Lua 脚本的报错会像以前那样一条条铺在屏幕左上角；默认关闭，报错仍然照常写入控制台和日志文件，游戏行为不受影响。注意：debugPrint 的输出不受此开关影响，始终显示
+hscriptErrorOverlay => When on, HScript script errors (runHaxeCode failures, addHaxeLibrary resolve errors) are printed on screen. Off by default; errors are still written to the console and log files. Independent from the Lua switch above. Note: debugPrint output is not affected by this switch and always shows / 开启后，HScript 脚本的报错（runHaxeCode 执行出错、addHaxeLibrary 解析失败）会显示在屏幕左上角；默认关闭，报错仍然照常写入控制台和日志文件。与上面那条 Lua 开关各自独立、互不影响。注意：debugPrint 的输出不受此开关影响，始终显示
 
-oldHscriptVersion => 使用 Hscript 为 runhaxecode 工作以兼容旧模组
+oldHscriptVersion => Reduced version to use hscript work for runhaxecode / 使用 Hscript 为 runhaxecode 工作以兼容旧模组
 
 
-APP => 应用程序
+APP => App / 应用程序
 
-discordRPC => 从 Discord 上的“正在播放”框中显示应用程序
-checkForUpdates => 检查应用程序版本
-screensaver => 处于非活动状态不会进入休眠状态
-filesCheck => 检查游戏是否丢失文件
-filesCheckNew => 检查游戏是否有有问题的文件
-storageFolder => 选择储存游戏数据的文件夹，切换后游戏将自动退出。
-adjustMobileEditorKeys => 开启后暂时隐藏各 Editor 默认移动端按键，并在外部浏览器窗口创建/删除/保存自定义按键；文件存 FuckYouDCEMobile 并按当前 Editor 命名（如 ChartEditorNewFuckingButtonMobile.json）
+discordRPC => Show the Application from your \"Playing\" box on Discord / 从 Discord 上的“正在播放”框中显示应用程序
+checkForUpdates => checkForUpdates / 检查应用程序版本
+screensaver => Phone will sleep after going inactive for few seconds / 处于非活动状态不会进入休眠状态
+filesCheck => Check game whether miss files / 检查游戏是否丢失文件
+filesCheckNew => Check game whether questionable files / 检查游戏是否有有问题的文件
+storageFolder => Choose a folder to store game data. The game will restart after switching. / 选择储存游戏数据的文件夹，切换后游戏将自动退出。
+adjustMobileEditorKeys => Hides default mobile Editor buttons and opens an external browser window to create/delete/save custom keys. Files are stored in FuckYouDCEMobile, named per Editor (e.g. ChartEditorNewFuckingButtonMobile.json) / 开启后暂时隐藏各 Editor 默认移动端按键，并在外部浏览器窗口创建/删除/保存自定义按键；文件存 FuckYouDCEMobile 并按当前 Editor 命名（如 ChartEditorNewFuckingButtonMobile.json）
+
+enterOriginFunkin => Exit D.C.E. and start the Origin Funkin frontend on the next launch. / 下次启动时退出 D.C.E. 并启动 Origin Funkin 前端。

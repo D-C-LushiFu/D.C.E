@@ -1,0 +1,103 @@
+# ===== Dialogue Character Editor top menu (Adobe style) =====
+# ===== Menu titles =====
+menu_type => Position / 位置
+menu_char => Character / 角色
+menu_anim => Animation / 动画
+menu_view => View / 视图
+menu_file => File / 文件
+menu_help => Help / 帮助
+
+# ===== Status bar =====
+status_side => Pos: / 位置:
+status_image => Image: / 图像:
+status_anim => Anim: / 动画:
+status_offset => Offset: / 偏移:
+status_scale => Scale: / 缩放:
+
+# ===== Items: Position menu =====
+item_side_left => Align left / 靠左显示
+item_side_center => Align center / 居中显示
+item_side_right => Align right / 靠右显示
+
+# ===== Items: Character menu =====
+item_image => Image file / 图像文件
+label_image => Image file / 图像文件
+item_pos_x => Position offset X / 位置偏移 X
+label_pos_x => Position X / 位置 X
+item_pos_y => Position offset Y / 位置偏移 Y
+label_pos_y => Position Y / 位置 Y
+item_scale => Scale / 缩放
+label_scale => Scale / 缩放
+item_no_aa => Disable antialiasing / 关闭抗锯齿
+item_reload_image => Reload image / 重新加载图像
+item_load_char => Load character JSON / 载入角色 JSON
+item_save_char => Save character JSON / 保存角色 JSON
+
+# ===== Items: Animation menu =====
+item_anim => Expression / 表情动画
+label_anim => Animation / 动画
+item_anim_name => Animation name (JSON) / 动画名（JSON）
+label_anim_name => Anim name / 动画名
+item_loop_name => Loop prefix (XML) / 循环动画（XML 前缀）
+label_loop_name => Loop prefix / 循环前缀
+item_idle_name => Idle prefix (XML) / 待机动画（XML 前缀）
+label_idle_name => Idle prefix / 待机前缀
+item_anim_add_update => Add / Update animation / 添加 / 更新动画
+item_anim_remove => Remove animation / 删除动画
+
+# ===== Items: View menu =====
+item_view_reset => Reset camera & display / 重置相机与显示
+item_view_bubble => Toggle speech bubble / 显示/隐藏对话气泡
+item_view_ghost => Cycle ghosts (Loop / Idle / Off) / 循环显示幽灵（Loop/Idle/关闭）
+
+# ===== Items: File menu =====
+item_load => Load character (JSON) / 载入角色（JSON）
+item_save => Save character (JSON) / 保存角色（JSON）
+item_exit => Exit editor / 退出编辑器
+
+# ===== Descriptions =====
+desc_side_left => Character & bubble aligned to the left side / 角色与气泡靠屏幕左侧
+desc_side_center => Character & bubble centered / 角色与气泡居中显示
+desc_side_right => Character aligned to the right side / 角色靠屏幕右侧显示
+desc_image => Sparrow atlas/XML name of the portrait (under images/dialogue/) / 对话立绘的图集 XML 名（images/dialogue/ 下，不含路径）
+desc_pos_x => Horizontal offset from the base position / 角色在基准位置上的水平偏移
+desc_pos_y => Vertical offset from the base position / 角色在基准位置上的垂直偏移
+desc_scale => Overall character scale / 角色整体缩放倍率
+desc_no_aa => Disable antialiasing for this character / 关闭该角色的抗锯齿渲染
+desc_reload_image => Reload atlas & animations using the current image file / 按当前图像文件重载图集与动画
+desc_load_char => Load a dialogue character JSON from disk / 从磁盘载入对话角色 JSON
+desc_save_char => Save the current character data as JSON / 把当前角色数据保存为 JSON
+desc_anim => Pick an animation from the list to view/edit / 从列表选择一个动画查看/编辑
+desc_anim_name => Animation name used inside the character JSON / 动画在角色 JSON 中的名字
+desc_loop_name => XML frame prefix of the looping segment / 该动画循环段的 XML 帧前缀
+desc_idle_name => XML frame prefix of the idle/finish segment / 该动画待机/收尾段的 XML 帧前缀
+desc_anim_add_update => Add a new animation; updates loop/idle prefixes when the name exists / 新增动画；名字已存在则更新其循环/待机前缀
+desc_anim_remove => Remove the current animation entry / 删除当前动画条目
+desc_view_reset => Reset camera zoom to 1x, reset content position and show HUD / 相机缩放恢复 1、内容归零并显示 HUD
+desc_view_bubble => Show or hide the speech bubble preview / 显示或隐藏对话气泡预览
+desc_view_ghost => Cycle ghost display: Loop ghost → Idle ghost → off / 循环切换幽灵显示：Loop 幽灵 → Idle 幽灵 → 关闭
+desc_load => Load a dialogue character JSON from disk / 从磁盘载入对话角色 JSON
+desc_save => Save the current character as a dialogue character JSON / 把当前角色保存为 dialogue character JSON
+desc_exit => Exit the dialogue character editor and return to the master editor menu (confirms when unsaved changes exist) / 退出对话立绘编辑器，返回主编辑器菜单（有未保存修改时先确认）
+
+# ===== Help rows =====
+item_help_keys => Offset nudging (Animation tab): WASD / Arrow keys / 偏移微调（动画页）：WASD / 方向键
+item_help_camera => Move camera: J K L I / 移动相机：J K L I
+item_help_zoom => Zoom camera: Q / E / 缩放相机：Q / E
+item_help_shift => Hold Shift: offset steps x10 / 按住 Shift：偏移步长 ×10
+item_help_space => Replay current animation & text: SPACE / 重播当前动画与文字：SPACE
+item_help_f1 => Open this help menu: F1 / 打开本帮助菜单：F1
+item_help_exit => Exit editor: ESC / 退出编辑器：ESC
+
+# ===== Help row descriptions =====
+desc_help_keys => On the Animation page: WASD = loop offset, Arrow keys = idle offset / 动画页微调偏移：WASD=循环偏移，方向键=待机偏移
+desc_help_camera => Hold J/K/L/I to pan the camera (Shift moves 4x faster) / 按住 J/K/L/I 平移相机（Shift 加速 ×4）
+desc_help_zoom => Q zooms out, E zooms in (up to 1x) / Q 缩小、E 放大相机（上限 1x）
+desc_help_shift => While held, offset steps are multiplied by 10 / 按住 Shift 时偏移步长 ×10
+desc_help_space => Replay the current animation and reset the dialogue typing / 重播当前动画并重置对话文字打字
+desc_help_f1 => Open this help menu: F1 / 打开本帮助菜单：F1
+desc_help_exit => Exit editor: ESC (confirms when unsaved changes exist) / 退出编辑器：ESC（有未保存修改时先确认）
+
+# ===== Exit confirmation popup (overrides the shared keys in the editors group) =====
+confirm_unsaved_title => Exit Dialogue Portrait Editor / 退出对话立绘编辑器
+confirm_unsaved_message => This portrait has unsaved changes. They will be lost if you exit. Discard them and exit? / 当前立绘还有未保存的修改，退出后这些改动将会丢失。确定要放弃修改并退出吗？

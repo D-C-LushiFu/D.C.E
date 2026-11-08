@@ -1,13 +1,15 @@
-languageName => 不是人话
+languageName => English / 不是人话
 fontName => fuckme
-langPreview => 我讨厌用Haxe做东西。甚至在我的主观感受上还不如Lua和前端全家桶呢
+langPreview => When you change the language in settings and then read this message, you find you've set the language successfully. So you switch the language again — oh no, why can't you understand it anymore? / 我讨厌用Haxe做东西。甚至在我的主观感受上还不如Lua和前端全家桶呢
 justsayLang => Lang-ZH
-play => 🎮
-back => 🔙
-optionsTitle => 选项
-optionsMenuTitle => 选项菜单
-rebinding => 重新绑定
-holdBCancel => 按住B取消
-holdCDelete => 按住C删除
-holdEscCancel => 按住ESC取消
-holdBackspaceDelete => 按住退格键删除
+play => play / 🎮
+back => back / 🔙
+optionsTitle => Options / 选项
+optionsMenuTitle => Options Menu / 选项菜单
+rebinding => Rebinding / 重新绑定
+holdBCancel => Hold B to Cancel / 按住B取消
+holdCDelete => Hold C to Delete / 按住C删除
+holdEscCancel => Hold ESC to Cancel / 按住ESC取消
+holdBackspaceDelete => Hold Backspace to DeletemodInfoEmpty => Nothing here yet, are you satisfied? / 按住退格键删除
+
+modInfoEmptyDesc => Select a mod in the Mods menu to see its info here. / 去 Mods 菜单里选一个 Mod，这里就会显示它的信息。

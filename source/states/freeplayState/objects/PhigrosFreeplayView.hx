@@ -30,6 +30,7 @@ class PhigrosFreeplayView extends FlxSpriteGroup
     public var durationValue:FlxText;
     public var recordsEmpty:FlxText;
     public var recordsInfo:FlxText;
+    public var recordsVisible:Bool = false;
     public var spectrum:AudioDisplay;
     public var voicesSpectrum:AudioDisplay;
     public var opponentSpectrum:AudioDisplay;
@@ -69,6 +70,10 @@ class PhigrosFreeplayView extends FlxSpriteGroup
     var coverRate:FlxText;
     var counter:FlxText;
     var emptyList:FlxText;
+    var modPanels:Array<PhiPanel> = [];
+    var modLabels:Array<FlxText> = [];
+    var modBackPanel:PhiPanel;
+    var modBackLabel:FlxText;
     var listScrollTrack:FlxSprite;
     var listScrollThumb:FlxSprite;
     var sortValue:FlxText;
@@ -103,6 +108,26 @@ class PhigrosFreeplayView extends FlxSpriteGroup
     var profileName:FlxText;
     var profileAvatar:FlxSprite;
     var profileInitial:FlxText;
+    var coverShade:FlxSprite;
+    var bestPanel:PhiPanel;
+    var bestCaption:FlxText;
+    var coverDivider:FlxSprite;
+    var recordModeButton:PhiPanel;
+    var recordModeLabel:FlxText;
+    var recordOverlay:PhiPanel;
+    var recordScrollTrack:FlxSprite;
+    var recordScrollThumb:FlxSprite;
+    var recordUiElements:Array<FlxSprite> = [];
+    var recordUiBaseAlpha:Array<Float> = [];
+    public var recordAnimationProgress:Float = 0;
+    var recordOpenTarget:Bool = false;
+    var recordTween:FlxTween;
+    static inline final RECORD_THUMB_BASE_HEIGHT:Float = 54;
+    var recordDragging:Bool = false;
+    var recordThumbGrab:Float = 0;
+    var pitchUpLabel:FlxText;
+    var pitchDownLabel:FlxText;
+    var recordHeaderLabel:FlxText;
 
     public function new(state:FreeplayState)
     {
@@ -126,24 +151,23 @@ class PhigrosFreeplayView extends FlxSpriteGroup
         rail.graphics.moveTo(69 + 720 * PhiPanel.SLOPE, 0); rail.graphics.lineTo(469 + 720 * PhiPanel.SLOPE, 0); rail.graphics.lineTo(469, 720); rail.graphics.lineTo(69, 720); rail.graphics.endFill();
         add(bitmapSprite(rail, 1280, 720));
 
-        // Use the full set of frequency bands once across the width instead
-        // of mirroring half of the spectrum. A longer FFT improves the low
-        // end without changing the visual refresh cadence.
+        // Use a shorter FFT window so transients appear promptly while keeping
+        // enough samples for a stable spectrum.
         spectrum = new AudioDisplay(FlxG.sound.music, 0, 1012, 1920, 160, 96, 3, FlxColor.WHITE, false);
-        spectrum.visualGain = 1.0;
-        spectrum.attackSpeed = 10; spectrum.releaseSpeed = 20; spectrum.sampleIntervalMs = 25; spectrum.resetWhenStopped = true; spectrum.fftQualityOverride = 8; spectrum.refreshFFTQuality(); spectrum.alpha = 0.15; add(spectrum);
+        spectrum.visualGain = 2.0;
+        spectrum.attackSpeed = 30; spectrum.releaseSpeed = 18; spectrum.sampleIntervalMs = 16; spectrum.resetWhenStopped = true; spectrum.fftQualityOverride = 4; spectrum.refreshFFTQuality(); spectrum.alpha = 0.30; add(spectrum);
         spectrumBottom = spectrum.enableBarGeometry();
-        spectrumBottom.alpha = 0.045; add(spectrumBottom);
+        spectrumBottom.alpha = 0.10; add(spectrumBottom);
         voicesSpectrum = new AudioDisplay(null, 0, 1012, 960, 160, 48, 3, FlxColor.BLACK, false);
-        voicesSpectrum.visualGain = 1.0;
-        voicesSpectrum.attackSpeed = 10; voicesSpectrum.releaseSpeed = 20; voicesSpectrum.sampleIntervalMs = 25; voicesSpectrum.resetWhenStopped = true; voicesSpectrum.fftQualityOverride = 8; voicesSpectrum.refreshFFTQuality(); voicesSpectrum.alpha = 0.17; add(voicesSpectrum);
+        voicesSpectrum.visualGain = 2.0;
+        voicesSpectrum.attackSpeed = 30; voicesSpectrum.releaseSpeed = 18; voicesSpectrum.sampleIntervalMs = 16; voicesSpectrum.resetWhenStopped = true; voicesSpectrum.fftQualityOverride = 4; voicesSpectrum.refreshFFTQuality(); voicesSpectrum.alpha = 0.30; add(voicesSpectrum);
         voicesSpectrumBottom = voicesSpectrum.enableBarGeometry();
-        voicesSpectrumBottom.alpha = 0.045; add(voicesSpectrumBottom);
+        voicesSpectrumBottom.alpha = 0.10; add(voicesSpectrumBottom);
         opponentSpectrum = new AudioDisplay(null, 960, 1012, 960, 160, 48, 3, 0xFFEF5364, false);
-        opponentSpectrum.visualGain = 1.0;
-        opponentSpectrum.attackSpeed = 10; opponentSpectrum.releaseSpeed = 20; opponentSpectrum.sampleIntervalMs = 25; opponentSpectrum.resetWhenStopped = true; opponentSpectrum.fftQualityOverride = 8; opponentSpectrum.refreshFFTQuality(); opponentSpectrum.alpha = 0.17; add(opponentSpectrum);
+        opponentSpectrum.visualGain = 2.0;
+        opponentSpectrum.attackSpeed = 30; opponentSpectrum.releaseSpeed = 18; opponentSpectrum.sampleIntervalMs = 16; opponentSpectrum.resetWhenStopped = true; opponentSpectrum.fftQualityOverride = 4; opponentSpectrum.refreshFFTQuality(); opponentSpectrum.alpha = 0.30; add(opponentSpectrum);
         opponentSpectrumBottom = opponentSpectrum.enableBarGeometry();
-        opponentSpectrumBottom.alpha = 0.045; add(opponentSpectrumBottom);
+        opponentSpectrumBottom.alpha = 0.10; add(opponentSpectrumBottom);
 
         var toolbar = panelAt(224, 36, 720, 66, 0xFF101722); toolbar.alpha = 0.82; add(toolbar);
         sortCaption = label(253, 51, 133, textFor('sortBy', '排序方式', 'Sort by'), 11, false, false, 0xFFC1CDD2);
@@ -160,11 +184,12 @@ class PhigrosFreeplayView extends FlxSpriteGroup
             var text:FlxSprite;
             if (actions[i] == 'audio') {
                 var marquee = new PhiMarqueeText(58);
-                marquee.setText(caption, Paths.font(~/[^\x00-\x7F]/.match(caption) ? 'Lang-ZH.ttf' : 'montserrat.ttf'), 13, FlxColor.WHITE);
+                marquee.setText(caption, Paths.font(~/[^\x00-\x7F]/.match(caption) ? 'Lang-ZH.ttf' : 'montserrat.ttf'), 9, FlxColor.WHITE);
                 marquee.setPosition((x + 1) * DENSITY, 78 * DENSITY);
                 text = marquee; add(marquee);
             } else {
                 var labelText = label(x + 1, 78, 58, caption, 9); labelText.alignment = CENTER;
+                fitLabel(labelText, 9 * DENSITY, 6 * DENSITY);
                 text = labelText;
             }
             tools.push({panel: panel, label: text, icon: icon, action: actions[i]});
@@ -196,6 +221,12 @@ class PhigrosFreeplayView extends FlxSpriteGroup
         listScrollThumb.origin.set(0, 0); listScrollThumb.angle = 15; listScrollThumb.alpha = 0.85; add(listScrollThumb);
         emptyList = label(248, 283, 330, textFor('noMatchingSongs', '没有符合条件的曲目', 'No matching songs'), 21);
         emptyList.visible = false;
+        modBackPanel = panelAt(24, 126, 150, 58, 0xFF182330); modBackPanel.alpha = 0; add(modBackPanel);
+        modBackLabel = label(38, 143, 122, textFor('previousLevel', '上一级', 'Previous level'), 18, false, true); modBackLabel.alignment = CENTER;
+        for (i in 0...9) {
+            var panel = panelAt(145, 190 + i * 58, 425, 52, 0xFF111821); panel.alpha = 0; add(panel); modPanels.push(panel);
+            var text = label(166, 203 + i * 58, 375, '', 20, false, true); modLabels.push(text);
+        }
 
         var detailStart = members.length;
         cover = panelAt(572, 147, 617, 329, 0xFF372C46); add(cover);
@@ -205,10 +236,10 @@ class PhigrosFreeplayView extends FlxSpriteGroup
         var shadeShape = new Shape(); var shadeMatrix = new Matrix(); shadeMatrix.createGradientBox(617, 329, Math.PI / 2);
         shadeShape.graphics.beginGradientFill(GradientType.LINEAR, [0x0A101C, 0x0A101C, 0x0A101C], [0.10, 0.15, 0.9], [0, 110, 255], shadeMatrix);
         var dx = 329 * PhiPanel.SLOPE; shadeShape.graphics.moveTo(dx, 0); shadeShape.graphics.lineTo(617, 0); shadeShape.graphics.lineTo(617 - dx, 329); shadeShape.graphics.lineTo(0, 329); shadeShape.graphics.endFill();
-        var shade = bitmapSprite(shadeShape, 617, 329); shade.x = 858; shade.y = 220.5; add(shade);
-        line(660, 147, 529, 1, 0x70FFFFFF);
-        var best = panelAt(669, 160, 129, 51, 0xFF0B1019); best.alpha = 0.87; add(best);
-        label(684, 165, 95, textFor('bestScore', '最高分', 'Best score'), 11, true, false, 0xFFC7D2DA);
+        coverShade = bitmapSprite(shadeShape, 617, 329); coverShade.x = 858; coverShade.y = 220.5; add(coverShade);
+        coverDivider = new FlxSprite(660 * DENSITY, 147 * DENSITY).makeGraphic(Std.int(529 * DENSITY), Std.int(DENSITY), 0x70FFFFFF); add(coverDivider);
+        bestPanel = panelAt(669, 160, 129, 51, 0xFF0B1019); bestPanel.alpha = 0.87; add(bestPanel);
+        bestCaption = label(684, 165, 95, textFor('bestScore', '最高分', 'Best score'), 11, true, false, 0xFFC7D2DA);
         bestScore = label(679, 181, 105, '—', 20, true, true);
         favoritePanel = panelAt(1133, 160, 42, 40, 0xFF0B1019); favoritePanel.alpha = 0.88; add(favoritePanel);
         favoriteIcon = makeIcon(1145, 170, 'favorites'); favoriteIcon.scale.set(1.2, 1.2); favoriteIcon.color = 0xFFBCC7D1; add(favoriteIcon);
@@ -222,11 +253,11 @@ class PhigrosFreeplayView extends FlxSpriteGroup
         elapsedLabel = label(608, 461, 80, '00:00', 9, true);
         lengthLabel = label(925, 461, 50, '00:00', 9, true); lengthLabel.alignment = RIGHT;
         pitchUp = panelAt(989, 447, 56, 24, 0xFF161B25); pitchUp.alpha = 0.92; add(pitchUp);
-        label(992, 451, 50, textFor('pitchUp', '+1音阶', '+1 semitone'), 9, false, true).alignment = CENTER;
+        pitchUpLabel = label(992, 451, 50, textFor('pitchUp', '+1音阶', '+1 semitone'), 9, false, true); pitchUpLabel.alignment = CENTER;
         speedButton = panelAt(1047, 447, 60, 24, 0xFF161B25); speedButton.alpha = 0.70; add(speedButton);
         speedText = label(1050, 451, 54, '[1.0X]', 9, false, true); speedText.alignment = CENTER;
         pitchDown = panelAt(1109, 447, 56, 24, 0xFF161B25); pitchDown.alpha = 0.92; add(pitchDown);
-        label(1112, 451, 50, textFor('pitchDown', '-1音阶', '-1 semitone'), 9, false, true).alignment = CENTER;
+        pitchDownLabel = label(1112, 451, 50, textFor('pitchDown', '-1音阶', '-1 semitone'), 9, false, true); pitchDownLabel.alignment = CENTER;
 
         var stats = panelAt(558, 487, 541, 43, 0xFF181B27); stats.alpha = 0.6; add(stats);
         var statsNames = [textFor('bpm', 'BPM', 'BPM'), textFor('duration', '时长', 'Duration'), textFor('noteCount', '音符', 'Notes'), textFor('holdNotes', '长按', 'Holds'), textFor('speed', '滚速', 'Speed'), textFor('keyCount', '键数', 'Keys')];
@@ -240,24 +271,35 @@ class PhigrosFreeplayView extends FlxSpriteGroup
             values.push(statValue);
         }
         bpmValue = values[0]; durationValue = values[1]; noteValue = values[2]; holdValue = values[3]; speedValue = values[4]; keyValue = values[5];
-        mirror = panelAt(1085, 540, 100, 36, 0xFF1A202B); mirror.alpha = 0.7; add(mirror);
-        mirrorText = label(1099, 550, 76, textFor('mirror', '镜像', 'Mirror'), 13); mirrorText.alignment = CENTER;
+        recordModeButton = panelAt(1106, 493, 72, 31, 0xFF111923); recordModeButton.alpha = 0.88; add(recordModeButton);
+        recordModeLabel = label(1110, 501, 64, textFor('savedRecords', '记录', 'Records'), 9, false, true); recordModeLabel.alignment = CENTER;
+        mirror = panelAt(900, 540, 100, 36, 0xFF1A202B); mirror.alpha = 0.7; add(mirror);
+        mirrorText = label(914, 550, 76, textFor('mirror', '镜像', 'Mirror'), 13); mirrorText.alignment = CENTER;
 
-        var records = panelAt(521, 538, 500, 124, 0xFF11151F); records.alpha = 0.75; add(records);
-        label(545, 543, 130, textFor('savedRecords', '已保存记录', 'Saved records'), 12, false, true);
-        recordsInfo = label(680, 546, 65, '', 9, false, false, 0xFFB9C4CB);
-        recordsEmpty = label(538, 574, 450, textFor('noSavedRecords', '暂无已保存记录', 'No saved records'), 12, false, false, 0xFFBBC7D1);
+        recordOverlay = panelAt(572, 147, 617, 329, 0xFF808080); recordOverlay.alpha = 0.50; add(recordOverlay);
+        recordUiElements.push(recordOverlay);
+        recordHeaderLabel = label(660, 214, 122, textFor('savedRecords', '已保存记录', 'Saved records'), 11, false, true);
+        recordUiElements.push(recordHeaderLabel);
+        recordsInfo = label(773, 217, 45, '', 9, false, false, 0xFFB9C4CB);
+        recordUiElements.push(recordsInfo);
+        recordsEmpty = label(660, 319, 450, textFor('noSavedRecords', '暂无已保存记录', 'No saved records'), 12, false, false, 0xFFBBC7D1);
+        recordUiElements.push(recordsEmpty);
         var sorts = [textFor('date', '日期', 'Date'), textFor('score', '得分', 'Score'), textFor('accuracy', '准度', 'Accuracy'), textFor('combo', '连击', 'Combo')];
         for (i in 0...4)
         {
-            var panel = PhigrosFreeplayView.panelAt(750 + i * 66, 553, 62, 21); panel.alpha = i == 0 ? 1 : 0; add(panel); sortButtons.push(panel);
-            var text = label(750 + i * 66, 555, 62, sorts[i], 9); text.alignment = CENTER; sortLabels.push(text);
+            var sx = 831 + i * 75;
+            var panel = PhigrosFreeplayView.panelAt(sx, 233, 68, 24); panel.alpha = i == 0 ? 1 : 0; add(panel); sortButtons.push(panel); recordUiElements.push(panel);
+            var text = label(sx, 239, 68, sorts[i], 9); text.alignment = CENTER; sortLabels.push(text); recordUiElements.push(text);
         }
-        play = panelAt(1025, 668, 219, 64); add(play);
+        recordScrollTrack = new FlxSprite(1683, 390).makeGraphic(8, 295, 0xCC303B4A); add(recordScrollTrack); recordUiElements.push(recordScrollTrack);
+        recordScrollThumb = new FlxSprite(1680, 390).makeGraphic(14, 54, 0xFFF2F7FC); add(recordScrollThumb); recordUiElements.push(recordScrollThumb);
+        for (element in recordUiElements) { recordUiBaseAlpha.push(element.alpha); element.visible = false; }
+        setRecordsVisible(false);
+        play = panelAt(1025, 540, 219, 64); add(play);
         var triangle = new Shape(); triangle.graphics.beginFill(0x252B33); triangle.graphics.moveTo(0, 0); triangle.graphics.lineTo(16, 10); triangle.graphics.lineTo(0, 20); triangle.graphics.endFill();
-        var playIcon = bitmapSprite(triangle, 17, 21); playIcon.x = 1594.5; playIcon.y = 1035; add(playIcon);
-        label(1091, 683, 84, textFor('start', '开始', 'Start'), 20, false, true, 0xFF252B33);
-        label(1096, 707, 79, textFor('playHint', '游 玩', 'P L A Y'), 7, false, false, 0xFF737C84);
+        var playIcon = bitmapSprite(triangle, 17, 21); playIcon.x = 1594.5; playIcon.y = 843; add(playIcon);
+        label(1091, 555, 84, textFor('start', '开始', 'Start'), 20, false, true, 0xFF252B33);
+        label(1096, 579, 79, textFor('playHint', '游 玩', 'P L A Y'), 7, false, false, 0xFF737C84);
         for (i in detailStart...members.length) {
             var sprite:FlxSprite = cast members[i];
             sprite.y -= 24 * DENSITY;
@@ -294,6 +336,16 @@ class PhigrosFreeplayView extends FlxSpriteGroup
     }
     function label(x:Float, y:Float, w:Float, text:String, size:Int, italic:Bool = false, bold:Bool = false, color:FlxColor = FlxColor.WHITE):FlxText
     { var result = labelAt(x, y, w, text, size, italic, bold, color); add(result); return result; }
+    static function fitLabel(text:FlxText, baseSize:Float, minimumSize:Float):Void
+    {
+        text.size = Std.int(baseSize);
+        while (text.size > minimumSize && text.textField.textWidth > text.fieldWidth - 6 * DENSITY) text.size--;
+    }
+    function setSortValue(value:String):Void
+    {
+        sortValue.text = value;
+        fitLabel(sortValue, 17 * DENSITY, 9 * DENSITY);
+    }
     function line(x:Float, y:Float, w:Int, h:Int, color:FlxColor):Void { add(new FlxSprite(x * DENSITY, y * DENSITY).makeGraphic(Std.int(Math.round(w * DENSITY)), Std.int(Math.round(h * DENSITY)), color)); }
     static function bitmapSprite(shape:Shape, w:Int, h:Int):FlxSprite
     { var bitmap = new BitmapData(Std.int(Math.round(w * DENSITY)), Std.int(Math.round(h * DENSITY)), true, 0); var matrix = new Matrix(); matrix.scale(DENSITY, DENSITY); bitmap.draw(shape, matrix, null, null, null, true); return new FlxSprite().loadGraphic(FlxGraphic.fromBitmapData(bitmap, false, null, false)); }
@@ -410,15 +462,15 @@ class PhigrosFreeplayView extends FlxSpriteGroup
         difficultyIds = state.availablePhiDifficulties(FreeplayState.curSelected).copy();
         var count = difficultyIds.length; if (count == 0) return;
         var w = Std.int(Math.min(88, 225 / count));
-        difficultyTrack = PhigrosFreeplayView.panelAt(1025, 582, count * (w - 3) + 3, 52, 0xFFF3F4F5);
+        difficultyTrack = PhigrosFreeplayView.panelAt(558, 535, count * (w - 3) + 3, 52, 0xFFF3F4F5);
         add(difficultyTrack);
         for (i in 0...count)
         {
-            var panel = PhigrosFreeplayView.panelAt(1025 + i * (w - 3), 582, w, 52, 0xFFF3F4F5);
+            var panel = PhigrosFreeplayView.panelAt(558 + i * (w - 3), 535, w, 52, 0xFFF3F4F5);
             panel.alpha = 0; add(panel); difficulties.push(panel);
         }
         var selected = Std.int(FlxMath.bound(difficultyIds.indexOf(FreeplayState.curDifficulty), 0, count - 1));
-        difficultySlider = PhigrosFreeplayView.panelAt(1025 + selected * (w - 3), 582, w, 52, state.difficultyColor(difficultyIds[selected]));
+        difficultySlider = PhigrosFreeplayView.panelAt(558 + selected * (w - 3), 535, w, 52, state.difficultyColor(difficultyIds[selected]));
         if (previousX >= 0) difficultySlider.x = previousX * DENSITY;
         add(difficultySlider);
         var names = state.phiDifficultyNames(FreeplayState.curSelected);
@@ -428,12 +480,12 @@ class PhigrosFreeplayView extends FlxSpriteGroup
             var diffId = difficultyIds[i];
             var difficultyName = diffId >= 0 && diffId < names.length ? names[diffId] : '';
             var valueColor = i == selected && difficultyName.toLowerCase() != 'normal' ? FlxColor.WHITE : 0xFF161A20;
-            var value = label(px + 5, 585, w - 10, state.phiRatingText(FreeplayState.curSelected, diffId), 17, false, true, valueColor);
+            var value = label(px + 5, 538, w - 10, state.phiRatingText(FreeplayState.curSelected, diffId), 17, false, true, valueColor);
             value.alignment = CENTER; difficultyValues.push(value);
-            var name = label(px + 3, 607, w - 6, difficultyName, 10, false, true, valueColor);
+            var name = label(px + 3, 560, w - 6, difficultyName, 10, false, true, valueColor);
             name.alignment = CENTER; difficultyNames.push(name);
         }
-        if (previousX >= 0) FlxTween.tween(difficultySlider, {x: (1025 + selected * (w - 3)) * DENSITY}, 0.16, {ease: FlxEase.quadOut});
+        if (previousX >= 0) FlxTween.tween(difficultySlider, {x: (558 + selected * (w - 3)) * DENSITY}, 0.16, {ease: FlxEase.quadOut});
     }
     public function refreshOrder():Void { dirtyRows = true; }
     public function refreshRatingValues():Void {
@@ -463,9 +515,78 @@ class PhigrosFreeplayView extends FlxSpriteGroup
         var selected = mode.indexOf('DATE') == 0 ? 0 : mode.indexOf('SCORE') == 0 ? 1 : mode.indexOf('ACC') == 0 ? 2 : 3;
         for (i in 0...sortButtons.length) { sortButtons[i].alpha = i == selected ? 1 : 0; sortLabels[i].color = i == selected ? 0xFF222831 : 0xFFC7D0DA; }
     }
+    public function setRecordsVisible(shown:Bool):Void
+    {
+        if (recordOpenTarget == shown && (shown ? recordsVisible : !recordsVisible)) return;
+        recordOpenTarget = shown;
+        if (recordTween != null) { recordTween.cancel(); recordTween = null; }
+        if (shown && !recordsVisible) {
+            recordsVisible = true;
+            for (element in recordUiElements) element.visible = true;
+            coverTitle.setPosition(652 * DENSITY, 150 * DENSITY);
+            remove(coverTitle, false);
+            add(coverTitle);
+            state.configurePhiReplayView();
+        }
+        if (shown) {
+            recordTween = FlxTween.tween(this, {recordAnimationProgress: 1}, 0.18,
+                {ease: FlxEase.quadOut, onComplete: function(_) {
+                    recordTween = null;
+                    if (!recordOpenTarget) return;
+                }});
+        } else {
+            recordDragging = false;
+            recordTween = FlxTween.tween(this, {recordAnimationProgress: 0}, 0.16,
+                {ease: FlxEase.quadIn, onComplete: function(_) {
+                    recordTween = null;
+                    if (recordOpenTarget) return;
+                    recordsVisible = false;
+                    for (element in recordUiElements) element.visible = false;
+                    coverTitle.setPosition(632 * DENSITY, 264 * DENSITY);
+                    remove(coverTitle, false);
+                    add(coverTitle);
+                    state.configurePhiReplayView();
+                }});
+        }
+        // Keep artwork and song title visible above the translucent records layer.
+        cover.visible = coverIncoming.visible = coverShade.visible = coverDivider.visible = true;
+        bestPanel.visible = bestCaption.visible = bestScore.visible = !shown;
+        favoritePanel.visible = favoriteIcon.visible = !shown;
+        coverRate.visible = !shown;
+        progressTrack.visible = progress.visible = progressThumb.visible = !shown;
+        elapsedLabel.visible = lengthLabel.visible = !shown;
+        pitchUp.visible = pitchUpLabel.visible = speedButton.visible = speedText.visible = pitchDown.visible = pitchDownLabel.visible = !shown;
+    }
+    public function updateRecordScroll(total:Int, position:Float, maxScroll:Float):Void
+    {
+        var trackY = 390.0;
+        var trackH = 295.0;
+        var canScroll = maxScroll > 0;
+        recordScrollTrack.visible = recordScrollThumb.visible = canScroll;
+        if (!canScroll) return;
+        var thumbH = Math.max(32.0, trackH * Math.min(1, 6 * 48 / Math.max(1, total * 48)));
+        var travel = trackH - thumbH;
+        var ratio = maxScroll <= 0 ? 0 : FlxMath.bound(position / maxScroll, 0, 1);
+        var thumbTop = travel * ratio;
+        recordScrollThumb.setPosition(1680, trackY + thumbTop);
+        recordScrollThumb.scale.y = thumbH / RECORD_THUMB_BASE_HEIGHT;
+    }
     public function click(mx:Float, my:Float):Void
     {
         if (dragMoved) { dragMoved = false; return; }
+        // Sorting remains available both in the mod list and inside a mod.
+        // Handle the toolbar before the category-list branch consumes clicks.
+        if (sortPanel.contains(mx, my)) { state.cyclePhiSort(); return; }
+        if (state.phiIsModMode() && !state.phiIsModCategoryList() && modBackPanel.contains(mx, my)) { state.phiLeaveMod(); return; }
+        if (state.phiIsModCategoryList()) {
+            for (row in rows) if (row.visible && row.modFolder != null && row.hit(mx, my)) {
+                state.phiEnterMod(row.modFolder);
+                return;
+            }
+            return;
+        }
+        if (recordModeButton.contains(mx, my)) { setRecordsVisible(!recordOpenTarget); return; }
+        if (recordOpenTarget && recordAnimationProgress < 0.98) return;
         if (profilePanel.contains(mx, my)) { state.openPhiProfile(); return; }
         if (play.contains(mx, my)) { state.startGame(); return; }
         if (back.contains(mx, my)) { state.returnPhiMenu(); return; }
@@ -475,8 +596,6 @@ class PhigrosFreeplayView extends FlxSpriteGroup
         if (speedButton.contains(mx, my)) return;
         if (favoritePanel.contains(mx, my)) { state.togglePhiFavorite(); return; }
         if (mirror.contains(mx, my)) { ClientPrefs.data.flipChart = !ClientPrefs.data.flipChart; ClientPrefs.saveSettings(); return; }
-        if (sortPanel.contains(mx, my)) { state.cyclePhiSort(); return; }
-
         for (tool in tools) if (tool.panel.contains(mx, my)) { state.runPhiTool(tool.action); return; }
         for (i in 0...difficulties.length) if (difficulties[i].contains(mx, my)) { state.setHybridDifficulty(difficultyIds[i]); return; }
         for (i in 0...sortButtons.length) if (sortButtons[i].contains(mx, my)) { state.sortPhiRecords(i); return; }
@@ -532,13 +651,14 @@ class PhigrosFreeplayView extends FlxSpriteGroup
         // Keep the live texture updates visible without turning the whole menu
         // into a high-contrast flash when the preview toggle is enabled.
         var visualizerBlend = Math.min(1, elapsed * 9);
-        spectrum.alpha = FlxMath.lerp(spectrum.alpha, state.phiAudioVisible ? 0.15 : 0, visualizerBlend);
-        spectrumBottom.alpha = FlxMath.lerp(spectrumBottom.alpha, state.phiAudioVisible ? 0.045 : 0, visualizerBlend);
-        voicesSpectrum.alpha = FlxMath.lerp(voicesSpectrum.alpha, state.phiAudioVisible ? 0.17 : 0, visualizerBlend);
-        voicesSpectrumBottom.alpha = FlxMath.lerp(voicesSpectrumBottom.alpha, state.phiAudioVisible ? 0.045 : 0, visualizerBlend);
-        opponentSpectrum.alpha = FlxMath.lerp(opponentSpectrum.alpha, state.phiAudioVisible ? 0.17 : 0, visualizerBlend);
+        spectrum.alpha = FlxMath.lerp(spectrum.alpha, state.phiAudioVisible ? 0.30 : 0, visualizerBlend);
+        spectrumBottom.alpha = FlxMath.lerp(spectrumBottom.alpha, state.phiAudioVisible ? 0.10 : 0, visualizerBlend);
+        voicesSpectrum.alpha = FlxMath.lerp(voicesSpectrum.alpha, state.phiAudioVisible ? 0.30 : 0, visualizerBlend);
+        voicesSpectrumBottom.alpha = FlxMath.lerp(voicesSpectrumBottom.alpha, state.phiAudioVisible ? 0.10 : 0, visualizerBlend);
+        opponentSpectrum.alpha = FlxMath.lerp(opponentSpectrum.alpha, state.phiAudioVisible ? 0.30 : 0, visualizerBlend);
         voicesSpectrumBottom.x = voicesSpectrum.x;
-        opponentSpectrumBottom.alpha = FlxMath.lerp(opponentSpectrumBottom.alpha, state.phiAudioVisible ? 0.045 : 0, visualizerBlend);
+        opponentSpectrumBottom.alpha = FlxMath.lerp(opponentSpectrumBottom.alpha, state.phiAudioVisible ? 0.10 : 0, visualizerBlend);
+        opponentSpectrumBottom.x = opponentSpectrum.x;
         voicesSpectrumBottom.visible = voicesSpectrum.visible;
         opponentSpectrumBottom.visible = opponentSpectrum.visible;
         spectrum.stopUpdate = voicesSpectrum.stopUpdate = opponentSpectrum.stopUpdate = !state.phiAudioVisible;
@@ -559,6 +679,35 @@ class PhigrosFreeplayView extends FlxSpriteGroup
         {
             dirtyRows = false;
             var order = state.phiSongOrder; var index = order.indexOf(FreeplayState.curSelected);
+            var categoryList = state.phiIsModCategoryList();
+            var modMode = state.phiIsModMode();
+            var folders = categoryList ? state.phiModFolders() : [];
+            modBackPanel.visible = modBackLabel.visible = modMode && !categoryList;
+            for (panel in modPanels) panel.visible = false;
+            for (label in modLabels) label.visible = false;
+            if (categoryList) {
+                var visibleMods = Std.int(Math.min(rows.length, folders.length));
+                var modAnchor = Std.int(Math.min(2, Math.max(0, visibleMods - 1)));
+                for (slot in 0...rows.length) {
+                    var item = state.phiModScroll + slot;
+                    var row = rows[slot];
+                    row.visible = item < folders.length;
+                    if (row.visible) {
+                        var rowY:Float = 270 + (slot - modAnchor) * 52 + (slot > modAnchor ? 48 : 0);
+                        row.setMod(folders[item], state.phiModDisplayName(folders[item]),
+                            168 - (rowY - 270) * PhiPanel.SLOPE, rowY);
+                    }
+                }
+                emptyList.visible = folders.length == 0;
+                selectionBand.visible = selectionBadge.visible = selectionIcon.visible = false;
+                for (item in badgeNames) item.visible = false;
+                for (item in badgeValues) item.visible = false;
+                counter.text = StringTools.lpad(Std.string(Math.min(state.phiModScroll + 1, folders.length)), '0', 2)
+                    + ' / ' + StringTools.lpad(Std.string(folders.length), '0', 2) + ' ' + textFor('mods', '个模组', 'MODS');
+                setSortValue(state.phiSortLabel);
+                super.update(elapsed);
+                return;
+            }
             emptyList.visible = order.length == 0;
             play.alpha = order.length == 0 ? 0.4 : 1;
             var visibleCount = Std.int(Math.min(rows.length, order.length));
@@ -598,7 +747,7 @@ class PhigrosFreeplayView extends FlxSpriteGroup
             listScrollThumb.setPosition((35 + (548 - thumbOffset) * PhiPanel.SLOPE) * DENSITY, (130 + thumbOffset) * DENSITY);
             listScrollThumb.scale.y = thumbHeight * DENSITY / Math.cos(Math.PI / 12);
             counter.text = StringTools.lpad(Std.string(index + 1), '0', 2) + '  /  ' + StringTools.lpad(Std.string(order.length), '0', 2) + ' ' + textFor('tracks', '首曲目', 'TRACKS');
-            sortValue.text = state.phiSortLabel;
+            setSortValue(state.phiSortLabel);
         }
         var favorite = state.isPhiFavorite(FreeplayState.curSelected);
         if (favorite != lastFavorite) { lastFavorite = favorite; favoriteIcon.color = favorite ? 0xFFFFD54F : 0xFFBCC7D1; }
@@ -612,6 +761,8 @@ class PhigrosFreeplayView extends FlxSpriteGroup
         var interactionsEnabled = !state.stopAll && !state.searchButton.hasFocus;
         hoverPanel(play, 0xFFFFFFFF, 0xFFE1F3FF, elapsed, interactionsEnabled && state.phiSongOrder.length > 0);
         hoverPanel(back, 0xFF131C25, 0xFF293B4D, elapsed, interactionsEnabled);
+        hoverPanel(modBackPanel, 0xFF182330, 0xFF304A60, elapsed, interactionsEnabled && state.phiIsModMode());
+        for (panel in modPanels) hoverPanel(panel, 0xFF111821, 0xFF263849, elapsed, interactionsEnabled && state.phiIsModCategoryList());
         hoverPanel(pitchUp, 0xFF161B25, 0xFF354B63, elapsed, interactionsEnabled);
         hoverPanel(pitchDown, 0xFF161B25, 0xFF354B63, elapsed, interactionsEnabled);
         hoverPanel(favoritePanel, 0xFF0B1019, 0xFF354B63, elapsed, interactionsEnabled);
@@ -622,13 +773,47 @@ class PhigrosFreeplayView extends FlxSpriteGroup
         var selectedTab = recordMode.indexOf('DATE') == 0 ? 0 : recordMode.indexOf('SCORE') == 0 ? 1 : recordMode.indexOf('ACC') == 0 ? 2 : 3;
         for (i in 0...sortButtons.length) {
             var selected = i == selectedTab;
-            sortButtons[i].alpha = selected ? 1 : interactionsEnabled && sortButtons[i].contains(state.phiMouseX, state.phiMouseY) ? 0.18 : 0;
+            sortButtons[i].alpha = (selected ? 1 : interactionsEnabled && sortButtons[i].contains(state.phiMouseX, state.phiMouseY) ? 0.18 : 0)
+                * FlxMath.bound(recordAnimationProgress, 0, 1);
         }
         for (item in difficulties) {
             item.color = 0xFF465A71;
             item.alpha = interactionsEnabled && item.contains(state.phiMouseX, state.phiMouseY) ? 0.14 : 0;
         }
         for (row in rows) if (row.visible) row.setHovered(interactionsEnabled && row.hit(state.phiMouseX, state.phiMouseY));
+        var recordTrackTop = 390.0;
+        var recordTrackBottom = 685.0;
+        if (recordsVisible && recordAnimationProgress >= 0.98 && interactionsEnabled && FlxG.mouse.justPressed
+            && state.phiMouseY >= recordTrackTop && state.phiMouseY <= recordTrackBottom
+            && (state.phiMouseX >= recordScrollTrack.x && state.phiMouseX <= recordScrollTrack.x + recordScrollTrack.width
+                || (state.phiMouseX >= recordScrollThumb.x - 10 && state.phiMouseX <= recordScrollThumb.x + recordScrollThumb.width + 10
+                    && state.phiMouseY >= recordScrollThumb.y && state.phiMouseY <= recordScrollThumb.y + RECORD_THUMB_BASE_HEIGHT * recordScrollThumb.scale.y)))
+        {
+            recordDragging = true;
+            var thumbHeight = RECORD_THUMB_BASE_HEIGHT * recordScrollThumb.scale.y;
+            recordThumbGrab = state.phiMouseY >= recordScrollThumb.y && state.phiMouseY <= recordScrollThumb.y + thumbHeight
+                ? state.phiMouseY - recordScrollThumb.y : thumbHeight * 0.5;
+            dragMoved = true;
+        }
+        if (recordDragging && recordAnimationProgress >= 0.98 && FlxG.mouse.pressed)
+        {
+            var thumbH = RECORD_THUMB_BASE_HEIGHT * recordScrollThumb.scale.y;
+            var travel = 295 - thumbH;
+            state.setPhiReplayScrollRatio(travel <= 0 ? 0 : FlxMath.bound((state.phiMouseY - recordTrackTop - recordThumbGrab) / travel, 0, 1));
+        }
+        if (recordsVisible) {
+            updateRecordScroll(state.phiReplayCount(), state.replayPosiData, state.phiReplayMaxScroll());
+            var progress = FlxMath.bound(recordAnimationProgress, 0, 1);
+            for (i in 0...recordUiElements.length) {
+                var isSortButton = false;
+                for (button in sortButtons) if (recordUiElements[i] == button) { isSortButton = true; break; }
+                if (!isSortButton)
+                    recordUiElements[i].alpha = recordUiBaseAlpha[i] * progress;
+            }
+            state.replayMoveEvent();
+        }
+        recordModeButton.alpha = recordModeButton.contains(state.phiMouseX, state.phiMouseY) ? 1 : 0.88;
+        recordModeLabel.color = recordsVisible ? 0xFF98FFC0 : FlxColor.WHITE;
         var overProgress = interactionsEnabled && state.phiMouseX >= progressLeft && state.phiMouseX <= progressRight
             && Math.abs(state.phiMouseY - progress.y) < 18;
         progressThumb.color = overProgress || scrubbingProgress ? 0xFF9ADFFF : FlxColor.WHITE;
@@ -650,7 +835,7 @@ class PhigrosFreeplayView extends FlxSpriteGroup
             if (dragging && FlxG.mouse.pressed && Math.abs(state.phiMouseY - dragStartY) > 38)
             { state.stepPhiSong(state.phiMouseY < dragStartY ? 1 : -1); dragStartY = state.phiMouseY; dragMoved = true; }
         }
-        if (FlxG.mouse.justReleased) { dragging = false; scrollingThumb = false; }
+        if (FlxG.mouse.justReleased) { dragging = false; scrollingThumb = false; recordDragging = false; }
         super.update(elapsed);
     }
 
@@ -666,7 +851,9 @@ class PhigrosFreeplayView extends FlxSpriteGroup
 private class PhiSongRow extends FlxSpriteGroup
 {
     public var songId:Int = -1;
+    public var modFolder:Null<String>;
     var title:PhiMarqueeText;
+    var modTitle:PhiMarqueeText;
     var artist:PhiMarqueeText;
     var difficultySummary:FlxText;
     var scoreCaption:FlxText;
@@ -678,17 +865,19 @@ private class PhiSongRow extends FlxSpriteGroup
     public function new()
     {
         super();
-        title = new PhiMarqueeText(300); add(title);
+        title = new PhiMarqueeText(250); add(title);
+        modTitle = new PhiMarqueeText(370); add(modTitle);
         artist = new PhiMarqueeText(300); add(artist);
         difficultySummary = PhigrosFreeplayView.labelAt(20, 48, 300, '', 10, false, false, 0xFFCFD7DE); add(difficultySummary);
         scoreCaption = PhigrosFreeplayView.labelAt(232, 0, 90, PhigrosFreeplayView.textFor('bestScore', '最高分', 'Best score'), 11, false, true, 0xFFD6E0E5); add(scoreCaption);
         score = PhigrosFreeplayView.labelAt(232, 18, 90, '—', 15, false, true); add(score);
     }
-    public function setHovered(hovered:Bool):Void { title.color = hovered && !selected ? 0xFFB9E7FF : FlxColor.WHITE; }
+    public function setHovered(hovered:Bool):Void { title.color = modTitle.color = hovered && !selected ? 0xFFB9E7FF : FlxColor.WHITE; }
     public function setSong(state:FreeplayState, id:Int, active:Bool, px:Float, py:Float, direction:Int):Void
     {
         var replaced = songId != id;
-        songId = id; selected = active; targetX = (px - (active ? 5 : 0)) * 1.5; targetY = py * 1.5;
+        songId = id; modFolder = null; selected = active; targetX = (px - (active ? 5 : 0)) * 1.5; targetY = py * 1.5;
+        title.visible = true; modTitle.visible = false;
         if (!initialized || replaced) {
             x = targetX - direction * 52 * PhiPanel.SLOPE * 1.5;
             y = targetY + direction * 52 * 1.5;
@@ -709,6 +898,22 @@ private class PhiSongRow extends FlxSpriteGroup
         difficultySummary.setPosition(x + 20 * 1.5, y + (active ? 77 : 48) * 1.5);
         scoreCaption.setPosition(x + 232 * 1.5, y + (active ? 13 : 0) * 1.5);
         score.setPosition(x + 232 * 1.5, y + (active ? 32 : 18) * 1.5);
+        artist.visible = scoreCaption.visible = score.visible = true;
+        alpha = 1;
+    }
+    public function setMod(folder:String, displayName:String, px:Float, py:Float):Void
+    {
+        var replaced = modFolder != folder;
+        songId = -1; modFolder = folder; selected = false;
+        targetX = px * 1.5; targetY = py * 1.5;
+        if (!initialized || replaced) { x = targetX; y = targetY; initialized = true; }
+        var font = Paths.font(~/[^\x00-\x7F]/.match(displayName) ? 'Lang-ZH.ttf' : 'montserrat.ttf');
+        title.visible = false; modTitle.visible = true;
+        modTitle.setText(displayName, font, 33, FlxColor.WHITE);
+        artist.visible = false;
+        difficultySummary.visible = false;
+        scoreCaption.visible = score.visible = false;
+        modTitle.setPosition(x + 20 * 1.5, y);
         alpha = 1;
     }
     static function fitText(text:FlxText, preferred:Int, minimum:Int):Void {
@@ -723,7 +928,7 @@ private class PhiSongRow extends FlxSpriteGroup
         var blend = 1 - Math.exp(-elapsed * 30);
         x += (targetX - x) * blend; y += (targetY - y) * blend;
         super.update(elapsed);
-        clipRect = new FlxRect(0, 0, 372 * 1.5, (selected ? 95 : 49) * 1.5);
+        clipRect = new FlxRect(0, 0, (modFolder != null ? 400 : 402) * 1.5, (selected ? 95 : 49) * 1.5);
     }
 }
 

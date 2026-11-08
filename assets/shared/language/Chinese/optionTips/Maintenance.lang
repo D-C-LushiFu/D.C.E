@@ -18,3 +18,4 @@ filesCheck => 检查游戏是否丢失文件
 filesCheckNew => 检查游戏是否有有问题的文件
 storageFolder => 选择储存游戏数据的文件夹，切换后游戏将自动退出。
 adjustMobileEditorKeys => 开启后暂时隐藏各 Editor 默认移动端按键，并在外部浏览器窗口创建/删除/保存自定义按键；文件存 FuckYouDCEMobile 并按当前 Editor 命名（如 ChartEditorNewFuckingButtonMobile.json）
+enterOriginFunkin => 下次启动时退出 D.C.E. 并启动 Origin Funkin 前端。

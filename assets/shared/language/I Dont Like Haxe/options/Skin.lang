@@ -1,20 +1,20 @@
-Skin => 皮肤设置
+Skin => Skin / 皮肤设置
 
 
-Note => 箭头皮肤
+Note => Note / 箭头皮肤
 
-noteSkin => 类型
-noteRGB => 着色器
-noteColorSwap => 旧版着色器
-NotesSubState => 颜色设置
-NotesSubStateLegacy => 旧版颜色设置
+noteSkin => Note Skin / 类型
+noteRGB => Note RGB / 着色器
+noteColorSwap => Note HSV / 旧版着色器
+NotesSubState => Note Color Setup / 颜色设置
+NotesSubStateLegacy => Legacy Color Setup / 旧版颜色设置
 
-KeyboardViewerSubState => 键盘反馈设置
+KeyboardViewerSubState => Keyboard Feedback / 键盘反馈设置
 
 
-Splash => 溅射皮肤
+Splash => Splash / 溅射皮肤
 
-showSplash => 显示
-splashSkin => 类型
-splashRGB => 着色器
-splashAlpha => 透明度
+showSplash => Show Splash / 显示
+splashSkin => Splash Skin / 类型
+splashRGB => Splash RGB / 着色器
+splashAlpha => Splash Alpha / 透明度

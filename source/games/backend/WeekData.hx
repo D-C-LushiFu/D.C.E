@@ -12,6 +12,7 @@ typedef WeekFile =
 	var weekBackground:String;
 	var weekBefore:String;
 	var storyName:String;
+	@:optional var description:String;
 	var weekName:String;
 	var freeplayColor:Array<Int>;
 	var startUnlocked:Bool;
@@ -35,6 +36,7 @@ class WeekData
 	public var weekBackground:String;
 	public var weekBefore:String;
 	public var storyName:String;
+	public var description:String;
 	public var weekName:String;
 	public var freeplayColor:Array<Int>;
 	public var startUnlocked:Bool;

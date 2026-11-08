@@ -1,17 +1,17 @@
-Graphics => 图形设置
+Graphics => Graphics / 图形设置
 
 
-FPScounter => 数据显示
+FPScounter => FPS counter / 数据显示
 
-showFPS => 显示当前帧数
-showExtra => 显示更多性能数值
-rainbowFPS => 字体颜色跟随帧数进行变化
-memoryType => 运存展示数据类型
-fpsScale => FPS大小
-fpsDisplayMode => 切换性能计数器显示 TPS 或 FPS
+showFPS => Show your FPS / 显示当前帧数
+showExtra => Show more data / 显示更多性能数值
+rainbowFPS => Change color with FPS / 字体颜色跟随帧数进行变化
+memoryType => Memory showcase data / 运存展示数据类型
+fpsScale => Size / FPS大小
+fpsDisplayMode => Switches the performance counter between TPS and FPS / 切换性能计数器显示 TPS 或 FPS
 
 
-Watermark => 水印设置
+Watermark => Watermark / 水印设置
 
-showWatermark => 显示水印
-watermarkScale => 水印大小
+showWatermark => Visible / 显示水印
+watermarkScale => Scale / 水印大小

@@ -1,0 +1,162 @@
+# ===== Character Editor top menu (Adobe style) =====
+# ===== Menu titles =====
+menu_char => Character / 角色
+menu_anim => Animation / 动画
+menu_settings => Settings / 设置
+menu_ghost => Ghost / 外观
+menu_file => File / 文件
+menu_help => Help / 帮助
+
+# ===== Status bar =====
+status_character => Char: / 角色:
+status_anim => Anim: / 动画:
+status_offset => Offset: / 偏移:
+status_frame => Frame: / 帧:
+status_zoom => Zoom: / 缩放:
+
+# ===== Items: Character menu =====
+item_char_select => Character / 角色
+item_image => Image File / 图像文件
+item_reload_image => Reload Image / 重新加载图像
+item_health_icon => Health Icon / 血条图标
+item_get_icon_color => Get Icon Color / 获取图标颜色
+item_vocals => Vocals File Postfix / 人声文件后缀
+
+# ===== Items: Animation menu =====
+item_anim_select => Animation / 动画
+item_anim_name => Animation Name / 动画名称
+item_anim_symbol => Animation Symbol Name/Tag / 动画符号名/标签
+item_anim_fps => Framerate / 帧率
+item_anim_loop => Should it Loop? / 是否循环播放?
+item_anim_indices => ADVANCED - Animation Indices / 高级 - 动画帧索引
+item_anim_add_update => Add/Update / 添加/更新
+item_anim_remove => Remove / 删除
+
+# ===== Items: Settings menu =====
+item_playable => Playable Character / 可游玩角色
+item_flip_x => Flip X / 水平翻转
+item_no_aa => No Antialiasing / 关闭抗锯齿
+item_scale => Scale / 缩放
+item_sing_duration => Sing Animation Length / 唱歌动画时长
+item_pos_x => Position X / 位置 X
+item_pos_y => Position Y / 位置 Y
+item_cam_x => Camera X / 相机 X
+item_cam_y => Camera Y / 相机 Y
+
+# ===== Items: Ghost menu =====
+item_make_ghost => Make Ghost / 生成 Ghost 帧
+item_highlight_ghost => Highlight Ghost / 高亮 Ghost 帧
+
+# ===== Items: File menu =====
+item_save => Save Character / 保存角色
+item_load_template => Load Template / 加载模板
+item_reload_char => Reload Character / 重新加载角色
+
+# ===== Labels (LabelWidget left label) =====
+label_char_select => Character: / 角色:
+label_image => Image: / 图像:
+label_health_icon => Icon: / 图标:
+label_vocals => Vocals: / 人声:
+label_anim_select => Animation: / 动画:
+label_anim_name => Name: / 名称:
+label_anim_symbol => Symbol: / 符号:
+label_anim_fps => FPS: / 帧率:
+label_anim_indices => Indices: / 索引:
+label_scale => Scale: / 缩放:
+label_sing_duration => Sing Length: / 唱歌时长:
+label_pos_x => Pos X: / 位置 X:
+label_pos_y => Pos Y: / 位置 Y:
+label_cam_x => Cam X: / 相机 X:
+label_cam_y => Cam Y: / 相机 Y:
+label_ghost_alpha => Opacity: / 不透明度:
+label_health_r => Health R: / 血条 R:
+label_health_g => Health G: / 血条 G:
+label_health_b => Health B: / 血条 B:
+
+# ===== Help titles =====
+help_camera => CAMERA / 相机
+help_char => CHARACTER / 角色
+help_other => OTHER / 其他
+item_help_camera => CAMERA / 相机
+item_help_char => CHARACTER / 角色
+item_help_other => OTHER / 其他
+
+# ===== Help lines (menu + F1 screen) =====
+item_help_cam_zoom => E/Q - Camera Zoom In/Out / E/Q - 相机放大/缩小
+item_help_cam_move => J/K/L/I - Move Camera / J/K/L/I - 移动相机
+item_help_cam_reset => R - Reset Camera Zoom / R - 重置相机缩放
+item_help_char_ctrl_r => Ctrl + R - Reset Current Offset / Ctrl + R - 重置当前偏移
+item_help_char_ctrl_c => Ctrl + C - Copy Current Offset / Ctrl + C - 复制当前偏移
+item_help_char_ctrl_v => Ctrl + V - Paste Copied Offset on Current Animation / Ctrl + V - 粘贴偏移到当前动画
+item_help_char_ctrl_z => Ctrl + Z - Undo Last Paste or Reset / Ctrl + Z - 撤销上次粘贴或重置
+item_help_char_anim => W/S - Previous/Next Animation / W/S - 上一个/下一个动画
+item_help_char_replay => Space - Replay Animation / 空格 - 重播动画
+item_help_char_offset => Arrow Keys / Mouse Right-Drag - Move Offset / 方向键 / 鼠标右键拖拽 - 移动偏移
+item_help_char_offset_keys => Ctrl+C/V/R/Z/Y - Copy / Paste / Reset / Undo / Redo Offset, Ctrl+S - Save Character / Ctrl+C/V/R/Z/Y - 复制 / 粘贴 / 重置 / 撤销 / 重做偏移，Ctrl+S - 保存角色
+item_help_char_frame => A/D - Frame Advance (Back/Forward) / A/D - 逐帧前进/后退
+item_help_other_sil => F12 - Toggle Silhouettes / F12 - 显示/隐藏剪影
+item_help_other_shift => Hold Shift - Move Offsets 10x Faster & Camera 4x Faster / 按住 Shift - 偏移移动速度 x10，相机速度 x4
+item_help_other_ctrl => Hold Control - Move Camera 4x Slower / 按住 Control - 相机移动速度 x0.25
+item_help_other_help => F1 - Toggle This Help Screen / F1 - 切换帮助屏幕
+item_help_other_exit => ESC - Exit Character Editor / ESC - 退出角色编辑器
+
+# ===== Help lines (mobile) =====
+item_help_m_cam_zoom => X/Y - Camera Zoom In/Out / X/Y - 相机放大/缩小
+item_help_m_cam_reset => Z - Reset Camera Zoom / Z - 重置相机缩放
+item_help_m_char_reset => A - Reset Current Offset / A - 重置当前偏移
+item_help_m_char_anim => V/D - Previous/Next Animation / V/D - 上一个/下一个动画
+item_help_m_char_offset => Arrow Buttons - Move Offset / 方向按钮 - 移动偏移
+item_help_m_other_sil => S - Toggle Silhouettes / S - 显示/隐藏剪影
+item_help_m_other_shift => Hold C - Move Offsets 10x Faster & Camera 4x Faster / 按住 C - 偏移移动速度 x10，相机速度 x4
+
+# ===== Tips =====
+tip_help_f1 => Press F1 for Help / 按 F1 查看帮助
+tip_help_f => Press F for Help / 按 F 查看帮助
+
+# ===== Descriptions (hover hint) =====
+desc_char_select => Pick which character file to edit. The list is built from data/characterList.txt plus every characters/*.json found in loaded mods. / 选择要编辑的角色文件。列表来自 data/characterList.txt 以及已加载模组中的所有 characters/*.json。
+desc_image => The image/sprite sheet file used by this character (e.g. characters/BOYFRIEND). Reload Image re-reads it from disk. / 该角色使用的图像/精灵表文件（例如 characters/BOYFRIEND）。重新加载图像会从磁盘重新读取。
+desc_reload_image => Re-read the current image file from disk and rebuild all animations. Useful after editing the sprite sheet outside the editor. / 从磁盘重新读取当前图像文件并重建所有动画。在编辑器外修改过精灵表后使用。
+desc_health_icon => The health icon shown on the health bar in gameplay (e.g. bf, dad, gf). / 游戏内血条上显示的血条图标（例如 bf、dad、gf）。
+desc_get_icon_color => Sample the dominant color of the health icon and write it into the health bar RGB values. / 提取血条图标的主色，并写入血条 RGB 值。
+desc_vocals => Optional postfix for the character's vocal track file. Leave empty to use the default vocal file. / 角色人声轨文件的可选后缀。留空则使用默认人声文件。
+desc_anim_select => Pick an animation to edit its name, symbol/tag, framerate, loop flag and offsets. / 选择要编辑的动画，可修改其名称、符号/标签、帧率、循环标志和偏移。
+desc_anim_name => The animation name that appears in gameplay logic (e.g. singLEFT). Must match what the game requests. / 游戏逻辑中使用的动画名称（例如 singLEFT），必须与游戏请求的名称一致。
+desc_anim_symbol => The sprite tag/prefix inside the sprite sheet for this animation (e.g. BF NOTE LEFT0), or the symbol name for Animate atlases. / 精灵表中该动画的标签/前缀（例如 BF NOTE LEFT0），Animate 图集则填符号名。
+desc_anim_fps => Playback speed of the animation in frames per second. / 动画的播放速度（帧/秒）。
+desc_anim_loop => Whether the animation loops forever or plays once and stays on the last frame. / 动画是无限循环，还是播放一次后停在最后一帧。
+desc_anim_indices => ADVANCED: comma-separated list of specific frames to use for this animation. Leave empty to use the whole symbol. / 高级：逗号分隔的帧序号列表，指定该动画使用的具体帧。留空则使用整个符号。
+desc_anim_add_update => Add a new animation with the values above, or update the existing one with the same name. Offsets are kept on update. / 用上方数值添加新动画；若名称相同则更新现有动画。更新时保留偏移。
+desc_anim_remove => Delete the animation whose name is currently in the Animation Name field. / 删除"动画名称"字段中当前名称对应的动画。
+desc_playable => Whether this character is controlled by the player (BF side) or the opponent (Dad side). Toggles flip and position presets. / 该角色由玩家（BF 侧）还是对手（Dad 侧）控制。会切换翻转与默认站位。
+desc_flip_x => Mirrors the character sprite horizontally. Stored as flip_x in the JSON. / 水平镜像角色精灵。在 JSON 中保存为 flip_x。
+desc_no_aa => Disable antialiasing for this character (pixel-art style). Stored as no_antialiasing. / 为该角色关闭抗锯齿（像素风）。在 JSON 中保存为 no_antialiasing。
+desc_scale => Global scale multiplier applied to the character sprite. / 应用于角色精灵的全局缩放倍率。
+desc_sing_duration => How long (in beats) the character keeps the singing pose after a note before returning to idle. / 角色在音符后保持唱歌姿态多久（拍），然后回到 idle。
+desc_healthbar_colors => Health bar color, saved as healthbar_colors in the character JSON (each 0-255). R = red component, G = green component, B = blue component. Controls the color of the health bar and the health icon - or use "Get Icon Color" in the Character menu to sample it from the icon automatically. / 血条颜色（角色 JSON 中的 healthbar_colors，各分量 0-255）：R = 红色分量，G = 绿色分量，B = 蓝色分量。决定血条与血条图标的颜色，也可在【角色】菜单用"获取图标颜色"从图标自动提取。
+desc_pos_x => Stage position X offset added on top of the default opponent/player spot. / 在默认对手/玩家站位基础上叠加的舞台位置 X 偏移。
+desc_pos_y => Stage position Y offset added on top of the default opponent/player spot. / 在默认对手/玩家站位基础上叠加的舞台位置 Y 偏移。
+desc_cam_x => Camera follow X position relative to the character. / 相机跟随点相对角色的 X 位置。
+desc_cam_y => Camera follow Y position relative to the character. / 相机跟随点相对角色的 Y 位置。
+desc_make_ghost => Freeze a copy of the current animation frame as a ghost overlay, so you can compare poses while editing offsets. / 将当前动画帧冻结为半透明 Ghost 叠加层，方便编辑偏移时对比姿态。
+desc_highlight_ghost => Add a red tint offset to the ghost so it stands out from the real character. / 给 Ghost 叠加层添加红色偏移色调，使其与真实角色区分开。
+desc_ghost_alpha => Opacity of the ghost overlay (0 = invisible, 1 = fully opaque). / Ghost 叠加层的不透明度（0 = 完全透明，1 = 完全不透明）。
+desc_save => Write the current character data to a JSON file (opens the system save dialog). / 将当前角色数据写入 JSON 文件（弹出系统保存对话框）。
+desc_load_template => Replace everything with the default BF template (idle + 4 sing animations) to start over. / 用默认 BF 模板（idle + 4 个唱歌动画）替换全部内容，重新开始。
+desc_reload_char => Reload the current character from its JSON file, discarding unsaved changes. / 从 JSON 文件重新加载当前角色，丢弃未保存的修改。
+desc_help_camera => Camera controls. / 相机控制。
+desc_help_cam_zoom => Zoom the camera in/out. / 相机放大/缩小。
+desc_help_cam_move => Pan the camera around the stage. / 在舞台上平移相机。
+desc_help_cam_reset => Reset camera zoom back to 1x. / 将相机缩放重置为 1 倍。
+desc_help_char => Character controls. / 角色控制。
+desc_help_char_anim => Switch between animations. / 切换动画。
+desc_help_char_offset => Nudge the current animation's offset. / 微调当前动画的偏移。
+desc_help_char_offset_keys => Ctrl+C copy, Ctrl+V paste, Ctrl+R reset, Ctrl+Z undo, Ctrl+Y redo the current offset; Ctrl+S saves the character. / Ctrl+C 复制、Ctrl+V 粘贴、Ctrl+R 重置、Ctrl+Z 撤销、Ctrl+Y 重做当前偏移；Ctrl+S 保存角色。
+desc_help_char_replay => Replay the current animation from frame 0. / 从第 0 帧重播当前动画。
+desc_help_char_frame => Step through animation frames. / 逐帧步进动画。
+desc_help_other => Other controls. / 其他控制。
+desc_help_other_sil => Show/hide the stage silhouettes. / 显示/隐藏舞台剪影。
+desc_help_other_shift => Speed up offset and camera movement. / 加速偏移与相机移动。
+desc_help_other_ctrl => Slow down camera movement. / 降低相机移动速度。
+desc_help_other_help => Toggle this help screen. / 切换帮助屏幕。
+desc_help_other_exit => Leave the character editor. / 退出角色编辑器。

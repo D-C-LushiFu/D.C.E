@@ -11,3 +11,5 @@ holdBCancel => Segure B para Cancelar
 holdCDelete => Segure C para Excluir
 holdEscCancel => Segure ESC para Cancelar
 holdBackspaceDelete => Segure Backspace para Excluir
+
+modInfoEmptyDesc => Select a mod in the Mods menu to see its info here.

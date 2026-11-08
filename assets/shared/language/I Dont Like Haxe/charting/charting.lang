@@ -1,0 +1,260 @@
+charting => Charting / 谱面
+
+# ===== Menu titles =====
+menu_charting => Charting / 谱面
+menu_data => Data / 数据
+menu_event => Event / 事件
+menu_note => Note / 音符
+menu_section => Section / 小节
+menu_song => Song / 歌曲
+menu_test => Test / 测试
+menu_help => Help / 帮助
+
+# ===== Status bar =====
+status_zoom => Zoom: / 缩放:
+status_tempo =>
+status_section => Section: / 小节:
+status_beat => Beat: / 节拍:
+status_snap => Beat Snap: / 吸附:
+status_move => Move Note Mode: / 移动音符模式:
+status_move_on => True / 开启
+status_move_off => False / 关闭
+
+# ===== Event panel =====
+event_tag => EVENT / 事件
+event_value1 => Value 1 / 值 1
+event_value2 => Value 2 / 值 2
+
+# ===== Items: Charting menu =====
+item_metronome => Metronome / 节拍器
+item_autoscroll => Disable Autoscroll (Not Recommended) / 禁用自动滚动（不建议）
+item_bpm => BPM / BPM
+item_offset => Offset (ms) / 偏移 (ms)
+item_waveform_inst => Waveform - Instrumental / 波形图 器乐
+item_waveform_main => Waveform - Main Vocals / 波形图 主音
+item_waveform_opp => Waveform - Opp. Vocals / 波形图 对手音
+item_mute_inst => Mute Instrumental / 静音器乐
+item_mute_main => Mute Main Vocals / 静音主音
+item_mute_opp => Mute Opp. Vocals / 静音对手音
+item_vortex => Vortex Editor / Vortex 编辑器
+item_ignore_warnings => Ignore Progress Warnings / 忽略进度警告
+item_sfx_bf => Play Sound - BF Notes / 校对 BF 音符
+item_sfx_opp => Play Sound - Opp. Notes / 校对 对手音符
+
+# ===== Items: Data menu =====
+item_go_char => Game Over Character / 游戏结束角色
+item_go_sound => Death Sound / 死亡音效
+item_go_loop => Loop Music / 循环音乐
+item_go_end => Retry Music / 重试音乐
+item_no_rgb => Disable Note RGB / 禁用音符 RGB
+item_note_skin => Note Texture / 音符皮肤
+item_note_splash => Note Splashes / 音符溅射
+item_apply_notes => Apply Note Changes / 应用音符更改
+
+# ===== Items: Event menu =====
+item_event_type => Event Type / 事件类型
+item_value1 => Value 1 / 值 1
+item_value2 => Value 2 / 值 2
+item_add_event => Add Event / 添加事件
+item_del_event => Remove Event / 删除事件
+item_prev_event => Previous / 上一个
+item_next_event => Next / 下一个
+
+# ===== Items: Note menu =====
+item_sustain_len => Sustain Length (ms) / 持续时长 (ms)
+item_strum_time => Strum Time (ms) / 击打时间 (ms)
+item_note_type => Note Type / 音符类型
+
+# ===== Items: Section menu =====
+item_must_hit => Must Hit Section / 玩家小节
+item_gf_section => GF Section / GF 小节
+item_alt_anim => Alt Animation / 替身动画
+item_beats_per_section => Beats per Section / 每小节节拍
+item_change_bpm => Change BPM / 更改 BPM
+item_section_bpm => Section BPM / 小节 BPM
+item_copy_section => Copy Section / 复制小节
+item_paste_section => Paste Section / 粘贴小节
+item_clear_section => Clear / 清空小节
+item_swap_section => Swap Section / 交换小节
+item_do_copy_beat => Apply Copy / 执行复制
+item_undo => Undo Last Action / 撤销上一步
+item_include_notes => Notes / 包含音符
+item_include_events => Events / 包含事件
+item_duet_notes => Duet Notes / 二重奏音符
+item_mirror_notes => Mirror Notes / 镜像音符
+
+# ===== Items: Song menu =====
+item_song_title => Song Title / 歌曲名
+item_has_voice => Has Voice Track / 人声轨道
+item_save => Save / 保存
+item_reload_audio => Reload Audio / 重载音频
+item_reload_json => Reload JSON / 重载 JSON
+item_engine => Engine / 引擎
+item_load_autosave => Load Autosave / 载入自动保存
+item_load_events => Load Events / 载入事件
+item_save_events => Save Events / 保存事件
+item_clear_events => Clear Events / 清空事件
+item_clear_notes => Clear Notes / 清空音符
+item_speed => Speed / 速度
+item_mania => Mania / 键数
+item_opponent => Opponent / 对手
+item_girlfriend => Girlfriend / 女友
+item_player => Player / 玩家
+item_stage => Stage / 舞台
+
+# ===== Items: Test menu =====
+item_test_mode => Playtest / 以测试模式进行
+item_normal_mode => Play Normally / 以正常模式进行
+
+# ===== Descriptions (hover hint) =====
+desc_metronome => Plays a crisp metronome click on every beat (default 800Hz short tone) to help you lock down timing and spot drift. Turn it down in tandem with the mute toggles if the ticking gets annoying. / 打谱时按 BPM 周期发出清脆的节拍声（默认 800Hz 短音），帮助快速对齐节奏、检查节拍偏移；若觉得吵可配合试听静音一起关。
+desc_autoscroll => When off, the chart grid won't auto-follow the playhead. The whole song appears as one long scroll - great for large-scale arrangement tweaks, but definitely not for beginners. / 关闭后谱面不会自动跟随播放位置滚动，需要你手动滚动。这个选项会让整首谱面缩成一张完整的大图，方便整体调整，但是新手不推荐用。
+desc_bpm => Beats per minute. Drives every time-related calculation in the editor: grid cell size, metronome, waveform rendering, drag snapping, and playback ticks. If you change this, hit Reload JSON to double-check the grid. / 歌曲每分钟节拍数。这个值决定了网格里每一格是多少毫秒，也直接影响节拍器、波形显示、拖拽吸附等一切和时间相关的计算。改了以后建议「重载 JSON」确认效果。
+desc_offset => Audio output latency compensation (ms). Positive values push the entire chart later in time (handles BT headphone lag); negative values pull it earlier (fights oversampling / pre-trigger). A difference of +/-5ms is usually inaudible; at +/-20ms you'll clearly feel it. / 音频输出延迟补偿值，单位毫秒。正值把谱面整体往后挪（用来对齐慢一拍的耳机蓝牙延迟），负值把谱面整体往前挪（应对采样设备提前触发）。建议反复微调，±5ms 基本听不出来，±20ms 开始有影响。
+desc_waveform_inst => Overlay the instrumental track waveform (Inst.ogg) on the grid. Instrumental waveforms make kick / snare / bass hits visible at a glance - ideal for aligning drum-heavy charts. / 在谱面网格上叠加器乐轨道（Inst.ogg）的波形图。器乐波形能帮你快速找到鼓点、贝斯和底鼓落位，适合配鼓点的谱。
+desc_waveform_main => Overlay the main (player) vocal waveform. Pair with the instrumental to see how vocals line up against the beat. / 在谱面网格上叠加主音（玩家）演唱轨道的波形图。和器乐波形一起开时可以同时观察两者的节奏对齐。
+desc_waveform_opp => Overlay the opponent's vocal waveform (Vocals-dad / Vocals-mom / etc.). Useful for rap battles where the opponent has standalone verses. / 在谱面网格上叠加对手演唱轨道（Vocals-dad / Vocals-mom 等）的波形图。适合对手有独立人声段落（比如 rap battle）时使用。
+desc_mute_inst => Mute the instrumental (Inst.ogg) during playback so you can isolate vocals and check that every syllable is properly charted. / 试听时静音器乐（Inst.ogg），只听人声轨道。可以用来仔细检查人声段落的谱是否贴合每一个咬字。
+desc_mute_main => Mute the player's main vocal, leaving only instrumental + opponent vocals. Good for focusing on the opponent side of a battle without hearing BF cues. / 试听时静音主音玩家的演唱，只听器乐 + 对手音。适合需要同时盯对手谱又怕被玩家干扰的情况。
+desc_mute_opp => Mute the opponent vocal, leaving only instrumental + player vocal. Use for fine-grained inspection of the player's chart accuracy. / 试听时静音对手的演唱，只听器乐 + 玩家音。检查玩家谱面的细节精度时可以开。
+desc_vortex => Enable Vortex editor mode, which unlocks free editing across more than the default 4 lanes. Pick this for mania charts, dual-player charts, or non-standard lane counts. / 启用 Vortex 模式编辑器，可在更多轨道上自由编辑（默认 4K 之外），适合 Mania 模式、双人谱或非常规轨数的歌曲。
+desc_ignore_warnings => Suppress the red progress warnings (too few notes, zero notes, song length below the standard threshold, etc.). Only turn this on for micro-songs or short practice clips. / 关闭谱面进度相关的红色警告，包括：「音符数量偏少」「整首歌 0 音符」「歌曲时长短于标准谱」等。一般只在做 micro-song / 练习小片段时开。
+desc_sfx_bf => Play a sharp 'tick' sound each time you place a BF (player) note. Instantly tells you if the note attack sits on the beat; perfect for precise drum mapping. / 放置 BF（玩家）音符时播放一个「卡」的试听音，让你放音符时就知道音头踩不踩点，非常适合对鼓点做精准对位。
+desc_sfx_opp => Play a tick when placing opponent notes. Same benefit as above - turn it on when the opponent's rhythm diverges from the player's. / 放置对手音符时播放试听音，功能同上。当对手段落和玩家段落节奏不同步时建议开。
+desc_go_char => Character sprite shown on the Game Over screen. Must match the character table name (e.g., bf-pixel, bf, gf-pixel). Falls back to default BF if missing. / 游戏结束界面显示的角色精灵名称，和角色表中的对应，比如 bf-pixel、bf、gf-pixel。角色不存在会回退到默认 BF。
+desc_go_sound => Sound file played the instant the player dies (combo hits 0). Has to be registered in the metadata sounds list; unknown names are silently skipped. / 玩家死亡（连击归零）时立刻播放的音效文件名，要先在 metadata 的 sound 列表里注册，没注册的名字会静默不播放。
+desc_go_loop => Looping background music for the Game Over screen. Plays on repeat from the moment the player lands on the Game Over panel. / 游戏结束界面循环播放的背景乐。当玩家连击归零进入 Game Over 屏幕后，这首音乐从头开始循环播放。
+desc_go_end => Short end-music clip played right before the editor retries the song after Game Over. / 玩家选择「重试」时播放的收尾音乐，紧接在 Game Over 循环之后触发。
+desc_no_rgb => Disable per-note RGB tinting so every note uses its skin's original colors. Use this when the skin already comes with gradients or themed tints. Also gives a tiny performance boost. / 禁用每一个音符的单独 RGB 着色，统一使用音符皮肤原图中的本色。适合皮肤本身已经画好渐变或特定配色的情况，开了之后性能也会轻微提升。
+desc_note_skin => Base filename of the note textures, found under assets/shared/images/notes/. The engine automatically appends _left / _down / _up / _right. / 音符贴图资产文件名，位于 assets/shared/images/notes/ 目录。只需要填文件名（不含扩展名），引擎会自动加 _left/_down/_up/_right 后缀。
+desc_note_splash => Asset name for the note-hit splash effect. Splash files are transparent PNGs holding 4 small splash sprites; the engine picks one and randomly rotates it. / 音符击中时溅射效果的资产名。溅射一般是一张透明 PNG，里面放 4 张不同角度的小溅射图，引擎会按方向挑一张随机旋转。
+desc_apply_notes => Bulk-apply the current note skin / splash / no-RGB settings to every note that's already been placed in the chart. One click instead of patching each note by hand. / 把当前选择的音符皮肤 / 溅射 / 禁止 RGB 设置一次性应用到整首歌里已经放好的所有音符上，不用挨个改。改完皮肤直接按这个就行。
+desc_event_type => Choose the type of the current event. The description panel on the right updates with the precise meaning of Value 1 / Value 2, recommended ranges, and common patterns. / 选择当前事件的类型，右侧描述面板会跟着更新这个事件的具体用法、取值范围、常用示例。
+desc_event_info => Current event type and its description. Hover over the dropdown options above to preview each event's name and usage before picking one. / 当前事件类型及其说明：把鼠标悬停在上方下拉列表的选项上，就能预览每个事件的名字和用法，不用先点下去。
+desc_value1 => First parameter for the event. Its meaning changes per type: zoom amount for camera events, character name for animation events, property path for SetProperty. / 事件的第一个参数值，含义完全随事件类型变化：相机事件是缩放量，动画事件是角色名，属性事件是属性路径。
+desc_value2 => Second parameter for the event. Zoom events use it for HUD zoom; animation events take the animation id; sound events use it for volume. / 事件的第二个参数值，含义随事件类型变化：相机事件是 HUD 缩放，动画事件是动画名，声音事件是音量。
+desc_add_event => Insert a brand new event of the currently selected type at the playhead (that red vertical line), and auto-select it. / 在当前播放头（那条竖红线）的位置插入一个和当前类型一致的新事件，然后选中它。
+desc_del_event => Delete the currently selected event permanently. There's no undo, so hit Save before deleting anything important. / 删除当前已经选中的事件。删了就没了，不能撤销，删之前先「保存」一次。
+desc_prev_event => Move selection backward to the previous event in chronological order. / 把选中条从当前事件往前跳到时间更小的那一个。
+desc_next_event => Move selection forward to the next event in chronological order. / 把选中条从当前事件往后跳到时间更大的那一个。
+desc_sustain_len => Hold duration in milliseconds. Its length in beats depends on the current BPM: one beat is 60,000 / BPM ms. 0 gives you a short tap. / 当前音符的延音时长，单位为毫秒。占几拍由当前 BPM 决定：一拍为 60000 ÷ BPM 毫秒；0 为普通短音符。
+desc_strum_time => The exact millisecond moment (counted from song start) at which the note should be hit by the player. / 音符的击打时间（毫秒），即这个音符应该被玩家按下的精确时刻，从歌曲开头 0ms 起算。
+desc_note_type => Marks a note as special. Choices: None = normal, Alt Animation = uses the alt animation group, Hey! = plays the VO clip, Hurt Note = damages on hit, GF Sing = triggers GF sing, No Animation = silent visually. / 音符特殊类型：None = 普通，Alt Animation = 替身动画，Hey! = 播放配音，Hurt Note = 击中丢血，GF Sing = 让女友唱一声，No Animation = 不出动画。
+desc_must_hit => When ON this section is played by BF (the player); when OFF it's played by the opponent. Choose one per section, don't mix and match randomly. / 开启时本小节由玩家（BF）击打；关闭时由对手击打。每一个 Section 只能选一种，别乱混。
+desc_gf_section => When ON, girlfriend (GF) sings along during this section. Useful for bridges or choruses where you want to emphasize GF's presence. / 开启时本小节女友（GF）也加入演唱。适合在桥段（Bridge）或副歌时强调女友的参与感。
+desc_alt_anim => When ON, every character switches to the 'alt' animation set for this section (e.g., BF puts on sunglasses, GF strikes a new pose). / 开启时本小节所有角色自动切换到 alt（替身/替代）动画组，比如 BF 戴上墨镜、女友换姿势等。
+desc_beats_per_section => How many beats fit inside this section (default 4). Change to get weird time signatures: 3/4, 5/4, 7/8, etc. 4 beats is the overwhelming FNF standard. / 本小节的节拍数（默认 4）。改这个就能做 3/4、5/4、7/8 拍这种奇怪拍号的谱，但注意 4 拍是绝对主流，别为了炫技乱改。
+desc_change_bpm => When ON, this section uses the Section BPM value instead of the global song BPM. Use for mid-song tempo changes. / 开启后本小节使用独立的「小节 BPM」值，而不是全局 BPM。常用在歌曲中途提速 / 降速的桥段。
+desc_section_bpm => Independent BPM value for this section. Only active when 'Change BPM' is ON. Watch out for misaligned snaps when adjacent sections differ greatly. / 本小节独立 BPM 值，仅在「更改 BPM」开启时才会生效。如果和全局 BPM 差很多，注意前后两个小节交界处音符吸附会不会错位。
+desc_copy_section => Copy the entire current section (player notes + opponent notes + events) to the clipboard, respecting the 'Include Notes' / 'Include Events' toggles. / 复制当前小节的全部内容（玩家音符 + 对手音符 + 事件，视「包含音符 / 事件」勾选）到剪贴板。
+desc_paste_section => Paste whatever is in the clipboard as the new contents of the current section. Paste overwrites - so take a backup or save first. / 把剪贴板中的上一次小节内容完整粘贴到当前小节。粘贴会覆盖掉原来的内容，注意先备份。
+desc_clear_section => Wipe every note and event out of the current section. Fully destructive, non-reversible - save before clearing. / 清空当前小节的所有内容（音符、事件全没了）。这是 destructive 操作，无法撤销，记得先保存。
+desc_swap_section => Swap ownership (mustHit) plus arrow directions between the player and the opponent in this section - essentially mirroring the battle. / 把当前小节里玩家音符和对手音符交换位置（交换 mustHit 归属 + 左右箭头轨道），相当于把一段 Battle 对调。
+desc_copy_beat => Based on the current beat (N), a positive number copies the content of beat [N - value] straight into the current beat; a negative number does the opposite. Value 1 = one beat before, 2 = two beats before, etc. / 以当前节拍为基准（设 N），正数就是从 [N－数] 拍直接复制粘贴到当前节拍；负数反之。1 = 复制前一拍，2 = 复制前两拍，以此类推。
+desc_do_copy_beat => Run the copy using the offset above. The target beat's content (notes + events) overwrites the current beat, so make sure the value is what you want. / 按上方偏移量执行复制：把目标小节的内容（音符 + 事件）复制覆盖到当前小节。动手前先确认数值没错。
+desc_undo => Undo the most recent destructive operation (copy / paste / swap / copy beat / duet / mirror, etc.). Keeps up to 50 steps. Ctrl+Z works too. / 撤销最近一次破坏性操作（复制 / 粘贴 / 交换 / 复制节拍 / 二重奏 / 镜像等），最多保留 50 步。快捷键 Ctrl+Z 同样有效。
+desc_include_notes => Whether copy / paste / mirror / swap operations should touch notes. Turn off to manipulate only the event layer. / 执行复制 / 粘贴 / 镜像 / 交换 等操作时，是否把音符包含进去。关掉以后只会操作事件。
+desc_include_events => Whether copy / paste / mirror / swap operations should touch events. Turn off to manipulate only the note layer. / 执行复制 / 粘贴 / 镜像 / 交换 等操作时，是否把事件（相机、动画、属性等）包含进去。关掉以后只会操作音符。
+desc_duet_notes => Clone every note in this section so the player AND opponent strike identical notes simultaneously. Used for chorus duets. / 把当前小节的音符复制成二重奏：同一时间点玩家和对手都有同样的音符，适合做合唱段落。
+desc_mirror_notes => Horizontally mirror the current section: left <-> right arrows, down <-> up arrows. Mirrors direction only, not timing. / 把当前小节内的音符左右镜像，左 ↔ 右、下 ↔ 上 互换。镜像的是按键（箭头方向），不是时值。
+desc_song_title => Song title, which also doubles as the default lookup name for chart and audio files (sans extension). Stick to short English names for maximum sanity. / 歌曲标题，也是谱面文件、Inst/Vocals 音频的默认查找名（不含扩展名），所以别瞎写中文，改成英文短名最稳。
+desc_has_voice => Whether the song ships with a separate vocal track (Vocals.ogg / Vocals-dad.ogg / Vocals-mom.ogg). When OFF, the engine only tries to play Inst.ogg. / 歌曲是否包含独立的人声轨道（Vocals.ogg / Vocals-dad.ogg / Vocals-mom.ogg）。关掉后引擎会尝试只用 Inst.ogg 播放。
+desc_save => Save the current chart JSON to the charts/ directory using the song title as the filename. Press this early, press this often. Ctrl+S shortcut. / 保存当前谱面到 charts/ 目录。文件名默认就是「歌曲名.json」，改完谱先点一次再说别的。快捷键 Ctrl+S。
+desc_reload_audio => Re-read all song audio files from disk. Use this right after swapping Inst.ogg or Vocals.ogg externally - no need to restart the editor. / 重新从磁盘读取歌曲的音频文件。当你在外部替换了 Inst.ogg / Vocals.ogg 后点这个，不用重启编辑器。
+desc_reload_json => Reload the chart JSON file from disk. Use when you edited the JSON in a text editor and want the changes reflected, or to discard in-memory mistakes. / 重新从磁盘读取谱面的 JSON 文件。一般是你用记事本/外部编辑器改了 JSON 内容想刷到编辑器里来，或者因为误操作想回退时用。
+desc_engine => Switch engine version / compatibility mode. Different engines have slightly different note properties and event names; picking the right one here saves tons of compatibility headaches with older charts. / 切换编辑器引擎的版本号 / 兼容模式。不同引擎版本音符的属性、事件的名字可能不同，老谱导入新引擎时选对这个能省很多兼容性头疼事。
+desc_load_autosave => Load the editor's latest auto-saved chart from the autosave/ directory. This is your parachute after a crash or an unsaved bad edit. / 加载编辑器的自动保存谱面。编辑器每隔一段时间会把谱面写一份备份到 autosave/ 目录，意外崩溃了就靠这个救命。
+desc_load_events => Merge an event JSON file from the events/ folder into the current chart. Events are NOT de-duplicated on load - duplicates stack. / 从 events/ 文件夹加载一份 .json 事件文件并合并到当前谱里。事件不会自动去重，加载重复会叠好几层。
+desc_save_events => Export only the event list out of the current chart and save it to events/. Lets you share an event sequence (cameras, etc.) between multiple charts of the same song. / 把当前谱中所有的事件单独拎出来保存到 events/ 目录，方便和其他谱共享事件序列（比如同一首歌两套谱用相同相机）。
+desc_clear_events => Permanently erase every single event in the entire song (cameras, animations, SetProperty, sounds, the lot). No undo. Save first. Please. / 清空整首歌的所有事件（相机、动画、SetProperty、声音等全部没了）。这个操作 destructive，不能撤销，一定要先保存。
+desc_clear_notes => Permanently erase every note in the song - all characters, all lanes, all types. Leaves BPM, sections, and stage information intact so you can rewrite the chart cleanly. / 清空整首歌的所有音符（全角色、全轨道、全类型）。谱空了但歌曲、节拍、Section 结构还留着，想重写谱直接用这个就行。
+desc_speed => Playback speed multiplier (1.0 = original song speed). Only affects playback inside the editor; saved charts stay at 1.0. Use < 1.0 for detail inspection, > 1.0 for fast sanity passes. / 歌曲游玩的速度倍率（1.0 = 原速）。只在编辑器里试听时生效，不影响保存出去的真实谱。常用于放慢检查细节，或加速快速走完全曲。
+desc_mania => Mania lane count (2 - 9). Controls both the visual grid and the keybind layout. Vanilla FNF is 4K; changing this rerenders the grid with the chosen number of lanes. / Mania 键数（2 ~ 9），影响谱面布局、轨道数、对应键位。默认 FNF 是 4K，改了后网格会从 4 轨变成你选的轨数。
+desc_opponent => Sprite name of the opponent character. Folder must exist under assets/shared/images/. A missing name renders as a black placeholder. / 对手角色的精灵名，和 assets/shared/images/ 里的角色文件夹名保持一致，不存在会显示成占位黑块。
+desc_girlfriend => Sprite name of girlfriend. She decorates the middle of the stage and bops her head to the beat. / 女友角色的精灵名。女友一般站在双人中间当装饰，会根据节拍左右摇头。
+desc_player => Sprite name of the player character. Usually BF, but you can plug in any protagonist of your mod. / 玩家角色的精灵名。大多数谱默认是 BF，但 mod 里可以替换成你自己的主角。
+desc_stage => Name of the stage / background asset, matching a folder in assets/shared/images/stages/. A missing stage name leaves the background black. / 舞台背景名，对应 assets/shared/images/stages/ 里的文件夹名，不存在会显示黑色背景。
+desc_test_mode => Enter EditorPlayState test mode: overlays stay on, judgement leniency is relaxed, and you can press Esc to drop back into the editor without dying. For quick chart walkthroughs. / 进入 EditorPlayState 试玩模式：保留编辑器辅助信息（节拍器、播放头位置、事件高亮），按键不会真的判定死，用来快速走谱。按 Esc 可以从这里返回编辑器。
+desc_normal_mode => Launch the normal PlayState from the current playhead. Full real judgement, real combo, real Game Over. Choose this if you actually want to play-test the chart for real. Enter shortcut. / 以正常游玩模式从当前播放头位置开始（PlayState）：正常判定、正常连击、正常死 Game Over。想真的打一遍谱就选这个，Enter 快捷键。
+
+# ===== Items: Help menu =====
+item_help_nav => Navigation / 导航操作
+item_help_nav_ws => W / S or Mouse Wheel - Move playhead up/down / W / S 或 鼠标滚轮 - 上下移动播放头
+item_help_nav_ad => A / D - Previous / Next section / A / D - 切换上一个 / 下一个小节
+item_help_nav_lr => ← / → - Adjust snap precision / ← / → - 调整吸附精度
+item_help_note => Note Operations / 音符操作
+item_help_note_add => Left Click - Add note at cursor position / 鼠标左键 - 在当前位置添加音符
+item_help_note_move => Right Click Hold - Drag to move note / 鼠标右键按住 - 拖拽移动音符
+item_help_note_del => Left Click on existing note - Delete / 鼠标左键点击已有音符 - 删除
+item_help_note_sus => Q / E - Shorten / Lengthen note sustain / Q / E - 缩短 / 延长音符持续长度
+item_help_play => Playback Control / 播放控制
+item_help_play_test => Esc - Test mode playthrough / Esc - 测试模式试玩
+item_help_play_norm => Enter - Normal mode playthrough / Enter - 正常模式游玩
+item_help_play_stop => Space - Pause / Resume playback / 空格 - 暂停 / 继续播放
+item_help_play_zoom => Z / X - Zoom in / out / Z / X - 放大 / 缩小
+item_help_edit => Edit Operations / 编辑操作
+item_help_edit_undo => Ctrl+Z - Undo / Ctrl+Z - 撤销
+item_help_edit_save => Ctrl+S - Save current chart / Ctrl+S - 保存当前谱面
+item_help_edit_section => Tab / Shift+Tab - Switch to next / previous panel / Tab / Shift+Tab - 切换到下一个 / 上一个功能面板
+
+# ===== Item labels (for labeled controls) =====
+label_bpm => BPM: / BPM:
+label_offset => Offset (ms): / 偏移 (ms):
+label_inst_vol => Inst Volume: / 器乐音量:
+label_voices_vol => Main Vol: / 主音音量:
+label_voices_opp_vol => Opp Vol: / 对手音量:
+label_go_char => End Character: / 结束角色:
+label_go_sound => Death Sound: / 死亡音效:
+label_go_loop => Loop Music: / 循环音乐:
+label_go_end => Retry Music: / 重试音乐:
+label_note_skin => Note Skin: / 音符皮肤:
+label_note_splash => Note Splash: / 音符溅射:
+label_event_type => Event Type: / 事件类型:
+label_value1 => Value 1: / 值 1:
+label_value2 => Value 2: / 值 2:
+label_sustain_len => Sustain Length (ms): / 持续时长 (ms):
+label_strum_time => Strum Time: / 击打时间:
+label_note_type => Note Type: / 音符类型:
+label_beats => Beats/Section: / 当前小节节拍:
+label_section_bpm => Section BPM: / 小节 BPM:
+label_copy_beat => Copy Beat: / 复制节拍:
+label_song_title => Song Title: / 歌曲名:
+label_song_bpm => BPM: / BPM:
+label_song_speed => Speed: / 速度:
+label_song_mania => Mania: / 键数:
+label_stage => Stage: / 舞台:
+label_player1 => Player: / 玩家:
+label_gf => Girlfriend: / 女友:
+label_player2 => Opponent: / 对手:
+
+# ===== Confirm prompts (destructive actions) =====
+prompt_paste_section => Paste clipboard into current section?\nThis will overwrite the current section. / 把剪贴板内容粘贴到当前小节？\n这会覆盖当前小节。
+prompt_clear_section => Clear all notes & events of the current section? / 清空当前小节的所有音符和事件？
+prompt_swap_section => Swap the player's and opponent's notes in this section? / 把当前小节里玩家音符和对手音符对调？
+prompt_copy_beat => Copy the target beat and overwrite the current section? / 复制目标节拍并覆盖当前小节？
+prompt_duet_notes => Balance this section's two sides?\nCopy the notes of the fuller side to the emptier side. / 平衡本小节两侧音符？\n把音符多的一侧复制到少的一侧。
+prompt_mirror_notes => Mirror every note of this section? / 镜像本小节的所有音符？
+item_history => History / 历史记录
+desc_history => View and jump through the chart editing history / 查看并跳转到编谱器的编辑历史
+item_redo => Redo / 重做上一步
+desc_redo => Redo the most recently undone edit / 重做最近撤销的编辑
+history_title => Edit History / 编辑历史
+history_undo => Undo  Ctrl+Z / 撤销  Ctrl+Z
+history_redo => Redo  Ctrl+Y / 重做  Ctrl+Y
+history_opened_chart => Opened chart / 打开谱面
+history_add_item => Added note or event / 添加音符或事件
+history_delete_item => Deleted note or event / 删除音符或事件
+history_edit_chart => Edited chart data / 编辑谱面数据
+history_apply_note_skin => Applied note type / 应用音符类型
+history_paste_section => Pasted section / 粘贴小节
+history_clear_section => Cleared section / 清空小节
+history_swap_sides => Swapped note sides / 交换音符双方
+history_copy_section => Copied previous section / 复制上一小节
+history_copy_beat => Copied beat / 复制节拍
+history_duet => Balanced note sides / 平衡双方音符
+history_mirror => Mirrored notes / 镜像音符
+history_clear_events => Cleared events / 清空事件
+history_clear_notes => Cleared notes / 清空音符
+history_change_sustain => Changed sustain length / 修改持续音长度
+history_load_events => Loaded events / 载入事件
+history_load_autosave => Loaded autosave / 载入自动保存

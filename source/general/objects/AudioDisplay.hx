@@ -422,15 +422,18 @@ class AudioDisplay extends FlxSprite
 	}
 
 	/**
-	 * Supplies decoded PCM for players such as hxvlc whose placeholder
-	 * SoundChannel does not expose a Lime AudioSource. The buffer is used only
-	 * for FFT sampling; playback time still comes from FlxG.sound.music.
+	 * Supplies compact decoded PCM for streamed previews whose Lime source has
+	 * no retained sample data. The buffer is used only for FFT sampling;
+	 * playback time still comes from the active FlxSound.
 	 */
-	public function changeAudioBuffer(buffer:AudioBuffer):Void
+	public function changeAudioBuffer(buffer:AudioBuffer, ?player:FlxSound):Void
 	{
 		invalidateAnalyzerBinding();
 		releaseExternalAudioBuffer();
 		useExternalAudioSource = true;
+		// Freeplay creates its view before the preview sound exists. Keep the
+		// analysis clock tied to the newly installed player, not that old handle.
+		if (player != null) this.snd = player;
 
 		if (buffer != null && buffer.data != null && buffer.data.length > 0)
 		{
@@ -444,8 +447,8 @@ class AudioDisplay extends FlxSprite
 		refreshAnalyzerBinding();
 		if (analyzer != null && externalAudioBuffer != null)
 		{
-			// A VLC preview has no OpenAL clock. Sample decoded PCM at the real
-			// FlxSound playback position instead of the analysis-only source's 0ms.
+			// The analysis-only source has no OpenAL playback clock. Sample decoded
+			// PCM at the real FlxSound position instead of repeatedly reading frame 0.
 			@:privateAccess analyzer.audioClip = new PreviewAnalysisClip(externalAudioBuffer, snd);
 			analyzer.updateIntervalMs = 8;
 		}
@@ -483,16 +486,20 @@ private class PreviewAnalysisClip implements funkin.vis.AudioClip
 	public var source:Dynamic;
 	public var currentFrame(get, never):Int;
 	var player:FlxSound;
+	var sourceBuffer:AudioBuffer;
 	var duration:Float;
 	public function new(buffer:AudioBuffer, player:FlxSound)
 	{
 		this.player = player;
+		sourceBuffer = buffer;
 		audioBuffer = new funkin.vis.AudioBuffer(cast buffer.data, buffer.sampleRate);
 		source = buffer.src;
 		duration = buffer.data.length / (buffer.channels * buffer.bitsPerSample / 8) / buffer.sampleRate * 1000;
 	}
 	function get_currentFrame():Int
 	{
-		return player == null || duration <= 0 ? 0 : Std.int(audioBuffer.data.length * FlxMath.bound(player.time / duration, 0, 1));
+		// SpectralAnalyzer slices AudioBuffer.data as UInt8Array, so its cursor
+		// is a byte offset even though funkin.vis exposes a UInt16Array view.
+		return player == null || duration <= 0 ? 0 : Std.int(sourceBuffer.data.length * FlxMath.bound(player.time / duration, 0, 1));
 	}
 }

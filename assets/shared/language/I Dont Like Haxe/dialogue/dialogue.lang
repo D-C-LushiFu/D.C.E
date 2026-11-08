@@ -1,0 +1,83 @@
+# ===== Dialogue Editor top menu (Adobe style) =====
+# ===== Menu titles =====
+menu_line => Line / 对白行
+menu_char => Character / 角色
+menu_text => Text / 文本
+menu_file => File / 文件
+menu_help => Help / 帮助
+
+# ===== Status bar =====
+status_line => Line: / 行:
+status_char => Char: / 角色:
+status_anim => Anim: / 动画:
+status_speed => Speed: / 语速:
+
+# ===== Items: Line menu =====
+item_prev_line => Previous line / 上一条对白
+item_next_line => Next line / 下一条对白
+item_add_line => Insert new line after current / 在当前行后插入新行
+item_remove_line => Delete current line / 删除当前行
+
+# ===== Items: Character menu =====
+item_char => Character file / 角色文件
+label_char => Character file / 角色文件
+item_angry => Angry bubble / 生气气泡
+label_angry => Angry bubble / 生气气泡
+item_speed => Type speed (sec/char) / 打字速度（秒/字）
+label_speed => Type speed / 打字速度
+item_sound => Type sound / 打字音效
+label_sound => Type sound / 打字音效
+item_replay_text => Replay current line text / 重播当前对白文字
+item_prev_anim => Previous expression / 上一个表情
+item_next_anim => Next expression / 下一个表情
+
+# ===== Items: Text menu =====
+item_text => Dialogue text / 对白文本
+label_text => Dialogue text / 对白文本
+
+# ===== Items: File menu =====
+item_load => Load dialogue (JSON) / 载入对白（JSON）
+item_save => Save dialogue (JSON) / 保存对白（JSON）
+item_exit => Exit editor / 退出编辑器
+
+# ===== Descriptions (hover row footer) =====
+desc_prev_line => Switch to the previous dialogue line / 切换到上一条对白行
+desc_next_line => Switch to the next dialogue line / 切换到下一条对白行
+desc_add_line => Insert a new dialogue line after the selected one and select it / 在当前选中行之后插入一条新对白并选中
+desc_remove_line => Delete the currently selected dialogue line / 删除当前选中的对白行
+desc_char => Character JSON file used for the portrait (under images/dialogue/) / 对话立绘对应的角色 JSON 文件名（images/dialogue/ 下）
+desc_angry => Use the red "angry" speech bubble style for this line / 该行使用红色“生气”气泡样式
+desc_speed => Type speed: smaller values type faster (sec/char) / 打字速度：数值越小打得越快（秒/字）
+desc_sound => Type sound file name (under sounds/, empty uses default) / 打字音效文件名（sounds/ 下，留空用默认）
+desc_text => The dialogue text shown for this line (Shift+Enter adds a line break) / 该行显示的对白文本（支持 Shift+Enter 换行）
+desc_replay_text => Replay the typing animation of the current line text / 重新播放当前行文字的打字动画
+desc_prev_anim => Switch to the previous expression animation / 切换到上一个表情动画
+desc_next_anim => Switch to the next expression animation / 切换到下一个表情动画
+desc_load => Load a dialogue JSON file from disk / 从磁盘载入一个 dialogue JSON 文件
+desc_save => Save the current dialogue as a dialogue JSON file / 把当前对白保存为 dialogue JSON 文件
+desc_exit => Exit the dialogue editor and return to the master editor menu (confirms when unsaved changes exist) / 退出对话编辑器，返回主编辑器菜单（有未保存修改时先确认）
+
+# ===== Help (read-only text rows) =====
+item_help_nav => Previous/next line: A / D / 上/下一条对白：A / D
+item_help_anims => Previous/next expression: W / S / 上/下一个表情：W / S
+item_help_replay => Replay text: SPACE / 重播文字：SPACE
+item_help_f1 => Open this help menu: F1 / 打开本帮助菜单：F1
+item_help_exit => Exit editor: ESC / 退出编辑器：ESC
+
+# ===== Help row descriptions =====
+desc_help_nav => Previous/next line: A / D / 上/下一条对白：A / D
+desc_help_anims => Previous/next expression: W / S / 上/下一个表情：W / S
+desc_help_replay => Replay current line text: SPACE / 重播当前行文字：SPACE
+desc_help_f1 => Open this help menu: F1 / 打开本帮助菜单：F1
+desc_help_exit => Exit editor: ESC (confirms when unsaved changes exist) / 退出编辑器：ESC（有未保存修改时先确认）
+
+# ===== Exit confirmation popup (overrides the shared keys in the editors group) =====
+confirm_unsaved_title => Exit Dialogue Editor / 退出对话编辑器
+confirm_unsaved_message => This dialogue has unsaved changes. Those lines will be lost if you exit. Discard them and exit? / 当前对白还有未保存的修改，退出后这些对白行将会丢失。确定要放弃修改并退出吗？
+
+item_duplicate_line => Duplicate line / 复制当前对白行
+desc_duplicate_line => Copy this line and all its properties below it / 复制当前对白及其全部属性，并插入下一行
+item_move_line_up => Move line up / 将当前行上移
+desc_move_line_up => Move the current dialogue line earlier / 将当前对白向前移动一行
+item_move_line_down => Move line down / 将当前行下移
+desc_move_line_down => Move the current dialogue line later / 将当前对白向后移动一行

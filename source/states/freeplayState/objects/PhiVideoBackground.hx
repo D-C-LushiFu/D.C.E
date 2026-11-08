@@ -12,6 +12,9 @@ class PhiVideoBackground extends FlxVideoSprite
         antialiasing = true;
         shader = new PhiMonochromeShader();
         alpha = 0.55;
+        // Do not composite the decoder's initial black surface over the
+        // Freeplay artwork while VLC is opening the file / waiting for frame 1.
+        visible = false;
         bitmap.volumeAdjust = 0;
         bitmap.onFormatSetup.add(fitBackground);
         bitmap.onEncounteredError.add(reportError);
@@ -33,6 +36,7 @@ class PhiVideoBackground extends FlxVideoSprite
         setGraphicSize(Math.ceil(bitmap.bitmapData.width * factor), Math.ceil(bitmap.bitmapData.height * factor));
         updateHitbox();
         setPosition((1920 - width) / 2, (1080 - height) / 2);
+        visible = true;
     }
 
     function reportError(message:String):Void { trace('FREEPLAY BACKGROUND: ' + message); }
