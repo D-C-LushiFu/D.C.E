@@ -12,6 +12,7 @@ on:
         default: ''
 
 permissions:
+  actions: read
   contents: write
 
 jobs:
@@ -100,27 +101,29 @@ jobs:
             git push
           fi
           
-  mobile-build:
-    name: "Mobile Build (macOS 14)"
-    needs: update-versions
-    uses: ./.github/workflows/MobileBuild.yml
-    with:
-      dependencies_to_update: 'all'
-      build_ios: false
-    secrets: inherit
-
   releaser:
     name: "Create Release"
-    needs: [update-versions, mobile-build]
+    needs: [update-versions]
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: write
     steps:
-      - name: Download Android Build
+      - name: Download Linux Build
         uses: actions/download-artifact@v4
         with:
-          name: androidBuild
+          name: LinuxBuild
           path: artifacts/
+          run-id: 42493102795
+          github-token: ${{ github.token }}
+
+      - name: Download iOS Build
+        uses: actions/download-artifact@v4
+        with:
+          name: iOSBuild
+          path: artifacts/
+          run-id: 42493102795
+          github-token: ${{ github.token }}
 
       - name: List downloaded artifacts
         run: |
@@ -140,6 +143,8 @@ jobs:
 
             This release focuses on a refreshed StoryMode experience.
 
+            Linux and iOS packages are included in this first update. The Android package will be added when its build finishes.
+
             ### What's new
             - Redesigned the StoryMode week selection screen with opponent themed gradient backgrounds and smoother transitions.
             - Added a clearer track list with per song scores, grades, and week score details.
@@ -155,6 +160,8 @@ jobs:
             ## Beta1.1 — StoryMode 更新
 
             本次更新以 StoryMode 为主，重新整理了周目选择界面与曲目浏览体验。
+
+            本次先提供 Linux 和 iOS 包；Android 包将在构建完成后补充。
 
             ### 新增与改进
             - StoryMode 周目选择界面改版，加入与对手主题对应的渐变背景和更顺畅的切换效果。
