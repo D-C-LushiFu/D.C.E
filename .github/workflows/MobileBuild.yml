@@ -53,7 +53,7 @@ jobs:
           haxe-version: 4.3.7
 
       - name: Restore private GameAnalytics
-        if: github.repository == 'D-C-LushiFu/Different-Creatingness-Engine' && github.event_name != 'pull_request_target' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        if: github.repository == 'D-C-LushiFu/Different-Creatingness-Engine' && github.ref_type != 'tag' && github.event_name != 'pull_request_target' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         shell: pwsh
         env:
           NOVA_GA_IMPL_B64: ${{ secrets.NOVA_GA_IMPL_B64 }}
@@ -215,7 +215,7 @@ jobs:
           haxe-version: 4.3.7
 
       - name: Restore private GameAnalytics
-        if: github.repository == 'D-C-LushiFu/Different-Creatingness-Engine' && github.event_name != 'pull_request_target' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        if: github.repository == 'D-C-LushiFu/Different-Creatingness-Engine' && github.ref_type != 'tag' && github.event_name != 'pull_request_target' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         shell: pwsh
         env:
           NOVA_GA_IMPL_B64: ${{ secrets.NOVA_GA_IMPL_B64 }}
